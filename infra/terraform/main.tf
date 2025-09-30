@@ -95,27 +95,28 @@ resource "aws_ecr_repository" "backend" {
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 
-  lifecycle_policy {
-    policy = jsonencode({
-      rules = [
-        {
-          rulePriority = 1,
-          description  = "Retain last 10 images",
-          selection = {
-            tagStatus     = "any",
-            countType     = "imageCountMoreThan",
-            countNumber   = 10,
-            countUnit     = "images"
-          },
-          action = { type = "expire" }
-        }
-      ]
-    })
-  }
-
   tags = {
     Project = var.project_name
   }
+}
+
+resource "aws_ecr_lifecycle_policy" "backend" {
+  repository = aws_ecr_repository.backend.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1,
+        description  = "Retain last 10 images",
+        selection = {
+          tagStatus   = "any",
+          countType   = "imageCountMoreThan",
+          countNumber = 10
+        },
+        action = { type = "expire" }
+      }
+    ]
+  })
 }
 
 locals {
@@ -322,9 +323,8 @@ resource "aws_elasticache_subnet_group" "redis" {
 }
 
 resource "aws_elasticache_replication_group" "redis" {
-  description                = "Redis for ${var.project_name} analytics"
+  description            = "Redis for ${var.project_name} analytics"
   replication_group_id          = "${var.project_name}-redis"
-  replication_group_description = "Redis for ${var.project_name} analytics"
   engine                        = "redis"
   engine_version                = "7.1"
   node_type                     = var.redis_node_type
