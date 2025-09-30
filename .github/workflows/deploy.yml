@@ -120,9 +120,6 @@ jobs:
       - run: npm run build
         working-directory: frontend
 
-      - name: Upload frontend to S3
-        run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
-
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
 
@@ -146,3 +143,6 @@ jobs:
           TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
           TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
         run: terraform apply -auto-approve
+
+      - name: Upload frontend to S3
+        run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete

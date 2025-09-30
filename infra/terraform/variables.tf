@@ -55,3 +55,9 @@ variable "desired_count" {
   type        = number
   default     = 1
 }
+
+variable "redis_node_type" {
+  description = "ElastiCache node instance class"
+  type        = string
+  default     = "cache.t4g.micro"
+}

@@ -289,6 +289,53 @@ resource "aws_ecs_task_definition" "backend" {
   ])
 }
 
+
+resource "aws_security_group" "redis" {
+  name   = "${var.project_name}-redis-sg"
+  vpc_id = data.aws_vpc.default.id
+
+  ingress {
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs_tasks.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_elasticache_subnet_group" "redis" {
+  name       = "${var.project_name}-redis-subnets"
+  subnet_ids = local.public_subnet_ids
+}
+
+resource "aws_elasticache_replication_group" "redis" {
+  replication_group_id          = "${var.project_name}-redis"
+  replication_group_description = "Redis for ${var.project_name} analytics"
+  engine                        = "redis"
+  engine_version                = "7.1"
+  node_type                     = var.redis_node_type
+  port                          = 6379
+  parameter_group_name          = "default.redis7"
+  automatic_failover_enabled    = false
+  at_rest_encryption_enabled    = true
+  transit_encryption_enabled    = true
+  num_cache_clusters            = 1
+
+  subnet_group_name       = aws_elasticache_subnet_group.redis.name
+  security_group_ids      = [aws_security_group.redis.id]
+  preferred_cache_cluster_azs = [data.aws_subnets.selected.ids[0]]
+
+  lifecycle {
+    ignore_changes = [ engine_version ]
+  }
+}
+
 resource "aws_ecs_service" "backend" {
   name            = "${var.project_name}-service"
   cluster         = aws_ecs_cluster.main.id
