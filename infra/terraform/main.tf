@@ -59,13 +59,20 @@ resource "aws_s3_bucket" "frontend" {
   bucket        = var.frontend_bucket_name
   force_destroy = true
 
-  website {
-    index_document = "index.html"
-    error_document = "index.html"
-  }
-
   tags = {
     Project = var.project_name
+  }
+}
+
+resource "aws_s3_bucket_website_configuration" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+
+  index_document {
+    suffix = "index.html"
+  }
+
+  error_document {
+    key = "index.html"
   }
 }
 
@@ -315,6 +322,7 @@ resource "aws_elasticache_subnet_group" "redis" {
 }
 
 resource "aws_elasticache_replication_group" "redis" {
+  description                = "Redis for ${var.project_name} analytics"
   replication_group_id          = "${var.project_name}-redis"
   replication_group_description = "Redis for ${var.project_name} analytics"
   engine                        = "redis"
@@ -322,19 +330,19 @@ resource "aws_elasticache_replication_group" "redis" {
   node_type                     = var.redis_node_type
   port                          = 6379
   parameter_group_name          = "default.redis7"
-  automatic_failover_enabled    = false
-  at_rest_encryption_enabled    = true
-  transit_encryption_enabled    = true
-  num_cache_clusters            = 1
+  automatic_failover_enabled = false
+  at_rest_encryption_enabled = true
+  transit_encryption_enabled = true
+  num_cache_clusters         = 1
 
-  subnet_group_name       = aws_elasticache_subnet_group.redis.name
-  security_group_ids      = [aws_security_group.redis.id]
-  preferred_cache_cluster_azs = [data.aws_subnets.selected.ids[0]]
+  subnet_group_name  = aws_elasticache_subnet_group.redis.name
+  security_group_ids = [aws_security_group.redis.id]
 
   lifecycle {
-    ignore_changes = [ engine_version ]
+    ignore_changes = [engine_version]
   }
 }
+
 
 resource "aws_ecs_service" "backend" {
   name            = "${var.project_name}-service"
