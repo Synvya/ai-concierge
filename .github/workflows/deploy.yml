@@ -1,0 +1,146 @@
+name: ci-cd
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: ai-concierge-deploy
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  PROJECT_NAME: ai-concierge
+  ECR_REPOSITORY: ai-concierge-backend
+  FRONTEND_BUCKET: ${{ secrets.FRONTEND_BUCKET }}
+  ANALYTICS_BUCKET: ${{ secrets.ANALYTICS_BUCKET }}
+  TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+  TF_STATE_KEY: ai-concierge/terraform.tfstate
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pytest-asyncio httpx
+
+      - name: Run backend tests
+        working-directory: backend
+        run: pytest
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Type check frontend
+        working-directory: frontend
+        run: npm run typecheck
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build backend image
+        working-directory: backend
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          IMAGE_URI=${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}
+          docker build -t ${IMAGE_URI} -t ${REGISTRY}/${ECR_REPOSITORY}:latest .
+          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
+
+      - name: Push backend image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker push ${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}
+          docker push ${REGISTRY}/${ECR_REPOSITORY}:latest
+
+      - name: Emit image output
+        id: image
+        run: echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+
+    outputs:
+      image_uri: ${{ steps.image.outputs.image_uri }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+      - name: Upload frontend to S3
+        run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}"
+
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
+          TF_VAR_backend_image: ${{ needs.build.outputs.image_uri }}
+          TF_VAR_analytics_bucket_name: ${{ env.ANALYTICS_BUCKET }}
+          TF_VAR_frontend_bucket_name: ${{ env.FRONTEND_BUCKET }}
+          TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
+          TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
+        run: terraform apply -auto-approve
