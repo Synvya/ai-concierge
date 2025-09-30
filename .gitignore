@@ -29,3 +29,7 @@ Icon?
 backend/.env
 frontend/.env
 infra/terraform/.env
+
+# terraform
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate

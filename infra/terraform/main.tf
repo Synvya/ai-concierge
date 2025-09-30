@@ -12,12 +12,12 @@ data "aws_subnets" "selected" {
 }
 
 locals {
-  name_prefix        = var.project_name
-  public_subnet_ids  = data.aws_subnets.selected.ids
-  environment_map    = jsondecode(var.environment_variables)
-  secret_map         = jsondecode(var.secret_variables)
-  container_env      = [for k, v in local.environment_map : { name = k, value = v }]
-  container_secrets  = [for k, v in local.secret_map : { name = k, valueFrom = v }]
+  name_prefix       = var.project_name
+  public_subnet_ids = data.aws_subnets.selected.ids
+  environment_map   = jsondecode(var.environment_variables)
+  secret_map        = jsondecode(var.secret_variables)
+  container_env     = [for k, v in local.environment_map : { name = k, value = v }]
+  container_secrets = [for k, v in local.secret_map : { name = k, valueFrom = v }]
 }
 
 resource "aws_s3_bucket" "analytics" {
@@ -323,13 +323,13 @@ resource "aws_elasticache_subnet_group" "redis" {
 }
 
 resource "aws_elasticache_replication_group" "redis" {
-  description            = "Redis for ${var.project_name} analytics"
-  replication_group_id          = "${var.project_name}-redis"
-  engine                        = "redis"
-  engine_version                = "7.1"
-  node_type                     = var.redis_node_type
-  port                          = 6379
-  parameter_group_name          = "default.redis7"
+  description                = "Redis for ${var.project_name} analytics"
+  replication_group_id       = "${var.project_name}-redis"
+  engine                     = "redis"
+  engine_version             = "7.1"
+  node_type                  = var.redis_node_type
+  port                       = 6379
+  parameter_group_name       = "default.redis7"
   automatic_failover_enabled = false
   at_rest_encryption_enabled = true
   transit_encryption_enabled = true
@@ -353,9 +353,9 @@ resource "aws_ecs_service" "backend" {
   depends_on      = [aws_lb_listener.http]
 
   network_configuration {
-    subnets         = local.public_subnet_ids
+    subnets          = local.public_subnet_ids
     assign_public_ip = true
-    security_groups = [aws_security_group.ecs_tasks.id]
+    security_groups  = [aws_security_group.ecs_tasks.id]
   }
 
   load_balancer {
