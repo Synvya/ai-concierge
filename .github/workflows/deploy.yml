@@ -73,28 +73,20 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build backend image
+      - name: Build and push backend image
+        id: build-image
         working-directory: backend
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           IMAGE_URI=${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}
           docker build -t ${IMAGE_URI} -t ${REGISTRY}/${ECR_REPOSITORY}:latest .
-          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
-
-      - name: Push backend image
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker push ${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}
+          docker push ${IMAGE_URI}
           docker push ${REGISTRY}/${ECR_REPOSITORY}:latest
-
-      - name: Emit image output
-        id: image
-        run: echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+          echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
 
     outputs:
-      image_uri: ${{ steps.image.outputs.image_uri }}
+      image_uri: ${{ steps.build-image.outputs.image_uri }}
 
   deploy:
     runs-on: ubuntu-latest
@@ -148,16 +140,11 @@ jobs:
       - name: Upload frontend to S3
         run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
 
-      - name: Remove stale ECS task definition state
+      - name: Clean up stale task definition state
         if: ${{ failure() }}
         working-directory: infra/terraform
         run: |
-          if ! command -v terraform >/dev/null 2>&1; then
-            echo "Terraform command not available; skipping cleanup."
-            exit 0
-          fi
-          terraform init -reconfigure \
-            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -backend-config="key=${{ env.TF_STATE_KEY }}" \
-            -backend-config="region=${{ env.AWS_REGION }}"
-          terraform state rm aws_ecs_task_definition.backend || true
+          echo "Deployment failed. Cleaning up potentially corrupted Terraform state..."
+          terraform state rm aws_ecs_task_definition.backend 2>/dev/null || echo "Task definition not in state"
+          terraform state rm aws_ecs_service.backend 2>/dev/null || echo "ECS service not in state"
+          echo "State cleaned. Re-run the workflow to retry deployment."
