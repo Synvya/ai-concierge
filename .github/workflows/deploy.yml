@@ -75,17 +75,19 @@ jobs:
 
       - name: Build and push backend image
         id: build-image
-        working-directory: backend
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
+          cd backend
           IMAGE_URI=${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}
           echo "Building image: ${IMAGE_URI}"
           docker build -t ${IMAGE_URI} -t ${REGISTRY}/${ECR_REPOSITORY}:latest .
           docker push ${IMAGE_URI}
           docker push ${REGISTRY}/${ECR_REPOSITORY}:latest
-          echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+          echo "GITHUB_OUTPUT path: ${GITHUB_OUTPUT}"
+          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
           echo "Output set to: ${IMAGE_URI}"
+          cat "${GITHUB_OUTPUT}" || true
 
     outputs:
       image_uri: ${{ steps.build-image.outputs.image_uri }}
