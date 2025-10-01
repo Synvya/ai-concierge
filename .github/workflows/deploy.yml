@@ -140,6 +140,7 @@ jobs:
           TF_VAR_backend_image: ${{ needs.build.outputs.image_uri }}
           TF_VAR_analytics_bucket_name: ${{ env.ANALYTICS_BUCKET }}
           TF_VAR_frontend_bucket_name: ${{ env.FRONTEND_BUCKET }}
+          TF_VAR_tf_state_bucket_name: ${{ env.TF_STATE_BUCKET }}
           TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
           TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
         run: terraform apply -auto-approve

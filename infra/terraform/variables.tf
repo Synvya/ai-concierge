@@ -50,6 +50,18 @@ variable "frontend_bucket_name" {
   type        = string
 }
 
+variable "tf_state_bucket_name" {
+  description = "Name of the S3 bucket storing Terraform state"
+  type        = string
+  default     = ""
+}
+
+variable "deployer_user_names" {
+  description = "Optional list of IAM user names that should receive the deploy policy"
+  type        = list(string)
+  default     = []
+}
+
 variable "desired_count" {
   description = "Number of Fargate tasks to run"
   type        = number
