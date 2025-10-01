@@ -142,6 +142,21 @@ jobs:
           echo "execution_role=${EXEC_ROLE_ARN}" >> "$GITHUB_OUTPUT"
           echo "task_role=${TASK_ROLE_ARN}" >> "$GITHUB_OUTPUT"
 
+      - name: Ensure ECS cluster and service exist
+        run: |
+          set -e
+          CLUSTER_ARN=$(aws ecs describe-clusters --clusters "${PROJECT_NAME}-cluster" --query 'clusters[0].clusterArn' --output text 2>/dev/null || true)
+          if [ -z "$CLUSTER_ARN" ] || [ "$CLUSTER_ARN" = "None" ]; then
+            echo "ERROR: ECS cluster '${PROJECT_NAME}-cluster' not found. Provision infrastructure (e.g., run Terraform) before deploying." >&2
+            exit 1
+          fi
+
+          SERVICE_STATUS=$(aws ecs describe-services --cluster "${PROJECT_NAME}-cluster" --services "${PROJECT_NAME}-service" --query 'services[0].status' --output text 2>/dev/null || true)
+          if [ -z "$SERVICE_STATUS" ] || [ "$SERVICE_STATUS" = "NONE" ] || [ "$SERVICE_STATUS" = "INACTIVE" ]; then
+            echo "ERROR: ECS service '${PROJECT_NAME}-service' missing or inactive. Provision it before deploying." >&2
+            exit 1
+          fi
+
       - name: Render task definition
         env:
           IMAGE_URI: ${{ needs.build.outputs.image_uri }}

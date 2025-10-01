@@ -28,6 +28,37 @@ locals {
     local.tf_state_bucket_arn != "" ? "${local.tf_state_bucket_arn}/*" : ""
   ])
 
+  deploy_user_arns = [for user_name in var.deployer_user_names : "arn:aws:iam::${local.account_id}:user/${user_name}"]
+
+  assume_role_statements = concat(
+    [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = "repo:Synvya/ai-concierge:*"
+          }
+        }
+      }
+    ],
+    length(local.deploy_user_arns) > 0 ? [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = local.deploy_user_arns
+        }
+        Action = "sts:AssumeRole"
+      }
+    ] : []
+  )
+
   deploy_policy_document = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -97,7 +128,8 @@ locals {
           "iam:PutUserPolicy",
           "iam:DeleteUserPolicy",
           "iam:GetUserPolicy",
-          "iam:ListUserPolicies"
+          "iam:ListUserPolicies",
+          "iam:UpdateAssumeRolePolicy"
         ],
         Resource = [
           local.exec_role_arn,
@@ -249,23 +281,7 @@ resource "aws_iam_role" "github_actions" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
-        },
-        Action = "sts:AssumeRoleWithWebIdentity",
-        Condition = {
-          StringEquals = {
-            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          },
-          StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:Synvya/ai-concierge:*"
-          }
-        }
-      }
-    ]
+    Statement = local.assume_role_statements
   })
 }
 
