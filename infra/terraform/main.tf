@@ -12,8 +12,12 @@ data "aws_subnets" "selected" {
 }
 
 locals {
-  name_prefix       = var.project_name
-  public_subnet_ids = data.aws_subnets.selected.ids
+  name_prefix = var.project_name
+  public_subnet_ids = [
+    "subnet-02ef84424a2a85f0e",
+    "subnet-07f34bdba501ac2da",
+    "subnet-0b7ed5bd25d7357fb"
+  ]
   environment_map   = jsondecode(var.environment_variables)
   secret_map        = jsondecode(var.secret_variables)
   container_env     = [for k, v in local.environment_map : { name = k, value = v }]
