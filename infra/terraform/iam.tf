@@ -74,13 +74,10 @@ locals {
           "ecs:DescribeTaskDefinition",
           "ecs:RegisterTaskDefinition",
           "ecs:DeregisterTaskDefinition",
-          "ecs:UpdateService"
+          "ecs:UpdateService",
+          "ecs:ListTaskDefinitions"
         ],
-        Resource = [
-          local.ecs_cluster_arn,
-          local.ecs_service_arn,
-          local.ecs_taskdef_arn
-        ]
+        Resource = "*"
       },
       {
         Sid    = "IAMRoleMgmt",

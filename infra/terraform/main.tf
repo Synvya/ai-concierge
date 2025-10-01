@@ -274,6 +274,7 @@ resource "aws_ecs_task_definition" "backend" {
   memory                   = tostring(var.backend_memory)
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
+  depends_on               = [aws_iam_role_policy.github_actions_deploy]
 
   container_definitions = jsonencode([
     {
