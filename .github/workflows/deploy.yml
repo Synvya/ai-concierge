@@ -85,7 +85,15 @@ jobs:
           docker push "${IMAGE_URI}"
           docker push "${REGISTRY}/${ECR_REPOSITORY}:latest"
           echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          echo "${IMAGE_URI}" > ../image_uri.txt
           echo "Built and pushed: ${IMAGE_URI}"
+
+      - name: Upload image URI
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-uri
+          path: image_uri.txt
+          retention-days: 1
 
     outputs:
       image_uri: ${{ steps.build_image.outputs.image_uri }}
@@ -99,13 +107,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate image URI
+      - name: Download image URI
+        uses: actions/download-artifact@v4
+        with:
+          name: image-uri
+        continue-on-error: true
+
+      - name: Resolve image URI
+        id: image
         run: |
-          echo "Using image URI: '${{ needs.build.outputs.image_uri }}'"
-          if [ -z "${{ needs.build.outputs.image_uri }}" ]; then
+          IMAGE_URI="${{ needs.build.outputs.image_uri }}"
+          if [ -z "$IMAGE_URI" ] && [ -f image_uri.txt ]; then
+            echo "Job output empty; falling back to artifact"
+            IMAGE_URI=$(cat image_uri.txt)
+          fi
+          echo "Using image URI: '$IMAGE_URI'"
+          if [ -z "$IMAGE_URI" ]; then
             echo "ERROR: image_uri is EMPTY!"
             exit 1
           fi
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -133,7 +154,7 @@ jobs:
         run: |
           python scripts/render_task_definition.py \
             --family "${PROJECT_NAME}-backend" \
-            --image "${IMAGE_URI}" \
+            --image "${{ steps.image.outputs.image_uri }}" \
             --cpu "512" \
             --memory "1024" \
             --execution-role "${EXECUTION_ROLE_ARN}" \
