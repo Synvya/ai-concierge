@@ -146,3 +146,17 @@ jobs:
 
       - name: Upload frontend to S3
         run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
+
+      - name: Remove stale ECS task definition state
+        if: ${{ failure() }}
+        working-directory: infra/terraform
+        run: |
+          if ! command -v terraform >/dev/null 2>&1; then
+            echo "Terraform command not available; skipping cleanup."
+            exit 0
+          fi
+          terraform init -reconfigure \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ env.TF_STATE_KEY }}" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+          terraform state rm aws_ecs_task_definition.backend || true
