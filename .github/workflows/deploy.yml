@@ -74,6 +74,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build backend image
+        id: build_image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
@@ -83,15 +84,11 @@ jobs:
           docker build -t "${IMAGE_URI}" -t "${REGISTRY}/${ECR_REPOSITORY}:latest" .
           docker push "${IMAGE_URI}"
           docker push "${REGISTRY}/${ECR_REPOSITORY}:latest"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
           echo "Built and pushed: ${IMAGE_URI}"
-          echo "${IMAGE_URI}" > ../image_uri.txt
 
-      - name: Upload image URI
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-uri
-          path: image_uri.txt
-          retention-days: 1
+    outputs:
+      image_uri: ${{ steps.build_image.outputs.image_uri }}
 
   deploy:
     runs-on: ubuntu-latest
@@ -102,23 +99,66 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download image URI
-        uses: actions/download-artifact@v4
-        with:
-          name: image-uri
-
-      - name: Set image URI variable
-        id: image
+      - name: Validate image URI
         run: |
-          IMAGE_URI=$(cat image_uri.txt)
-          echo "Loaded image URI: ${IMAGE_URI}"
-          echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+          echo "Using image URI: '${{ needs.build.outputs.image_uri }}'"
+          if [ -z "${{ needs.build.outputs.image_uri }}" ]; then
+            echo "ERROR: image_uri is EMPTY!"
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve ECS role ARNs
+        id: roles
+        run: |
+          EXEC_ROLE_ARN=$(aws iam get-role --role-name "${PROJECT_NAME}-ecs-execution" --query 'Role.Arn' --output text)
+          TASK_ROLE_ARN=$(aws iam get-role --role-name "${PROJECT_NAME}-ecs-task" --query 'Role.Arn' --output text)
+          echo "execution_role=${EXEC_ROLE_ARN}" >> "$GITHUB_OUTPUT"
+          echo "task_role=${TASK_ROLE_ARN}" >> "$GITHUB_OUTPUT"
+
+      - name: Render task definition
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image_uri }}
+          EXECUTION_ROLE_ARN: ${{ steps.roles.outputs.execution_role }}
+          TASK_ROLE_ARN: ${{ steps.roles.outputs.task_role }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          BACKEND_ENV_JSON: ${{ secrets.BACKEND_ENV_JSON }}
+          BACKEND_SECRET_JSON: ${{ secrets.BACKEND_SECRET_JSON }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+        run: |
+          python scripts/render_task_definition.py \
+            --family "${PROJECT_NAME}-backend" \
+            --image "${IMAGE_URI}" \
+            --cpu "512" \
+            --memory "1024" \
+            --execution-role "${EXECUTION_ROLE_ARN}" \
+            --task-role "${TASK_ROLE_ARN}" \
+            --log-group "/ecs/${PROJECT_NAME}-backend" \
+            --log-region "${AWS_REGION}" \
+            --environment-json env:BACKEND_ENV_JSON \
+            --secret-json env:BACKEND_SECRET_JSON \
+            --output taskdef.json
+
+      - name: Register task definition
+        id: register
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task_definition=${TASK_DEF_ARN}" >> "$GITHUB_OUTPUT"
+          echo "Registered task definition: ${TASK_DEF_ARN}"
+
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster "${PROJECT_NAME}-cluster" \
+            --service "${PROJECT_NAME}-service" \
+            --task-definition "${{ steps.register.outputs.task_definition }}" \
+            --force-new-deployment
+          aws ecs wait services-stable --cluster "${PROJECT_NAME}-cluster" --services "${PROJECT_NAME}-service"
 
       - name: Build frontend
         uses: actions/setup-node@v4
@@ -128,66 +168,6 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_wrapper: false
-
-      - name: Terraform Init
-        working-directory: infra/terraform
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-        run: |
-          terraform init \
-            -backend-config="bucket=${TF_STATE_BUCKET}" \
-            -backend-config="key=${TF_STATE_KEY}" \
-            -backend-config="region=${AWS_REGION}"
-
-      - name: Terraform Apply
-        id: apply
-        working-directory: infra/terraform
-        env:
-          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
-          TF_VAR_backend_image: ${{ steps.image.outputs.image_uri }}
-          TF_VAR_analytics_bucket_name: ${{ env.ANALYTICS_BUCKET }}
-          TF_VAR_frontend_bucket_name: ${{ env.FRONTEND_BUCKET }}
-          TF_VAR_tf_state_bucket_name: ${{ env.TF_STATE_BUCKET }}
-          TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
-          TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
-        run: terraform apply -auto-approve
-        continue-on-error: true
-
-      - name: Fix task definition state
-        if: steps.apply.outcome == 'failure'
-        working-directory: infra/terraform
-        env:
-          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
-          TF_VAR_backend_image: ${{ steps.image.outputs.image_uri }}
-          TF_VAR_analytics_bucket_name: ${{ env.ANALYTICS_BUCKET }}
-          TF_VAR_frontend_bucket_name: ${{ env.FRONTEND_BUCKET }}
-          TF_VAR_tf_state_bucket_name: ${{ env.TF_STATE_BUCKET }}
-          TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
-          TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
-        run: |
-          echo "Apply failed - cleaning corrupted state and importing created task definition"
-          
-          # Remove from state
-          terraform state rm aws_ecs_task_definition.backend 2>/dev/null || true
-          terraform state rm aws_ecs_service.backend 2>/dev/null || true
-          
-          # Wait for AWS
-          sleep 20
-          
-          # Get the latest revision that was just created
-          LATEST_REV=$(aws ecs list-task-definitions --family-prefix ai-concierge-backend --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text | awk -F: '{print $NF}')
-          echo "Found task definition revision: $LATEST_REV"
-          
-          # Import it into Terraform state
-          terraform import aws_ecs_task_definition.backend "ai-concierge-backend:${LATEST_REV}"
-          
-          # Now apply to create the service
-          terraform apply -auto-approve
 
       - name: Upload frontend to S3
         run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
