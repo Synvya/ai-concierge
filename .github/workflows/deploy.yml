@@ -126,6 +126,7 @@ jobs:
             -backend-config="region=${AWS_REGION}"
 
       - name: Terraform Apply
+        id: apply
         working-directory: infra/terraform
         env:
           TF_VAR_project_name: ${{ env.PROJECT_NAME }}
@@ -136,15 +137,25 @@ jobs:
           TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
           TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
         run: terraform apply -auto-approve
+        continue-on-error: true
+
+      - name: Retry on task definition error
+        if: steps.apply.outcome == 'failure'
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
+          TF_VAR_backend_image: ${{ needs.build.outputs.image_uri }}
+          TF_VAR_analytics_bucket_name: ${{ env.ANALYTICS_BUCKET }}
+          TF_VAR_frontend_bucket_name: ${{ env.FRONTEND_BUCKET }}
+          TF_VAR_tf_state_bucket_name: ${{ env.TF_STATE_BUCKET }}
+          TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
+          TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
+        run: |
+          echo "First apply failed, cleaning state and retrying..."
+          terraform state rm aws_ecs_task_definition.backend 2>/dev/null || true
+          terraform state rm aws_ecs_service.backend 2>/dev/null || true
+          sleep 5
+          terraform apply -auto-approve
 
       - name: Upload frontend to S3
         run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
-
-      - name: Clean up stale task definition state
-        if: ${{ failure() }}
-        working-directory: infra/terraform
-        run: |
-          echo "Deployment failed. Cleaning up potentially corrupted Terraform state..."
-          terraform state rm aws_ecs_task_definition.backend 2>/dev/null || echo "Task definition not in state"
-          terraform state rm aws_ecs_service.backend 2>/dev/null || echo "ECS service not in state"
-          echo "State cleaned. Re-run the workflow to retry deployment."
