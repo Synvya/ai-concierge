@@ -274,7 +274,6 @@ resource "aws_ecs_task_definition" "backend" {
   memory                   = tostring(var.backend_memory)
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
-  skip_destroy             = true
 
   container_definitions = jsonencode([
     {

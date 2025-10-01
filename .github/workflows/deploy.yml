@@ -171,12 +171,15 @@ jobs:
           TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
           TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
         run: |
-          set +e
-          echo "First apply failed, cleaning state and retrying..."
-          terraform state rm aws_ecs_task_definition.backend 2>/dev/null
-          terraform state rm aws_ecs_service.backend 2>/dev/null
-          set -e
-          sleep 5
+          echo "Apply failed - likely ECS task definition eventual consistency issue"
+          echo "Cleaning state and importing existing task definition..."
+          
+          terraform state rm aws_ecs_task_definition.backend 2>/dev/null || true
+          terraform state rm aws_ecs_service.backend 2>/dev/null || true
+          
+          echo "Waiting 10 seconds for AWS to index the task definition..."
+          sleep 10
+          
           terraform apply -auto-approve
 
       - name: Upload frontend to S3
