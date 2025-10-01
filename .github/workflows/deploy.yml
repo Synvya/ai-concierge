@@ -158,10 +158,9 @@ jobs:
         run: terraform apply -auto-approve
         continue-on-error: true
 
-      - name: Retry on task definition error
+      - name: Fix task definition state
         if: steps.apply.outcome == 'failure'
         working-directory: infra/terraform
-        shell: bash
         env:
           TF_VAR_project_name: ${{ env.PROJECT_NAME }}
           TF_VAR_backend_image: ${{ steps.image.outputs.image_uri }}
@@ -171,26 +170,24 @@ jobs:
           TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
           TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
         run: |
-          echo "Apply failed - ECS task definition eventual consistency issue"
+          echo "Apply failed - cleaning corrupted state and importing created task definition"
           
-          for i in 1 2 3; do
-            echo "Retry attempt $i/3..."
-            terraform state rm aws_ecs_task_definition.backend 2>/dev/null || true
-            terraform state rm aws_ecs_service.backend 2>/dev/null || true
-            
-            echo "Waiting 30 seconds for AWS eventual consistency..."
-            sleep 30
-            
-            if terraform apply -auto-approve; then
-              echo "Success on retry $i"
-              exit 0
-            fi
-            
-            echo "Retry $i failed"
-          done
+          # Remove from state
+          terraform state rm aws_ecs_task_definition.backend 2>/dev/null || true
+          terraform state rm aws_ecs_service.backend 2>/dev/null || true
           
-          echo "All retries exhausted"
-          exit 1
+          # Wait for AWS
+          sleep 20
+          
+          # Get the latest revision that was just created
+          LATEST_REV=$(aws ecs list-task-definitions --family-prefix ai-concierge-backend --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text | awk -F: '{print $NF}')
+          echo "Found task definition revision: $LATEST_REV"
+          
+          # Import it into Terraform state
+          terraform import aws_ecs_task_definition.backend "ai-concierge-backend:${LATEST_REV}"
+          
+          # Now apply to create the service
+          terraform apply -auto-approve
 
       - name: Upload frontend to S3
         run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
