@@ -27,38 +27,8 @@ locals {
     "${local.analytics_bucket_arn}/*",
     local.tf_state_bucket_arn != "" ? "${local.tf_state_bucket_arn}/*" : ""
   ])
-}
 
-resource "aws_iam_role" "github_actions" {
-  name = "ai-concierge-deploy"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
-        },
-        Action = "sts:AssumeRoleWithWebIdentity",
-        Condition = {
-          StringEquals = {
-            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          },
-          StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:Synvya/ai-concierge:*"
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "github_actions_deploy" {
-  name        = "${local.project}-deploy-policy"
-  description = "Policy used by deployment automation"
-
-  policy = jsonencode({
+  deploy_policy_document = jsonencode({
     Version = "2012-10-17",
     Statement = [
       {
@@ -126,7 +96,11 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "iam:ListRolePolicies",
           "iam:CreateServiceLinkedRole",
           "iam:ListAttachedRolePolicies",
-          "iam:GetRolePolicy"
+          "iam:GetRolePolicy",
+          "iam:PutUserPolicy",
+          "iam:DeleteUserPolicy",
+          "iam:GetUserPolicy",
+          "iam:ListUserPolicies"
         ],
         Resource = [
           local.exec_role_arn,
@@ -273,13 +247,40 @@ resource "aws_iam_policy" "github_actions_deploy" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "github_actions_deploy" {
-  role       = aws_iam_role.github_actions.name
-  policy_arn = aws_iam_policy.github_actions_deploy.arn
+resource "aws_iam_role" "github_actions" {
+  name = "ai-concierge-deploy"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
+        },
+        Action = "sts:AssumeRoleWithWebIdentity",
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          },
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = "repo:Synvya/ai-concierge:*"
+          }
+        }
+      }
+    ]
+  })
 }
 
-resource "aws_iam_user_policy_attachment" "deployer_users" {
-  for_each   = toset(var.deployer_user_names)
-  user       = each.value
-  policy_arn = aws_iam_policy.github_actions_deploy.arn
+resource "aws_iam_role_policy" "github_actions_deploy" {
+  name   = "ai-concierge-deploy-policy"
+  role   = aws_iam_role.github_actions.id
+  policy = local.deploy_policy_document
+}
+
+resource "aws_iam_user_policy" "deployer_users" {
+  for_each = toset(var.deployer_user_names)
+  name     = "${local.project}-deploy-inline"
+  user     = each.value
+  policy   = local.deploy_policy_document
 }
