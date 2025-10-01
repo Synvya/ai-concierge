@@ -73,24 +73,25 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push backend image
-        id: build-image
+      - name: Build backend image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           cd backend
-          IMAGE_URI=${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}"
           echo "Building image: ${IMAGE_URI}"
-          docker build -t ${IMAGE_URI} -t ${REGISTRY}/${ECR_REPOSITORY}:latest .
-          docker push ${IMAGE_URI}
-          docker push ${REGISTRY}/${ECR_REPOSITORY}:latest
-          echo "GITHUB_OUTPUT path: ${GITHUB_OUTPUT}"
-          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
-          echo "Output set to: ${IMAGE_URI}"
-          cat "${GITHUB_OUTPUT}" || true
+          docker build -t "${IMAGE_URI}" -t "${REGISTRY}/${ECR_REPOSITORY}:latest" .
+          docker push "${IMAGE_URI}"
+          docker push "${REGISTRY}/${ECR_REPOSITORY}:latest"
+          echo "Built and pushed: ${IMAGE_URI}"
+          echo "${IMAGE_URI}" > ../image_uri.txt
 
-    outputs:
-      image_uri: ${{ steps.build-image.outputs.image_uri }}
+      - name: Upload image URI
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-uri
+          path: image_uri.txt
+          retention-days: 1
 
   deploy:
     runs-on: ubuntu-latest
@@ -101,13 +102,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug image URI
+      - name: Download image URI
+        uses: actions/download-artifact@v4
+        with:
+          name: image-uri
+
+      - name: Set image URI variable
+        id: image
         run: |
-          echo "Received image_uri from build job: '${{ needs.build.outputs.image_uri }}'"
-          if [ -z "${{ needs.build.outputs.image_uri }}" ]; then
-            echo "ERROR: image_uri is EMPTY!"
-            exit 1
-          fi
+          IMAGE_URI=$(cat image_uri.txt)
+          echo "Loaded image URI: ${IMAGE_URI}"
+          echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -144,7 +149,7 @@ jobs:
         working-directory: infra/terraform
         env:
           TF_VAR_project_name: ${{ env.PROJECT_NAME }}
-          TF_VAR_backend_image: ${{ needs.build.outputs.image_uri }}
+          TF_VAR_backend_image: ${{ steps.image.outputs.image_uri }}
           TF_VAR_analytics_bucket_name: ${{ env.ANALYTICS_BUCKET }}
           TF_VAR_frontend_bucket_name: ${{ env.FRONTEND_BUCKET }}
           TF_VAR_tf_state_bucket_name: ${{ env.TF_STATE_BUCKET }}
@@ -159,7 +164,7 @@ jobs:
         shell: bash
         env:
           TF_VAR_project_name: ${{ env.PROJECT_NAME }}
-          TF_VAR_backend_image: ${{ needs.build.outputs.image_uri }}
+          TF_VAR_backend_image: ${{ steps.image.outputs.image_uri }}
           TF_VAR_analytics_bucket_name: ${{ env.ANALYTICS_BUCKET }}
           TF_VAR_frontend_bucket_name: ${{ env.FRONTEND_BUCKET }}
           TF_VAR_tf_state_bucket_name: ${{ env.TF_STATE_BUCKET }}
