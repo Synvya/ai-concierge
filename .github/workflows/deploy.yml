@@ -114,6 +114,8 @@ jobs:
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
 
       - name: Terraform Init
         working-directory: infra/terraform
@@ -142,6 +144,7 @@ jobs:
       - name: Retry on task definition error
         if: steps.apply.outcome == 'failure'
         working-directory: infra/terraform
+        shell: bash
         env:
           TF_VAR_project_name: ${{ env.PROJECT_NAME }}
           TF_VAR_backend_image: ${{ needs.build.outputs.image_uri }}
@@ -151,9 +154,11 @@ jobs:
           TF_VAR_environment_variables: ${{ secrets.BACKEND_ENV_JSON }}
           TF_VAR_secret_variables: ${{ secrets.BACKEND_SECRET_JSON }}
         run: |
+          set +e
           echo "First apply failed, cleaning state and retrying..."
-          terraform state rm aws_ecs_task_definition.backend 2>/dev/null || true
-          terraform state rm aws_ecs_service.backend 2>/dev/null || true
+          terraform state rm aws_ecs_task_definition.backend 2>/dev/null
+          terraform state rm aws_ecs_service.backend 2>/dev/null
+          set -e
           sleep 5
           terraform apply -auto-approve
 
