@@ -126,6 +126,11 @@ jobs:
           fi
           echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
+      - name: Show backend API URL
+        run: echo "Using backend API URL: '$BACKEND_API_URL'"
+        env:
+          BACKEND_API_URL: ${{ secrets.BACKEND_API_URL }}
+
       - name: Validate backend API URL secret
         run: |
           if [ -z "$BACKEND_API_URL" ]; then
@@ -214,6 +219,15 @@ jobs:
         working-directory: frontend
         env:
           VITE_API_BASE_URL: ${{ secrets.BACKEND_API_URL }}
+      - name: Verify bundle references API URL
+        working-directory: frontend
+        env:
+          BACKEND_API_URL: ${{ secrets.BACKEND_API_URL }}
+        run: |
+          if ! grep -R "${BACKEND_API_URL}" dist; then
+            echo "Expected backend API URL not found in build output"
+            exit 1
+          fi
 
       - name: Upload frontend to S3
         run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
