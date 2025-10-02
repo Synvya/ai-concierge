@@ -23,9 +23,21 @@ Because infrastructure is now managed outside of Terraform, ensure the following
 - **S3 Buckets**:
   - Frontend hosting bucket (public website hosting or CloudFront).
   - Analytics bucket for daily JSON payloads.
+- **DNS & Certificates**:
+  - ACM certificate in us-east-1 covering `snovalley.synvya.com` for the CloudFront distribution.
+  - Route53 (or external DNS) CNAME/ALIAS pointing `snovalley.synvya.com` at the frontend CloudFront distribution.
 - **Database / VPC** resources referenced by your environment variables.
 
 Any changes to that infrastructure (for example, new subnets, security groups, or IAM policies) must now be performed manually via the AWS console or CLI.
+
+## Custom Domain
+
+The public site is served from CloudFront with the hostname `snovalley.synvya.com`. When you update the distribution or create a new environment:
+
+1. Request or renew an ACM certificate in `us-east-1` that covers `snovalley.synvya.com`.
+2. Add the alias to your CloudFront distribution and deploy the change.
+3. Create or update the Route53 record so the domain resolves to the CloudFront distribution.
+4. Set `FRONTEND_BASE_URL` to `https://snovalley.synvya.com` in `BACKEND_ENV_JSON` so the backend CORS policy allows the site.
 
 ## Updating Secrets & Environment Variables
 

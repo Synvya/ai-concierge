@@ -2,6 +2,7 @@
 
 ## Overview
 The AI Concierge is a full-stack application that helps users discover local businesses using natural language. It consists of a FastAPI backend that orchestrates vector search and LLM responses, and a React (Vite) frontend delivering a modern conversational UI. The system runs locally with Docker Compose and deploys to AWS through automated GitHub Actions workflows.
+Production builds are served from CloudFront at https://snovalley.synvya.com, fronted by Route53 DNS.
 
 ## Components
 - **Backend (`backend/`)**
@@ -37,7 +38,7 @@ The AI Concierge is a full-stack application that helps users discover local bus
 2. Lint & test jobs for backend and frontend.
 3. Build and push Docker images to ECR.
 4. Deploy job uses AWS CLI commands to register a new task definition and update the ECS service.
-5. Frontend build artifacts uploaded to S3 and CloudFront cache invalidated.
+5. Frontend build artifacts uploaded to S3 and the CloudFront distribution (https://snovalley.synvya.com) cache invalidated.
 
 ## Local Development
 - `docker-compose up` starts backend, frontend, local Postgres (with pgvector extension), and MinIO (S3-compatible) for analytics testing.

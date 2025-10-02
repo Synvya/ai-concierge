@@ -2,12 +2,14 @@
 
 Modern AI concierge that helps people discover local businesses, products, and services powered by a pgvector database and OpenAI.
 
+Live site: https://snovalley.synvya.com
+
 ## Features
 - FastAPI backend with OpenAI-powered conversational search and retrieval from PostgreSQL + pgvector.
 - React + Chakra UI frontend delivering a modern, responsive chat experience.
 - Configurable database connection (host, credentials, schema, table) via environment variables.
 - Analytics collection for visitor, session, and query metrics persisted to Amazon S3 (or MinIO locally).
-- Docker Compose stack for local development including Postgres, Redis, and MinIO.
+- Docker Compose stack for local development including Postgres and MinIO.
 - Automated AWS deployment via GitHub Actions (container image + ECS service update). Infrastructure is managed manually in AWS (see `infra/`).
 
 ## Prerequisites
@@ -56,7 +58,7 @@ npm run dev
 
 ## Analytics Pipeline
 - Each browser gets a persistent `visitor_id` and per-session `session_id`.
-- Every chat query increments counters in Redis for daily visitor/session counts and per-session queries.
+- Visitor and session counters are maintained in memory during a request window.
 - Aggregated payloads (unique visitors, sessions, query count, and raw queries) are pushed to S3 as JSON (`analytics/daily/<date>/<session_id>.json`).
 - In local mode the backend writes to MinIO using the same AWS SDK calls.
 
@@ -69,7 +71,7 @@ npm run dev
 | `OPENAI_ASSISTANT_MODEL`, `OPENAI_EMBEDDING_MODEL` | OpenAI model overrides |
 | `S3_ANALYTICS_BUCKET`, `S3_REGION` | Target bucket and AWS region for analytics |
 | `AWS_ENDPOINT_URL` | Optional S3-compatible endpoint (use MinIO locally) |
-| `REDIS_URL` | Redis instance for tracking analytics state |
+| `FRONTEND_BASE_URL` | Origin allowed by CORS (set to https://snovalley.synvya.com in production) |
 
 ## Testing
 ```bash
@@ -95,4 +97,5 @@ GitHub Actions builds the backend image, registers a new ECS task definition, fo
 
 - `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, and either access keys or an OIDC trust so the workflow can call AWS.
 - `BACKEND_ENV_JSON` and `BACKEND_SECRET_JSON` for backend configuration.
+- `BACKEND_ENV_JSON` should include `FRONTEND_BASE_URL=https://snovalley.synvya.com` so CORS permits the production site.
 - `BACKEND_API_URL` – public URL of the FastAPI service, injected into the frontend build as `VITE_API_BASE_URL`.
