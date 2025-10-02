@@ -73,19 +73,18 @@ class AnalyticsService:
             self._redis.llen(query_list),
         )
 
+        queries = await self._redis.lrange(query_list, 0, -1)
+
         payload = {
             "timestamp": now.isoformat(),
             "date": date_key,
             "visitor_id": visitor_id,
             "session_id": session_id,
             "query_count": query_count,
+            "queries": queries,
             "unique_visitors_today": unique_visitors,
             "sessions_today": total_sessions,
         }
-
-        payload["queries"] = await self._redis.lrange(
-            query_list, max(query_count - 5, 0), -1
-        )
 
         await self._queue.put(payload)
         return payload
