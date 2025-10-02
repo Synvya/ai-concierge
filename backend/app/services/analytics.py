@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import boto3
 import structlog
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoCredentialsError
 
 from ..core.config import get_settings
 
@@ -22,6 +22,7 @@ class AnalyticsService:
         self._worker_task: Optional[asyncio.Task[None]] = None
         self._session_data: Dict[str, Dict[str, Any]] = {}
         self._lock = asyncio.Lock()
+        self._enabled = True
 
         session = boto3.session.Session()
         self._s3_client = session.client(
@@ -33,7 +34,14 @@ class AnalyticsService:
                 settings.aws_secret_access_key.get_secret_value() if settings.aws_secret_access_key else None
             ),
         )
-        self._ensure_bucket()
+        try:
+            self._ensure_bucket()
+        except NoCredentialsError:
+            logger.warning(
+                "analytics_s3_disabled_no_credentials",
+                bucket=settings.s3_analytics_bucket,
+            )
+            self._enabled = False
 
     async def start(self) -> None:
         if self._worker_task is None:
@@ -96,6 +104,9 @@ class AnalyticsService:
             payload_to_write = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             key = f"analytics/daily/{payload['date']}/{session_id}.json"
 
+        if not self._enabled:
+            return
+
         def _put_object() -> None:
             self._s3_client.put_object(
                 Bucket=settings.s3_analytics_bucket,
@@ -111,8 +122,13 @@ class AnalyticsService:
 
     def _ensure_bucket(self) -> None:
         bucket = settings.s3_analytics_bucket
+        if not self._enabled:
+            return
+
         try:
             self._s3_client.head_bucket(Bucket=bucket)
+        except NoCredentialsError:
+            raise
         except ClientError as exc:
             error_code = exc.response.get("Error", {}).get("Code", "")
             if error_code in ("404", "NoSuchBucket", "NoSuchBucketPolicy"):
