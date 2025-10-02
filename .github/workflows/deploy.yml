@@ -127,9 +127,10 @@ jobs:
           echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       - name: Show backend API URL
-        run: echo "Using backend API URL: '$BACKEND_API_URL'"
         env:
           BACKEND_API_URL: ${{ secrets.BACKEND_API_URL }}
+        run: |
+          echo "Using backend API URL: '${BACKEND_API_URL}'"
 
       - name: Validate backend API URL secret
         run: |
