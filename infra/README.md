@@ -1,79 +1,68 @@
 # Infrastructure & Deployment
 
-This directory contains Terraform definitions and GitHub Actions automation for deploying the AI Concierge to AWS.
+Terraform has been retired from this project. The AWS infrastructure (ECS cluster, service, load balancer, IAM roles, S3 buckets, ElastiCache, etc.) is now managed manually in the AWS console.
 
-## Terraform Stack (`infra/terraform`)
-### Resources
-- **Amazon ECS on Fargate**: Runs the FastAPI backend in a managed, autoscaled container environment.
-- **Application Load Balancer**: Provides HTTPS-ready ingress (listener configured for HTTP by default; add ACM cert for HTTPS).
-- **Amazon ECR**: Container registry for backend images.
-- **Amazon S3 (Analytics)**: Stores anonymised usage analytics (`analytics/daily/<date>/<session_id>.json`).
-- **Amazon S3 (Frontend)**: Hosts the static React build (public website hosting enabled).
-- **CloudWatch Logs**: Captures backend logs from ECS.
-- **IAM Roles & Policies**: Grant the task permission to push analytics to S3 and pull secrets.
+## Current Deployment Flow
 
-### Variables
-Set via `terraform.tfvars`, CLI flags, or environment variables (`TF_VAR_*`):
-- `project_name`: Resource name prefix (default `ai-concierge`).
-- `backend_image`: Full ECR image URI, e.g. `123456789012.dkr.ecr.us-east-1.amazonaws.com/ai-concierge-backend:abcd1234`.
-- `analytics_bucket_name`: Target bucket for analytics JSON payloads.
-- `frontend_bucket_name`: Static site bucket name.
-- `environment_variables`: JSON map of plaintext env vars (example below).
-- `secret_variables`: JSON map of env var names to AWS Secrets Manager ARNs (for sensitive values).
+1. **Container Build & Push** – GitHub Actions (`.github/workflows/deploy.yml`) builds the backend image, pushes it to ECR, and stores the resulting image URI as a job output (with an artifact fallback).
+2. **Task Definition Rendering** – The deploy job renders a task definition JSON using `scripts/render_task_definition.py`, injecting the image URI, CloudWatch log configuration, and environment/secret maps supplied via GitHub secrets.
+3. **ECS Service Update** – The workflow calls `aws ecs register-task-definition` followed by `aws ecs update-service --force-new-deployment` to roll the service to the new revision, then waits for the service to stabilise.
+4. **Frontend Upload** – The Vite build artefacts are synchronised to the configured S3 website bucket.
 
-Example `terraform.tfvars`:
-```hcl
-project_name = "ai-concierge"
-backend_image = "123456789012.dkr.ecr.us-east-1.amazonaws.com/ai-concierge-backend:latest"
-analytics_bucket_name = "ai-concierge-analytics-prod"
-frontend_bucket_name  = "ai-concierge-frontend-prod"
-environment_variables = jsonencode({
-  DB_HOST             = "your-rds-endpoint"
-  DB_PORT             = "5432"
-  DB_USER             = "concierge_user"
-  DB_NAME             = "concierge"
-  DB_SCHEMA           = "nostr"
-  DB_TABLE            = "sellers"
-  S3_ANALYTICS_BUCKET = "ai-concierge-analytics-prod"
-  S3_REGION           = "us-east-1"
-  REDIS_URL           = "rediss://your-elasticache:6379/0"
-})
-secret_variables = jsonencode({
-  OPENAI_API_KEY = "arn:aws:secretsmanager:us-east-1:123456789012:secret:openai-key"
-  DB_PASSWORD    = "arn:aws:secretsmanager:us-east-1:123456789012:secret:concierge-db-password"
-})
-```
+## Manual Prerequisites
 
-### Usage
-```bash
-cd infra/terraform
-terraform init -backend-config="bucket=<state-bucket>" \
-               -backend-config="key=ai-concierge/terraform.tfstate" \
-               -backend-config="region=<aws-region>"
-terraform plan
-terraform apply
-```
+Because infrastructure is now managed outside of Terraform, ensure the following AWS resources already exist before running the pipeline:
 
-## GitHub Actions (`.github/workflows/deploy.yml`)
-### Pipeline Overview
-1. **test** – Installs dependencies, runs backend pytest suite, and TypeScript type checks the frontend.
-2. **build** – Assumes the AWS deploy role, builds & tags the backend image, and pushes to ECR.
-3. **deploy** – Builds the frontend bundle, syncs to the S3 website bucket, and applies Terraform to update infrastructure.
+- **ECR Repository**: `${PROJECT_NAME}-backend` containing any previous images.
+- **ECS Cluster**: `${PROJECT_NAME}-cluster` with a service named `${PROJECT_NAME}-service` targeting the application load balancer.
+- **IAM Roles**:
+  - `${PROJECT_NAME}-ecs-execution` with the managed policy `AmazonECSTaskExecutionRolePolicy` _plus_ inline access to required Secrets Manager ARNs.
+  - `${PROJECT_NAME}-ecs-task` granting the application permissions (for example, S3 analytics writes).
+  - `${PROJECT_NAME}-deploy` (GitHub deploy role) allowed to register task definitions and update the service.
+- **Application Load Balancer**: `${PROJECT_NAME}-alb` with listener and target group `${PROJECT_NAME}-tg`.
+- **S3 Buckets**:
+  - Frontend hosting bucket (public website hosting or CloudFront).
+  - Analytics bucket for daily JSON payloads.
+- **ElastiCache / Database / VPC** resources referenced by your environment variables.
 
-### Required GitHub Secrets / Variables
-Create these at the repository level:
-- `AWS_DEPLOY_ROLE_ARN` – IAM role ARN GitHub Actions should assume.
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` – Needed for `configure-aws-credentials` (leave blank if role assumption covers access keys).
-- `TF_STATE_BUCKET` – S3 bucket for Terraform state (create separately).
-- `ANALYTICS_BUCKET` – Matches `analytics_bucket_name` variable.
-- `FRONTEND_BUCKET` – Matches `frontend_bucket_name` variable.
-- `BACKEND_ENV_JSON` – JSON map of plaintext env vars (see example above).
+Any changes to that infrastructure (for example, new subnets, security groups, or IAM policies) must now be performed manually via the AWS console or CLI.
+
+## Updating Secrets & Environment Variables
+
+The deploy workflow expects two GitHub secrets:
+
+- `BACKEND_ENV_JSON` – JSON map of plaintext environment variables.
 - `BACKEND_SECRET_JSON` – JSON map of env var name to Secrets Manager ARN.
 
-Optional per-environment overrides can use GitHub environments for manual approvals.
+Whenever you add or rename variables, update those secrets and ensure the ECS execution role can read the referenced Secrets Manager entries.
 
-### Frontend Deployment
-The workflow runs `npm run build` and performs `aws s3 sync frontend/dist s3://$FRONTEND_BUCKET`. Configure CloudFront on top of the bucket for HTTPS if required.
+## Scripts
 
-### Backend Deployment
-Terraform wires the ECS task definition to the latest image URI emitted by the build job. Ensure your database/security groups allow inbound traffic from the ECS task subnets.
+`scripts/render_task_definition.py` converts the environment/secret maps and image URI into a valid task definition JSON document. You can run it locally for troubleshooting:
+
+```bash
+python scripts/render_task_definition.py \
+  --family ai-concierge-backend \
+  --image 123456789012.dkr.ecr.us-east-1.amazonaws.com/ai-concierge-backend:latest \
+  --execution-role arn:aws:iam::122610503853:role/ai-concierge-ecs-execution \
+  --task-role arn:aws:iam::122610503853:role/ai-concierge-ecs-task \
+  --log-group /ecs/ai-concierge-backend \
+  --log-region us-east-1 \
+  --environment-json '{"DB_HOST":"..."}' \
+  --secret-json '{"OPENAI_API_KEY":"arn:aws:..."}'
+```
+
+The resulting `taskdef.json` can be registered manually with the AWS CLI if needed:
+
+```bash
+aws ecs register-task-definition --cli-input-json file://taskdef.json
+aws ecs update-service --cluster ai-concierge-cluster --service ai-concierge-service --task-definition <new-arn> --force-new-deployment
+```
+
+## Troubleshooting
+
+- If the deploy job fails with `ServiceNotFoundException`, confirm the ECS cluster and service still exist.
+- If it times out waiting for the service to stabilise, inspect `aws ecs describe-services --cluster ... --services ... --query 'services[0].events[:10]'` for the root cause (missing secrets access, image pull errors, failing health checks, etc.).
+- IAM errors usually mean the deploy role or execution role is missing a required action; adjust them through the AWS console.
+
+With Terraform removed, there is no longer a state file or automated drift management—keep a record of any manual infrastructure changes and update this README as the architecture evolves.

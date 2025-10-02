@@ -8,7 +8,7 @@ Modern AI concierge that helps people discover local businesses, products, and s
 - Configurable database connection (host, credentials, schema, table) via environment variables.
 - Analytics collection for visitor, session, and query metrics persisted to Amazon S3 (or MinIO locally).
 - Docker Compose stack for local development including Postgres, Redis, and MinIO.
-- Automated AWS deployment via Terraform and GitHub Actions (see infra section).
+- Automated AWS deployment via GitHub Actions (container image + ECS service update). Infrastructure is managed manually in AWS (see `infra/`).
 
 ## Prerequisites
 - Python 3.11+
@@ -81,12 +81,12 @@ python -m pytest
 ```
 backend/   FastAPI service, analytics, OpenAI integration
 frontend/  Vite + React frontend
-infra/     Terraform + GitHub Actions (TBD)
+infra/     Deployment docs and scripts for the GitHub Actions pipeline
 internal/  Sample database export for local testing
 docs/      Architecture and planning docs
 scripts/   Utility scripts (database seeding)
 ```
 
 ## Deployment
-Infrastructure as code and CI/CD automation live in [`infra/`](infra/README.md).
-GitHub Actions builds containers, syncs the frontend to S3, and applies Terraform to keep AWS resources (ECS, ALB, S3 analytics bucket) in sync.
+Deployment docs and helper scripts live in [`infra/`](infra/README.md).
+GitHub Actions builds the backend image, registers a new ECS task definition, forces the service to deploy it, and syncs the frontend bundle to the S3 website bucket. Provisioning or modifying AWS infrastructure (ECS cluster, load balancer, IAM roles, etc.) is now a manual task performed outside the repository.

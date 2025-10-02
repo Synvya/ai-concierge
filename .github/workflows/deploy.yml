@@ -15,8 +15,6 @@ env:
   ECR_REPOSITORY: ai-concierge-backend
   FRONTEND_BUCKET: ${{ secrets.FRONTEND_BUCKET }}
   ANALYTICS_BUCKET: ${{ secrets.ANALYTICS_BUCKET }}
-  TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
-  TF_STATE_KEY: ai-concierge/terraform.tfstate
 
 jobs:
   test:
@@ -147,7 +145,7 @@ jobs:
           set -e
           CLUSTER_ARN=$(aws ecs describe-clusters --clusters "${PROJECT_NAME}-cluster" --query 'clusters[0].clusterArn' --output text 2>/dev/null || true)
           if [ -z "$CLUSTER_ARN" ] || [ "$CLUSTER_ARN" = "None" ]; then
-            echo "ERROR: ECS cluster '${PROJECT_NAME}-cluster' not found. Provision infrastructure (e.g., run Terraform) before deploying." >&2
+            echo "ERROR: ECS cluster '${PROJECT_NAME}-cluster' not found. Provision the infrastructure manually before deploying." >&2
             exit 1
           fi
 
