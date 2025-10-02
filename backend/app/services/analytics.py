@@ -73,11 +73,7 @@ class AnalyticsService:
             self._redis.llen(query_list),
         )
 
-        recent_queries = await self._redis.lrange(
-            query_list,
-            max(query_count - settings.analytics_query_snapshot, 0),
-            -1,
-        )
+        queries = await self._redis.lrange(query_list, 0, -1)
 
         payload = {
             "timestamp": now.isoformat(),
@@ -85,7 +81,7 @@ class AnalyticsService:
             "visitor_id": visitor_id,
             "session_id": session_id,
             "query_count": query_count,
-            "queries": recent_queries,
+            "queries": queries,
             "unique_visitors_today": unique_visitors,
             "sessions_today": total_sessions,
         }
