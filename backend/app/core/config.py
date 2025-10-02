@@ -45,6 +45,7 @@ class Settings(BaseSettings):
 
     analytics_flush_interval_seconds: int = Field(default=60)
     frontend_base_url: str = Field(default="http://localhost:5173")
+    analytics_query_snapshot: int = Field(default=10)
 
     @property
     def async_db_url(self) -> str:

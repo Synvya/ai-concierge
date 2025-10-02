@@ -36,16 +36,11 @@ async def chat(
 
     analytics_summary = None
     try:
-        analytics_summary = await asyncio.wait_for(
-            analytics_service.record_query(
-                visitor_id=payload.visitor_id or session_id,
-                session_id=session_id,
-                query=payload.message,
-            ),
-            timeout=3,
+        analytics_summary = await analytics_service.record_query(
+            visitor_id=payload.visitor_id or session_id,
+            session_id=session_id,
+            query=payload.message,
         )
-    except asyncio.TimeoutError:
-        logger.warning("analytics_record_timeout session_id=%s", session_id)
     except Exception as exc:  # noqa: BLE001
         logger.warning("analytics_record_failed session_id=%s error=%s", session_id, exc)
 
