@@ -5,10 +5,8 @@ from typing import Any, Dict, Optional
 
 import boto3
 import structlog
-from redis.asyncio import Redis
 
 from ..core.config import get_settings
-from ..core.redis import redis_client
 
 
 settings = get_settings()
@@ -16,10 +14,9 @@ logger = structlog.get_logger(__name__)
 
 
 class AnalyticsService:
-    """Tracks basic usage metrics and pushes aggregates to S3."""
+    """Persists per-query analytics snapshots directly to S3."""
 
-    def __init__(self, redis: Redis) -> None:
-        self._redis = redis
+    def __init__(self) -> None:
         self._queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
         self._worker_task: Optional[asyncio.Task[None]] = None
         session = boto3.session.Session()
@@ -50,40 +47,12 @@ class AnalyticsService:
         now = datetime.now(timezone.utc)
         date_key = now.strftime("%Y-%m-%d")
 
-        visitor_set = f"analytics:visitors:{date_key}"
-        session_set = f"analytics:sessions:{date_key}"
-        query_list = f"analytics:session-queries:{session_id}"
-
-        await asyncio.gather(
-            self._redis.sadd(visitor_set, visitor_id),
-            self._redis.sadd(session_set, session_id),
-            self._redis.rpush(query_list, query),
-        )
-
-        ttl_seconds = 60 * 60 * 24 * 14
-        await asyncio.gather(
-            self._redis.expire(visitor_set, ttl_seconds),
-            self._redis.expire(session_set, ttl_seconds),
-            self._redis.expire(query_list, ttl_seconds),
-        )
-
-        unique_visitors, total_sessions, query_count = await asyncio.gather(
-            self._redis.scard(visitor_set),
-            self._redis.scard(session_set),
-            self._redis.llen(query_list),
-        )
-
-        queries = await self._redis.lrange(query_list, 0, -1)
-
         payload = {
             "timestamp": now.isoformat(),
             "date": date_key,
             "visitor_id": visitor_id,
             "session_id": session_id,
-            "query_count": query_count,
-            "queries": queries,
-            "unique_visitors_today": unique_visitors,
-            "sessions_today": total_sessions,
+            "query": query,
         }
 
         await self._queue.put(payload)
@@ -96,7 +65,7 @@ class AnalyticsService:
             self._queue.task_done()
 
     async def _flush_to_s3(self, payload: Dict[str, Any]) -> None:
-        key = f"analytics/daily/{payload['date']}/{payload['session_id']}.json"
+        key = f"analytics/daily/{payload['date']}/{payload['session_id']}-{int(datetime.now(timezone.utc).timestamp()*1000)}.json"
 
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
@@ -114,4 +83,4 @@ class AnalyticsService:
             logger.warning("analytics_upload_failed", error=str(exc), key=key)
 
 
-analytics_service = AnalyticsService(redis_client)
+analytics_service = AnalyticsService()

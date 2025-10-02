@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api import chat, health, search
 from .core.config import get_settings
 from .core.logging import setup_logging
-from .core.redis import redis_client
 from .services.analytics import analytics_service
 
 
@@ -20,7 +19,6 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await analytics_service.stop()
-        await redis_client.close()
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
