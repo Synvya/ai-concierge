@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import boto3
 import structlog
-from botocore.exceptions import ClientError, NoCredentialsError
+from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
 
 from ..core.config import get_settings
 
@@ -40,6 +40,14 @@ class AnalyticsService:
             logger.warning(
                 "analytics_s3_disabled_no_credentials",
                 bucket=settings.s3_analytics_bucket,
+            )
+            self._enabled = False
+        except EndpointConnectionError as exc:
+            logger.warning(
+                "analytics_s3_disabled_unreachable",
+                bucket=settings.s3_analytics_bucket,
+                endpoint=settings.aws_endpoint_url or "aws",
+                error=str(exc),
             )
             self._enabled = False
 
@@ -129,6 +137,14 @@ class AnalyticsService:
             self._s3_client.head_bucket(Bucket=bucket)
         except NoCredentialsError:
             raise
+        except EndpointConnectionError as exc:
+            logger.warning(
+                "analytics_bucket_unreachable",
+                bucket=bucket,
+                endpoint=settings.aws_endpoint_url or "aws",
+                error=str(exc),
+            )
+            self._enabled = False
         except ClientError as exc:
             error_code = exc.response.get("Error", {}).get("Code", "")
             if error_code in ("404", "NoSuchBucket", "NoSuchBucketPolicy"):

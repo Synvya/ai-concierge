@@ -33,8 +33,6 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(default=1536)
     search_top_k: int = Field(default=5)
 
-    redis_url: str = Field(default="redis://localhost:6379/0")
-
     s3_analytics_bucket: str = Field(default="ai-concierge-analytics-dev")
     s3_region: str = Field(default="us-east-1")
     aws_access_key_id: Optional[str] = Field(default=None, alias="AWS_ACCESS_KEY_ID")

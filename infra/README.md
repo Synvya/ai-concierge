@@ -1,6 +1,6 @@
 # Infrastructure & Deployment
 
-Terraform has been retired from this project. The AWS infrastructure (ECS cluster, service, load balancer, IAM roles, S3 buckets, ElastiCache, etc.) is now managed manually in the AWS console.
+Terraform has been retired from this project. The AWS infrastructure (ECS cluster, service, load balancer, IAM roles, S3 buckets, and supporting networking) is now managed manually in the AWS console.
 
 ## Current Deployment Flow
 
@@ -23,7 +23,7 @@ Because infrastructure is now managed outside of Terraform, ensure the following
 - **S3 Buckets**:
   - Frontend hosting bucket (public website hosting or CloudFront).
   - Analytics bucket for daily JSON payloads.
-- **ElastiCache / Database / VPC** resources referenced by your environment variables.
+- **Database / VPC** resources referenced by your environment variables.
 
 Any changes to that infrastructure (for example, new subnets, security groups, or IAM policies) must now be performed manually via the AWS console or CLI.
 

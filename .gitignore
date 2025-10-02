@@ -28,6 +28,3 @@ Icon?
 .env
 backend/.env
 frontend/.env
-
-#docs
-docs/traces.md

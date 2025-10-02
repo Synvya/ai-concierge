@@ -8,7 +8,7 @@ The AI Concierge is a full-stack application that helps users discover local bus
   - FastAPI application exposing REST endpoints for chat, search results, and analytics beacons.
   - Integrates with a configurable PostgreSQL + pgvector database using SQLAlchemy.
   - Uses OpenAI Assistants API for response generation and structured tool calls.
-  - Maintains session state and query history in Redis (local) / ElastiCache (AWS) to estimate unique visitors and sessions.
+  - Tracks session state in-memory for the current process and persists analytics events directly to S3.
   - Emits analytics events to Amazon S3 via an asynchronous background task queue.
 
 - **Frontend (`frontend/`)**
@@ -19,7 +19,7 @@ The AI Concierge is a full-stack application that helps users discover local bus
 - **Infrastructure (`infra/`)**
   - Dockerfiles for both backend and frontend, plus `docker-compose.yaml` for local development.
   - GitHub Actions workflow to build, test, and containerize both services.
-  - Terraform stack provisioning AWS resources: ECS Fargate service (backend), S3 bucket (analytics), CloudFront + S3 static hosting (frontend), Secrets Manager (configuration), and optional ElastiCache.
+  - GitHub Actions deployment that builds the backend container, registers a task definition, updates the ECS service, and pushes the frontend bundle to S3.
 
 ## Data & Configuration
 - Database connection parameters (username, password, host, database, schema, table) are injected through environment variables and surfaced via `settings.py`.
@@ -28,7 +28,7 @@ The AI Concierge is a full-stack application that helps users discover local bus
 
 ## Analytics Flow
 1. Frontend tags each visitor with UUID stored in localStorage and calls `/analytics/visit`.
-2. Backend deduplicates visitors using Redis and writes a JSON record per visitor/day to S3.
+2. Backend deduplicates visitors within the running process and writes a JSON record per visitor/day to S3.
 3. Each chat session obtains a session UUID; queries within session are buffered and flushed to S3 on completion.
 4. No assistant responses are persisted; only queries and aggregate counts are stored.
 
@@ -36,7 +36,7 @@ The AI Concierge is a full-stack application that helps users discover local bus
 1. GitHub Actions workflow triggers on pushes to `main`.
 2. Lint & test jobs for backend and frontend.
 3. Build and push Docker images to ECR.
-4. Run Terraform plan & apply (with manual approval) to deploy infrastructure and update services.
+4. Deploy job uses AWS CLI commands to register a new task definition and update the ECS service.
 5. Frontend build artifacts uploaded to S3 and CloudFront cache invalidated.
 
 ## Local Development
