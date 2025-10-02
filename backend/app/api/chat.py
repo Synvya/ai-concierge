@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends
@@ -14,6 +16,7 @@ from ..services.embedding import embed_text
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=ChatResponse)
@@ -31,14 +34,23 @@ async def chat(
 
     answer = await generate_response(payload.message, results, payload.history)
 
-    analytics_summary = await analytics_service.record_query(
-        visitor_id=payload.visitor_id or session_id,
-        session_id=session_id,
-        query=payload.message,
-    )
+    analytics_summary = None
+    try:
+        analytics_summary = await asyncio.wait_for(
+            analytics_service.record_query(
+                visitor_id=payload.visitor_id or session_id,
+                session_id=session_id,
+                query=payload.message,
+            ),
+            timeout=3,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("analytics_record_timeout session_id=%s", session_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("analytics_record_failed session_id=%s error=%s", session_id, exc)
 
     debug_payload = None
-    if payload.debug:
+    if payload.debug and analytics_summary is not None:
         debug_payload = {
             "embedding_length": len(query_embedding),
             "raw_results": sellers,
