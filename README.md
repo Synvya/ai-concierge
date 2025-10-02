@@ -90,3 +90,9 @@ scripts/   Utility scripts (database seeding)
 ## Deployment
 Deployment docs and helper scripts live in [`infra/`](infra/README.md).
 GitHub Actions builds the backend image, registers a new ECS task definition, forces the service to deploy it, and syncs the frontend bundle to the S3 website bucket. Provisioning or modifying AWS infrastructure (ECS cluster, load balancer, IAM roles, etc.) is now a manual task performed outside the repository.
+
+### Required GitHub Secrets
+
+- `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, and either access keys or an OIDC trust so the workflow can call AWS.
+- `BACKEND_ENV_JSON` and `BACKEND_SECRET_JSON` for backend configuration.
+- `BACKEND_API_URL` – public URL of the FastAPI service, injected into the frontend build as `VITE_API_BASE_URL`.

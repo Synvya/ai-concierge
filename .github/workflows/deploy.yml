@@ -126,6 +126,15 @@ jobs:
           fi
           echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
+      - name: Validate backend API URL secret
+        run: |
+          if [ -z "$BACKEND_API_URL" ]; then
+            echo "BACKEND_API_URL secret is not configured."
+            exit 1
+          fi
+        env:
+          BACKEND_API_URL: ${{ secrets.BACKEND_API_URL }}
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -200,8 +209,11 @@ jobs:
           node-version: '20'
       - run: npm install
         working-directory: frontend
-      - run: npm run build
+      - name: Build frontend bundle
+        run: npm run build
         working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ secrets.BACKEND_API_URL }}
 
       - name: Upload frontend to S3
         run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete

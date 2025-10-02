@@ -7,7 +7,7 @@ Terraform has been retired from this project. The AWS infrastructure (ECS cluste
 1. **Container Build & Push** – GitHub Actions (`.github/workflows/deploy.yml`) builds the backend image, pushes it to ECR, and stores the resulting image URI as a job output (with an artifact fallback).
 2. **Task Definition Rendering** – The deploy job renders a task definition JSON using `scripts/render_task_definition.py`, injecting the image URI, CloudWatch log configuration, and environment/secret maps supplied via GitHub secrets.
 3. **ECS Service Update** – The workflow calls `aws ecs register-task-definition` followed by `aws ecs update-service --force-new-deployment` to roll the service to the new revision, then waits for the service to stabilise.
-4. **Frontend Upload** – The Vite build artefacts are synchronised to the configured S3 website bucket.
+4. **Frontend Upload** – The Vite build artefacts are synchronised to the configured S3 website bucket. The build step expects `VITE_API_BASE_URL` to be supplied through the GitHub secret `BACKEND_API_URL`, pointing to your public API endpoint (typically the ALB DNS name behind HTTPS).
 
 ## Manual Prerequisites
 
@@ -29,10 +29,11 @@ Any changes to that infrastructure (for example, new subnets, security groups, o
 
 ## Updating Secrets & Environment Variables
 
-The deploy workflow expects two GitHub secrets:
+The deploy workflow expects the following GitHub secrets:
 
 - `BACKEND_ENV_JSON` – JSON map of plaintext environment variables.
 - `BACKEND_SECRET_JSON` – JSON map of env var name to Secrets Manager ARN.
+- `BACKEND_API_URL` – Absolute URL of the backend API (e.g. `https://ai-concierge-alb-123456789.us-east-1.elb.amazonaws.com`). Used during the frontend build to set `VITE_API_BASE_URL`.
 
 Whenever you add or rename variables, update those secrets and ensure the ECS execution role can read the referenced Secrets Manager entries.
 
