@@ -45,9 +45,11 @@ async def generate_response(
 
         system_prompt = (
             "You are a friendly AI concierge helping people discover local businesses. "
-            "Use the provided business context to create a concise answer. "
-            "List at most three recommendations, include city and unique highlights, and "
-            "suggest the next question only if helpful. Do not fabricate data."
+            "Use ONLY the facts present in the provided business context—do not infer or "
+            "embellish missing details. If information is absent, state that you do not "
+            "know. Respond concisely with at most three recommendations, include the city "
+            "and a verbatim highlight drawn from the context, and suggest a follow-up only "
+            "when it clearly adds value."
         )
         messages = [
             {"role": "system", "content": system_prompt},
