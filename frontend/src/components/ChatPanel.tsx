@@ -206,9 +206,15 @@ export const ChatPanel = () => {
           </Button>
         </Flex>
         <Stack direction={{ base: 'column', md: 'row' }} spacing={4}>
-          <SuggestedQuery label="Find vegan brunch spots" onClick={handleSuggestedQuery} />
-          <SuggestedQuery label="Where can I repair my bike?" onClick={handleSuggestedQuery} />
-          <SuggestedQuery label="Book a last-minute spa appointment" onClick={handleSuggestedQuery} />
+          <SuggestedQuery
+            label="Where should I grab coffee and breakfast in downtown Snoqualmie this weekend?"
+            onClick={handleSuggestedQuery}
+          />
+          <SuggestedQuery label="Find me a family friendly Italian restaurant" onClick={handleSuggestedQuery} />
+          <SuggestedQuery
+            label="Are there any local wine rooms in Snoqualmie Valley for a casual night out?"
+            onClick={handleSuggestedQuery}
+          />
         </Stack>
       </Stack>
 
