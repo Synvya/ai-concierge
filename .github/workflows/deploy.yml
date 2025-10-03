@@ -15,6 +15,7 @@ env:
   ECR_REPOSITORY: ai-concierge-backend
   FRONTEND_BUCKET: ${{ secrets.FRONTEND_BUCKET }}
   ANALYTICS_BUCKET: ${{ secrets.ANALYTICS_BUCKET }}
+  FRONTEND_DISTRIBUTION_ID: ${{ secrets.FRONTEND_DISTRIBUTION_ID }}
 
 jobs:
   test:
@@ -232,3 +233,10 @@ jobs:
 
       - name: Upload frontend to S3
         run: aws s3 sync frontend/dist s3://${FRONTEND_BUCKET} --delete
+
+      - name: Invalidate CloudFront cache
+        if: ${{ env.FRONTEND_DISTRIBUTION_ID != '' }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${FRONTEND_DISTRIBUTION_ID}" \
+            --paths "/index.html" "/" "/*"
