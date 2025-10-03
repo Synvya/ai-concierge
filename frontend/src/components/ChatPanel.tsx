@@ -34,7 +34,15 @@ const USER_AVATAR_URL = '/assets/user.png'
 const LINK_REGEX = /(https?:\/\/[^\s]+)/g
 
 const SuggestedQuery = ({ label, onClick }: { label: string; onClick: (value: string) => void }) => (
-  <Tag as="button" size="lg" variant="outline" onClick={() => onClick(label)}>
+  <Tag
+    as="button"
+    size="lg"
+    variant="outline"
+    justifyContent="flex-start"
+    textAlign="left"
+    whiteSpace="normal"
+    onClick={() => onClick(label)}
+  >
     {label}
   </Tag>
 )
