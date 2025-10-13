@@ -40,6 +40,7 @@ docker-compose up --build
 python scripts/load_sample_data.py
 ```
 This imports `internal/sample_database.txt` into the configured schema/table.
+To surface product listings in the UI, also load your kind `30402` (NIP-99 Classified Listing) events into the table referenced by `DB_LISTINGS_TABLE` (defaults to `nostr.classified_listings`).
 
 ### 3. Run services without Docker (optional)
 ```bash
@@ -66,7 +67,8 @@ npm run dev
 | Variable | Description |
 | --- | --- |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | PostgreSQL connection details |
-| `DB_SCHEMA`, `DB_TABLE` | Schema/table to query for business data |
+| `DB_SCHEMA`, `DB_TABLE`, `DB_LISTINGS_TABLE` | Schema/tables to query for business and product data |
+| `LISTINGS_PER_SELLER` | Maximum number of listings to include in responses |
 | `OPENAI_API_KEY` | Used for embeddings and chat completions |
 | `OPENAI_ASSISTANT_MODEL`, `OPENAI_EMBEDDING_MODEL` | OpenAI model overrides |
 | `S3_ANALYTICS_BUCKET`, `S3_REGION` | Target bucket and AWS region for analytics |

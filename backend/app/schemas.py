@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -30,6 +31,28 @@ class SearchRequest(BaseModel):
     debug: bool = False
 
 
+class ListingPrice(BaseModel):
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    frequency: Optional[str] = None
+
+
+class ProductListing(BaseModel):
+    id: str
+    title: str
+    summary: Optional[str] = None
+    content: Optional[str] = None
+    status: Optional[str] = None
+    location: Optional[str] = None
+    price: Optional[ListingPrice] = None
+    published_at: Optional[datetime] = None
+    images: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+    url: Optional[str] = None
+    identifier: Optional[str] = None
+    raw_tags: List[List[str]] = Field(default_factory=list)
+
+
 class SellerResult(BaseModel):
     id: str
     name: Optional[str] = None
@@ -38,6 +61,7 @@ class SellerResult(BaseModel):
     content: Optional[str] = None
     distance: Optional[float] = None
     score: float = Field(default=0.0)
+    listings: List[ProductListing] = Field(default_factory=list)
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
         if self.distance is not None and self.distance != 0:

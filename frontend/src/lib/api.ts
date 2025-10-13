@@ -1,5 +1,27 @@
 import axios from 'axios'
 
+export interface ListingPrice {
+  amount?: number
+  currency?: string
+  frequency?: string
+}
+
+export interface ProductListing {
+  id: string
+  title: string
+  summary?: string
+  content?: string
+  status?: string
+  location?: string
+  price?: ListingPrice
+  published_at?: string
+  images?: string[]
+  tags?: string[]
+  url?: string
+  identifier?: string
+  raw_tags?: string[][]
+}
+
 export interface SellerResult {
   id: string
   name?: string
@@ -8,6 +30,7 @@ export interface SellerResult {
   content?: string
   distance?: number
   score: number
+  listings?: ProductListing[]
 }
 
 export interface ChatMessage {

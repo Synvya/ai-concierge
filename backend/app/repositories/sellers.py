@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
+from .listings import get_listings_by_public_keys
 
 
 settings = get_settings()
@@ -27,6 +28,27 @@ sellers_table = Table(
 )
 
 
+def _should_exclude_seller(seller: Dict[str, Any]) -> bool:
+    def has_demo_flag(data: Dict[str, Any] | None) -> bool:
+        if not isinstance(data, dict):
+            return False
+        if data.get("hashtag_demo") is True:
+            return True
+        hashtags = data.get("hashtags")
+        if isinstance(hashtags, list) and any(
+            isinstance(tag, str) and tag.lower() == "demo" for tag in hashtags
+        ):
+            return True
+        environment = data.get("environment")
+        if isinstance(environment, str) and environment.lower() == "demo":
+            return True
+        return False
+
+    meta = seller.get("meta_data")
+    filters = seller.get("filters")
+    return has_demo_flag(meta) or has_demo_flag(filters)
+
+
 async def search_sellers(
     session: AsyncSession,
     query_embedding: Sequence[float],
@@ -46,12 +68,37 @@ async def search_sellers(
             distance,
         )
         .order_by(distance)
-        .limit(limit)
+        .limit(max(limit * 3, limit))
     )
 
     result = await session.execute(stmt)
     rows = result.mappings().all()
-    return [dict(row) for row in rows]
+
+    sellers: List[Dict[str, Any]] = []
+    for row in rows:
+        seller = dict(row)
+        if _should_exclude_seller(seller):
+            continue
+        sellers.append(seller)
+        if len(sellers) >= limit:
+            break
+
+    public_keys: List[str] = []
+    for seller in sellers:
+        meta = seller.get("meta_data")
+        if isinstance(meta, dict):
+            pubkey = meta.get("public_key")
+            if isinstance(pubkey, str) and pubkey:
+                public_keys.append(pubkey)
+
+    listings_map = await get_listings_by_public_keys(session, public_keys)
+
+    for seller in sellers:
+        meta = seller.get("meta_data")
+        pubkey = meta.get("public_key") if isinstance(meta, dict) else None
+        seller["listings"] = listings_map.get(pubkey, []) if pubkey else []
+
+    return sellers
 
 
 async def get_seller_by_id(session: AsyncSession, seller_id: str) -> Dict[str, Any] | None:
@@ -60,4 +107,14 @@ async def get_seller_by_id(session: AsyncSession, seller_id: str) -> Dict[str, A
     row = result.mappings().first()
     if row is None:
         return None
-    return dict(row)
+    seller = dict(row)
+    if _should_exclude_seller(seller):
+        return None
+    meta = seller.get("meta_data")
+    pubkey = meta.get("public_key") if isinstance(meta, dict) else None
+    if pubkey:
+        listings_map = await get_listings_by_public_keys(session, [pubkey])
+        seller["listings"] = listings_map.get(pubkey, [])
+    else:
+        seller["listings"] = []
+    return seller

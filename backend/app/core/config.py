@@ -27,11 +27,13 @@ class Settings(BaseSettings):
     db_name: str = Field(default="concierge")
     db_schema: Optional[str] = Field(default="nostr")
     db_table: str = Field(default="sellers")
+    listings_table: Optional[str] = Field(default="classified_listings", alias="DB_LISTINGS_TABLE")
     db_pool_size: int = Field(default=5)
     db_max_overflow: int = Field(default=10)
 
     embedding_dimensions: int = Field(default=1536)
     search_top_k: int = Field(default=5)
+    listings_per_seller: int = Field(default=4)
 
     s3_analytics_bucket: str = Field(default="ai-concierge-analytics-dev")
     s3_region: str = Field(default="us-east-1")

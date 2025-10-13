@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
   Avatar,
-  AspectRatio,
   Box,
   Button,
   Card,
@@ -9,12 +8,10 @@ import {
   Flex,
   Heading,
   IconButton,
-  Image,
   Input,
   InputGroup,
   InputRightElement,
   Link,
-  SimpleGrid,
   Spinner,
   Stack,
   Tag,
@@ -25,7 +22,7 @@ import {
 import { ArrowForwardIcon } from '@chakra-ui/icons'
 
 import { useClientIds } from '../hooks/useClientIds'
-import type { ChatMessage, ChatResponse, SellerResult } from '../lib/api'
+import type { ChatMessage, ChatResponse } from '../lib/api'
 import { chat } from '../lib/api'
 
 const ASSISTANT_NAME = 'Synvya Concierge'
@@ -46,23 +43,6 @@ const SuggestedQuery = ({ label, onClick }: { label: string; onClick: (value: st
     {label}
   </Tag>
 )
-
-const extractImage = (seller: SellerResult): string | undefined => {
-  const meta = (seller.meta_data ?? {}) as Record<string, unknown>
-  const picture = typeof meta.picture === 'string' && meta.picture.trim() ? (meta.picture as string).trim() : undefined
-  const banner = typeof meta.banner === 'string' && meta.banner.trim() ? (meta.banner as string).trim() : undefined
-  if (banner) return banner
-  if (picture) return picture
-  if (Array.isArray(meta.attachments)) {
-    const firstWithUrl = meta.attachments.find((item) => typeof (item as Record<string, unknown>)?.url === 'string') as
-      | { url: string }
-      | undefined
-    if (firstWithUrl?.url) {
-      return firstWithUrl.url
-    }
-  }
-  return undefined
-}
 
 const renderMessageContent = (text: string) =>
   text.split(/\n\n+/).map((paragraph, paragraphIdx) => (
@@ -96,24 +76,6 @@ const renderMessageContent = (text: string) =>
     </Stack>
   ))
 
-const SellerCard = ({ seller }: { seller: SellerResult }) => {
-  const image = extractImage(seller)
-  if (!image) return null
-
-  return (
-    <Stack spacing={2} key={seller.id}>
-      <AspectRatio ratio={16 / 9} borderRadius="lg" overflow="hidden">
-        <Image src={image} alt={seller.name ?? 'Business photo'} objectFit="cover" />
-      </AspectRatio>
-      {seller.name ? (
-        <Text fontSize="sm" textAlign="center" color="gray.600">
-          {seller.name}
-        </Text>
-      ) : null}
-    </Stack>
-  )
-}
-
 const initialMessages: ChatMessage[] = [
   {
     role: 'assistant',
@@ -127,7 +89,6 @@ export const ChatPanel = () => {
   const toast = useToast()
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
-  const [results, setResults] = useState<SellerResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   const handleChatResponse = useCallback((payload: ChatResponse) => {
@@ -136,7 +97,6 @@ export const ChatPanel = () => {
       content: payload.answer,
     }
     setMessages((prev) => [...prev, assistantMessage])
-    setResults(payload.results)
   }, [])
 
   const canSend = useMemo(
@@ -182,7 +142,6 @@ export const ChatPanel = () => {
   const startNewSession = () => {
     resetSession()
     setMessages(initialMessages)
-    setResults([])
   }
 
   const onKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (event) => {
@@ -241,13 +200,6 @@ export const ChatPanel = () => {
               <Card bg={message.role === 'assistant' ? 'purple.50' : 'white'} borderRadius="lg" shadow="sm" flex="1">
                 <CardBody display="flex" flexDirection="column" gap={4}>
                   {renderMessageContent(message.content)}
-                  {message.role === 'assistant' && index === messages.length - 1 && results.length > 0 ? (
-                    <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={4}>
-                      {results.map((seller) => (
-                        <SellerCard key={seller.id} seller={seller} />
-                      ))}
-                    </SimpleGrid>
-                  ) : null}
                 </CardBody>
               </Card>
             </Flex>

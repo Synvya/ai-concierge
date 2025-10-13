@@ -22,11 +22,29 @@ def _build_context(results: List[SellerResult]) -> str:
         meta = result.meta_data or {}
         location = meta.get("city")
         tags = ", ".join(meta.get("hashtags", [])) if meta.get("hashtags") else ""
+        listing_lines = []
+        for listing in result.listings[:3]:
+            price_parts = []
+            if listing.price:
+                if listing.price.amount is not None:
+                    price_parts.append(f"{listing.price.amount:g}")
+                if listing.price.currency:
+                    price_parts.append(listing.price.currency)
+                if listing.price.frequency:
+                    price_parts.append(listing.price.frequency)
+            price_str = f" ({' '.join(price_parts)})" if price_parts else ""
+            detail = listing.summary or listing.content or ""
+            detail_str = f" – {detail}" if detail else ""
+            listing_lines.append(f"     - {listing.title}{price_str}{detail_str}")
+        listings_block = ""
+        if listing_lines:
+            listings_block = "\n   Products & Services:\n" + "\n".join(listing_lines)
         lines.append(
             f"{idx}. {result.name or 'Unknown'} (score: {result.score:.3f})\n"
             f"   Summary: {result.content or 'No description provided.'}\n"
             f"   Location: {location or 'Unknown'}\n"
             f"   Tags: {tags}"
+            f"{listings_block}"
         )
     return "\n".join(lines)
 
