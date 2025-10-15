@@ -261,6 +261,26 @@ export const ChatPanel = () => {
     return undefined
   }
 
+  const pickListingImage = (images?: ProductListing['images']) => {
+    if (!Array.isArray(images)) {
+      return undefined
+    }
+    for (const entry of images) {
+      if (typeof entry === 'string' && entry.trim().length > 0) {
+        return entry.trim()
+      }
+    }
+    for (const entry of images) {
+      if (entry && typeof entry === 'object') {
+        const url = (entry as { url?: string | null }).url
+        if (typeof url === 'string' && url.trim().length > 0) {
+          return url.trim()
+        }
+      }
+    }
+    return undefined
+  }
+
   const renderAttachments = (attachments?: SellerResult[]) => {
     if (!attachments?.length) {
       return null
@@ -397,7 +417,7 @@ export const ChatPanel = () => {
                         const detail = listing.summary || listing.content
                         const priceLabel = formatPrice(listing.price)
                         const tags = (listing.tags ?? []).filter(Boolean).slice(0, 3)
-                        const image = Array.isArray(listing.images) ? listing.images.find((img) => typeof img === 'string' && img.trim().length > 0) ?? (listing.images[0] && typeof listing.images[0] === 'object' ? listing.images[0].url : undefined) : undefined
+                        const image = pickListingImage(listing.images)
                         return (
                           <Box
                             key={`${seller.id}-${listing.id}`}

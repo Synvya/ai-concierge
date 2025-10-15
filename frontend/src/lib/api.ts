@@ -6,6 +6,10 @@ export interface ListingPrice {
   frequency?: string
 }
 
+export interface ProductListingImageObject {
+  url?: string | null
+}
+
 export interface ProductListing {
   id: string
   title: string
@@ -15,7 +19,7 @@ export interface ProductListing {
   location?: string
   price?: ListingPrice
   published_at?: string
-  images?: string[]
+  images?: string[] | ProductListingImageObject[]
   tags?: string[]
   url?: string
   identifier?: string
