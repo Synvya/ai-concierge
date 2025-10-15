@@ -20,7 +20,12 @@ async def search(
     top_k = payload.top_k or settings.search_top_k
 
     query_embedding = await embed_text(payload.query)
-    sellers = await search_sellers(session=session, query_embedding=query_embedding, limit=top_k)
+    sellers = await search_sellers(
+        session=session,
+        query_embedding=query_embedding,
+        limit=top_k,
+        query_text=payload.query,
+    )
     results = [SellerResult(**seller) for seller in sellers]
 
     debug_payload = None

@@ -28,7 +28,12 @@ async def chat(
     top_k = payload.top_k or settings.search_top_k
 
     query_embedding = await embed_text(payload.message)
-    sellers = await search_sellers(session=session, query_embedding=query_embedding, limit=top_k)
+    sellers = await search_sellers(
+        session=session,
+        query_embedding=query_embedding,
+        limit=top_k,
+        query_text=payload.message,
+    )
 
     results = [SellerResult(**seller) for seller in sellers]
 

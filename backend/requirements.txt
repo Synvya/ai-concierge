@@ -13,3 +13,4 @@ tenacity>=8.2.3
 httpx>=0.26.0
 structlog>=23.2.0
 greenlet>=3.0.3
+pytest 

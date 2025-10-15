@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardBody,
+  Image,
   Flex,
   Heading,
   IconButton,
@@ -17,12 +18,20 @@ import {
   Tag,
   Text,
   Tooltip,
+  Wrap,
+  WrapItem,
   useToast,
 } from '@chakra-ui/react'
 import { ArrowForwardIcon } from '@chakra-ui/icons'
 
 import { useClientIds } from '../hooks/useClientIds'
-import type { ChatMessage, ChatResponse } from '../lib/api'
+import type {
+  ChatMessage,
+  ChatResponse,
+  ListingPrice,
+  ProductListing,
+  SellerResult,
+} from '../lib/api'
 import { chat } from '../lib/api'
 
 const ASSISTANT_NAME = 'Synvya Concierge'
@@ -95,6 +104,7 @@ export const ChatPanel = () => {
     const assistantMessage: ChatMessage = {
       role: 'assistant',
       content: payload.answer,
+      attachments: payload.results,
     }
     setMessages((prev) => [...prev, assistantMessage])
   }, [])
@@ -153,6 +163,310 @@ export const ChatPanel = () => {
     }
   }
 
+  const formatPrice = (price?: ListingPrice) => {
+    if (!price) {
+      return undefined
+    }
+    const { amount, currency, frequency } = price
+    const parts: string[] = []
+
+    if (typeof amount === 'number') {
+      if (currency) {
+        try {
+          const fractionDigits = Number.isInteger(amount) ? 0 : 2
+          parts.push(
+            new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency,
+              minimumFractionDigits: fractionDigits,
+              maximumFractionDigits: fractionDigits,
+            }).format(amount),
+          )
+        } catch {
+          parts.push(`${amount}${currency ? ` ${currency}` : ''}`)
+        }
+      } else {
+        const fractionDigits = Number.isInteger(amount) ? 0 : 2
+        parts.push(amount.toFixed(fractionDigits))
+      }
+    } else if (currency) {
+      parts.push(currency)
+    }
+
+    if (frequency) {
+      parts.push(frequency)
+    }
+
+    return parts.join(' ')
+  }
+
+  const getMetaString = (meta: Record<string, unknown> | undefined, key: string) => {
+    if (!meta) {
+      return undefined
+    }
+    const value = meta[key]
+    return typeof value === 'string' && value.trim().length > 0 ? value : undefined
+  }
+
+  const extractSellerDescription = (seller: SellerResult, meta: Record<string, unknown>) => {
+    const pickString = (value: unknown) =>
+      typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
+
+    const metaAbout = pickString(meta['about'])
+    if (metaAbout) {
+      return metaAbout
+    }
+
+    const parseContentObject = (value: unknown): Record<string, unknown> | undefined => {
+      if (!value) {
+        return undefined
+      }
+      if (typeof value === 'object') {
+        return value as Record<string, unknown>
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim()
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed)
+            if (parsed && typeof parsed === 'object') {
+              return parsed as Record<string, unknown>
+            }
+          } catch {
+            return undefined
+          }
+        }
+      }
+      return undefined
+    }
+
+    const contentObject = parseContentObject(seller.content)
+    if (contentObject) {
+      const fromObject =
+        pickString(contentObject.about) ??
+        pickString(contentObject['summary']) ??
+        pickString(contentObject['description'])
+      if (fromObject) {
+        return fromObject
+      }
+    }
+
+    if (typeof seller.content === 'string') {
+      const trimmed = seller.content.trim()
+      if (trimmed.length > 0 && !(trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+        return trimmed
+      }
+    }
+
+    return undefined
+  }
+
+  const renderAttachments = (attachments?: SellerResult[]) => {
+    if (!attachments?.length) {
+      return null
+    }
+
+    const parseMetaData = (metaData: SellerResult['meta_data']) => {
+      if (!metaData) {
+        return {}
+      }
+      if (typeof metaData === 'object') {
+        return metaData as Record<string, unknown>
+      }
+      if (typeof metaData === 'string') {
+        try {
+          const parsed = JSON.parse(metaData)
+          if (parsed && typeof parsed === 'object') {
+            return parsed as Record<string, unknown>
+          }
+        } catch {
+          return {}
+        }
+      }
+      return {}
+    }
+
+    const aggregateMap = new Map<
+      string,
+      { seller: SellerResult; meta: Record<string, unknown> }
+    >()
+
+    for (const seller of attachments) {
+      const meta = parseMetaData(seller.meta_data)
+      const canonical =
+        (typeof meta.public_key === 'string' && meta.public_key) ||
+        (typeof meta.seller === 'string' && meta.seller) ||
+        (typeof seller.id === 'string' && seller.id) ||
+        (typeof seller.name === 'string' && seller.name) ||
+        undefined
+      const key = canonical ? canonical.trim().toLowerCase() : `__fallback_${seller.id}`
+      const existing = aggregateMap.get(key)
+      const incomingListings = Array.isArray(seller.listings) ? seller.listings : []
+
+      if (existing) {
+        const mergedListings = Array.isArray(existing.seller.listings)
+          ? [...existing.seller.listings]
+          : []
+        const seenIds = new Set(mergedListings.map((item) => item.id))
+        for (const listing of incomingListings) {
+          if (listing && listing.id && !seenIds.has(listing.id)) {
+            mergedListings.push(listing)
+            seenIds.add(listing.id)
+          }
+        }
+        existing.seller = {
+          ...existing.seller,
+          listings: mergedListings,
+        }
+      } else {
+        aggregateMap.set(key, {
+          seller: {
+            ...seller,
+            listings: [...incomingListings],
+          },
+          meta,
+        })
+      }
+    }
+
+    const productAttachments = Array.from(aggregateMap.values()).filter(
+      ({ seller }) => Array.isArray(seller.listings) && seller.listings.length > 0,
+    )
+
+    if (!productAttachments.length) {
+      return null
+    }
+
+    return (
+      <Stack spacing={4}>
+        {productAttachments.map(({ seller, meta }) => {
+          const displayName =
+            getMetaString(meta, 'display_name') ?? seller.name ?? 'Local merchant'
+          const city = getMetaString(meta, 'city')
+          const state = getMetaString(meta, 'state')
+          const phone = getMetaString(meta, 'phone')
+          const website = getMetaString(meta, 'website')
+          const location = [city, state].filter(Boolean).join(', ')
+          const listingsToShow: ProductListing[] = seller.listings ?? []
+          const description = extractSellerDescription(seller, meta)
+
+          return (
+            <Card key={seller.id} variant="outline" borderColor="purple.100" bg="white">
+              <CardBody>
+                <Stack spacing={3}>
+                  <Flex
+                    direction={{ base: 'column', md: 'row' }}
+                    justify="space-between"
+                    align={{ base: 'flex-start', md: 'center' }}
+                    gap={2}
+                  >
+                    <Box>
+                      <Heading size="sm">{displayName}</Heading>
+                      {location ? (
+                        <Text fontSize="sm" color="gray.600">
+                          {location}
+                        </Text>
+                      ) : null}
+                    </Box>
+                    <Stack direction="row" spacing={3} align="center">
+                      {phone ? (
+                        <Text fontSize="sm" color="gray.600">
+                          {phone}
+                        </Text>
+                      ) : null}
+                      {website ? (
+                        <Link fontSize="sm" color="purple.600" href={website} target="_blank" rel="noreferrer">
+                          Visit website
+                        </Link>
+                      ) : null}
+                    </Stack>
+                  </Flex>
+
+                  {description ? (
+                    <Text fontSize="sm" color="gray.700">
+                      {description}
+                    </Text>
+                  ) : null}
+
+                  <Stack spacing={2}>
+                    <Heading size="xs" color="purple.600" textTransform="uppercase" letterSpacing="0.08em">
+                      Featured products
+                    </Heading>
+                    <Stack spacing={3}>
+                      {listingsToShow.map((listing) => {
+                        const detail = listing.summary || listing.content
+                        const priceLabel = formatPrice(listing.price)
+                        const tags = (listing.tags ?? []).filter(Boolean).slice(0, 3)
+                        const image = Array.isArray(listing.images) ? listing.images.find((img) => typeof img === 'string' && img.trim().length > 0) ?? (listing.images[0] && typeof listing.images[0] === 'object' ? listing.images[0].url : undefined) : undefined
+                        return (
+                          <Box
+                            key={`${seller.id}-${listing.id}`}
+                            borderLeftWidth="2px"
+                            borderColor="purple.100"
+                            pl={3}
+                          >
+                            <Stack spacing={1}>
+                              {image ? (
+                                <Box mb={2}>
+                                  <Image
+                                    src={image}
+                                    alt={listing.title}
+                                    maxH="160px"
+                                    borderRadius="md"
+                                    objectFit="cover"
+                                  />
+                                </Box>
+                              ) : null}
+                              <Text fontWeight="semibold">
+                                {listing.title}
+                                {priceLabel ? (
+                                  <Text as="span" color="purple.600">
+                                    {' '}
+                                    · {priceLabel}
+                                  </Text>
+                                ) : null}
+                              </Text>
+                              {detail ? (
+                                <Text fontSize="sm" color="gray.600">
+                                  {detail}
+                                </Text>
+                              ) : null}
+                              {listing.location ? (
+                                <Text fontSize="xs" color="gray.500">
+                                  {listing.location}
+                                </Text>
+                              ) : null}
+                              {listing.url ? (
+                                <Link fontSize="sm" color="purple.600" href={listing.url} target="_blank" rel="noreferrer">
+                                  View details
+                                </Link>
+                              ) : null}
+                              {tags.length ? (
+                                <Wrap spacing={2}>
+                                  {tags.map((tag) => (
+                                    <WrapItem key={`${listing.id}-${tag}`}>
+                                      <Tag size="sm" variant="subtle" colorScheme="purple">
+                                        #{tag}
+                                      </Tag>
+                                    </WrapItem>
+                                  ))}
+                                </Wrap>
+                              ) : null}
+                            </Stack>
+                          </Box>
+                        )
+                      })}
+                    </Stack>
+                  </Stack>
+                </Stack>
+              </CardBody>
+            </Card>
+          )
+        })}
+      </Stack>
+    )
+  }
+
   return (
     <Flex direction="column" height="100%" gap={6}>
       <Stack spacing={6}>
@@ -197,9 +511,17 @@ export const ChatPanel = () => {
                 borderWidth={0}
                 size="sm"
               />
-              <Card bg={message.role === 'assistant' ? 'purple.50' : 'white'} borderRadius="lg" shadow="sm" flex="1">
-                <CardBody display="flex" flexDirection="column" gap={4}>
-                  {renderMessageContent(message.content)}
+              <Card
+                bg={message.role === 'assistant' ? 'purple.50' : 'white'}
+                borderRadius="lg"
+                shadow="sm"
+                flex="1"
+              >
+                <CardBody>
+                  <Stack spacing={4}>
+                    <Stack spacing={3}>{renderMessageContent(message.content)}</Stack>
+                    {message.role === 'assistant' ? renderAttachments(message.attachments) : null}
+                  </Stack>
                 </CardBody>
               </Card>
             </Flex>

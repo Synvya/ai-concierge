@@ -23,7 +23,7 @@ def _build_context(results: List[SellerResult]) -> str:
         location = meta.get("city")
         tags = ", ".join(meta.get("hashtags", [])) if meta.get("hashtags") else ""
         listing_lines = []
-        for listing in result.listings[:3]:
+        for listing in result.listings:
             price_parts = []
             if listing.price:
                 if listing.price.amount is not None:
