@@ -44,6 +44,10 @@ class ProductListing(BaseModel):
     content: Optional[str] = None
     status: Optional[str] = None
     location: Optional[str] = None
+    full_address: Optional[str] = None
+    geohash: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     price: Optional[ListingPrice] = None
     published_at: Optional[datetime] = None
     images: List[str] = Field(default_factory=list)
@@ -59,6 +63,10 @@ class SellerResult(BaseModel):
     meta_data: Optional[Dict[str, Any]] = None
     filters: Optional[Dict[str, Any]] = None
     content: Optional[str] = None
+    full_address: Optional[str] = None
+    geohash: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     distance: Optional[float] = None
     score: float = Field(default=0.0)
     listings: List[ProductListing] = Field(default_factory=list)
