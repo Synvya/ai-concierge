@@ -36,6 +36,7 @@ describe('ChatPanel - Share my location', () => {
             ; (sessionStorage as Storage).clear()
             ; (localStorage as Storage).clear()
         vi.restoreAllMocks()
+        vi.unstubAllGlobals()
     })
 
     test('button shows pending then granted state and sends coords in payload', async () => {
@@ -43,10 +44,7 @@ describe('ChatPanel - Share my location', () => {
         const getCurrentPosition = vi.fn().mockImplementation((success: PositionCallback) => {
             success({ coords: { latitude: 47.6062, longitude: -122.3321 } } as GeolocationPosition)
         })
-        Object.defineProperty(globalThis.navigator as any, 'geolocation', {
-            value: { getCurrentPosition },
-            configurable: true,
-        })
+        vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } } as any)
 
         // Mock chat API to capture payload
         const chatSpy = vi.spyOn(api, 'chat').mockResolvedValue({
@@ -85,7 +83,7 @@ describe('ChatPanel - Share my location', () => {
 
     test('disables share button when geolocation unsupported', async () => {
         // Remove geolocation
-        Object.defineProperty(globalThis.navigator as any, 'geolocation', { value: undefined, configurable: true })
+        vi.stubGlobal('navigator', {} as any)
         renderWithChakra(<ChatPanel />)
         await waitFor(() => {
             const share = screen.getByRole('button', { name: /share location/i }) as HTMLButtonElement
