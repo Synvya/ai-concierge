@@ -4,6 +4,7 @@ from app.schemas import (
     ChatRequest,
     ChatResponse,
     GeoPoint,
+    ProductListing,
     SearchRequest,
     SearchResponse,
     SellerResult,
@@ -78,3 +79,32 @@ def test_search_response_includes_user_location_fields() -> None:
     assert dumped["user_location"] == "Denver, CO"
     assert dumped["user_coordinates"]["latitude"] == 39.7392
     assert dumped["user_coordinates"]["longitude"] == -104.9903
+
+
+def test_new_distance_and_maps_fields_present() -> None:
+    listing = ProductListing(
+        id="l1",
+        title="Item",
+        latitude=47.6,
+        longitude=-122.3,
+        geo_distance_km=1.23,
+        maps_url="https://www.google.com/maps/search/?api=1&query=47.600000%2C-122.300000",
+    )
+    seller = SellerResult(
+        id="s1",
+        score=0.0,
+        listings=[listing],
+        vector_distance=0.12,
+        geo_distance_km=1.23,
+        maps_url="https://www.google.com/maps/search/?api=1&query=47.600000%2C-122.300000",
+    )
+    dumped = seller.model_dump()
+    assert dumped["vector_distance"] == 0.12
+    assert dumped["geo_distance_km"] == 1.23
+    assert isinstance(dumped["maps_url"], str) and dumped["maps_url"].startswith(
+        "https://"
+    )
+    assert (
+        isinstance(dumped["listings"], list)
+        and dumped["listings"][0]["geo_distance_km"] == 1.23
+    )

@@ -57,6 +57,8 @@ class ProductListing(BaseModel):
     geohash: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    geo_distance_km: Optional[float] = None
+    maps_url: Optional[str] = None
     price: Optional[ListingPrice] = None
     published_at: Optional[datetime] = None
     images: List[str] = Field(default_factory=list)
@@ -76,15 +78,17 @@ class SellerResult(BaseModel):
     geohash: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    distance: Optional[float] = None
+    vector_distance: Optional[float] = None
+    geo_distance_km: Optional[float] = None
     score: float = Field(default=0.0)
+    maps_url: Optional[str] = None
     listings: List[ProductListing] = Field(default_factory=list)
     user_location: Optional[str] = None
     user_coordinates: Optional[GeoPoint] = None
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
-        if self.distance is not None and self.distance != 0:
-            self.score = max(0.0, 1.0 - self.distance)
+        # Keep score separate from distances; do not auto-mutate based on distances.
+        return
 
 
 class ChatResponse(BaseModel):

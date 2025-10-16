@@ -7,13 +7,13 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
+from ..utils.geolocation import build_maps_url, haversine_km
 from .listings import (
+    _npub_to_hex,
     filter_and_rank_listings,
     get_listings_by_public_keys,
-    _npub_to_hex,
     search_listings_by_text,
 )
-
 
 settings = get_settings()
 
@@ -74,7 +74,11 @@ def _normalize_pubkeys(pubkeys: Iterable[str]) -> List[str]:
 
 def _select_canonical_key(keys: List[str]) -> Optional[str]:
     for key in keys:
-        if isinstance(key, str) and len(key) == 64 and all(c in '0123456789abcdef' for c in key.lower()):
+        if (
+            isinstance(key, str)
+            and len(key) == 64
+            and all(c in "0123456789abcdef" for c in key.lower())
+        ):
             return key.lower()
     return keys[0].lower() if keys else None
 
@@ -125,18 +129,15 @@ async def _fetch_sellers_by_public_keys(
 
     pubkey_field = sellers_table.c.meta_data["public_key"].astext
 
-    stmt = (
-        select(
-            sellers_table.c.id,
-            sellers_table.c.name,
-            sellers_table.c.meta_data,
-            sellers_table.c.filters,
-            sellers_table.c.content,
-            sellers_table.c.usage,
-            sellers_table.c.content_hash,
-        )
-        .where(pubkey_field.in_(unique_pubkeys))
-    )
+    stmt = select(
+        sellers_table.c.id,
+        sellers_table.c.name,
+        sellers_table.c.meta_data,
+        sellers_table.c.filters,
+        sellers_table.c.content,
+        sellers_table.c.usage,
+        sellers_table.c.content_hash,
+    ).where(pubkey_field.in_(unique_pubkeys))
 
     result = await session.execute(stmt)
     seller_map: Dict[str, Dict[str, Any]] = {}
@@ -161,7 +162,9 @@ async def search_sellers(
     user_coordinates: Optional[Tuple[float, float]] = None,
     user_location: str | None = None,
 ) -> List[Dict[str, Any]]:
-    distance = sellers_table.c.embedding.cosine_distance(query_embedding).label("distance")
+    distance_expr = sellers_table.c.embedding.cosine_distance(query_embedding).label(
+        "vector_distance"
+    )
 
     stmt = (
         select(
@@ -172,9 +175,9 @@ async def search_sellers(
             sellers_table.c.content,
             sellers_table.c.usage,
             sellers_table.c.content_hash,
-            distance,
+            distance_expr,
         )
-        .order_by(distance)
+        .order_by(distance_expr)
         .limit(max(limit * 3, limit))
     )
 
@@ -201,7 +204,9 @@ async def search_sellers(
     listing_matches: List[Dict[str, Any]] = []
     if query_text:
         product_limit = max(limit, 1) * max(settings.listings_per_seller or 1, 1)
-        listing_matches = await search_listings_by_text(session, query_text, product_limit)
+        listing_matches = await search_listings_by_text(
+            session, query_text, product_limit
+        )
 
         normalized_matches: List[Dict[str, Any]] = []
         missing_pubkeys: List[str] = []
@@ -212,19 +217,24 @@ async def search_sellers(
             match["normalized_pubkey"] = normalized_pubkey
             normalized_matches.append(match)
             for candidate in candidate_keys:
-                if candidate not in seller_pubkey_map and candidate not in missing_pubkeys:
+                if (
+                    candidate not in seller_pubkey_map
+                    and candidate not in missing_pubkeys
+                ):
                     missing_pubkeys.append(candidate)
 
         listing_matches = normalized_matches
         if missing_pubkeys:
-            extra_sellers = await _fetch_sellers_by_public_keys(session, missing_pubkeys)
+            extra_sellers = await _fetch_sellers_by_public_keys(
+                session, missing_pubkeys
+            )
             seen_sellers: set[int] = set()
             for seller in extra_sellers.values():
                 sid = id(seller)
                 if sid in seen_sellers:
                     continue
                 seen_sellers.add(sid)
-                seller.setdefault("distance", None)
+                seller.setdefault("vector_distance", None)
                 if seller not in sellers:
                     sellers.append(seller)
                 for key in seller.get("normalized_pubkeys", []):
@@ -240,7 +250,9 @@ async def search_sellers(
             if key not in listings_map
         ]
         if missing_listing_pubkeys:
-            extra_listings = await get_listings_by_public_keys(session, missing_listing_pubkeys)
+            extra_listings = await get_listings_by_public_keys(
+                session, missing_listing_pubkeys
+            )
             listings_map.update(extra_listings)
 
         merged_sellers: Dict[str, Dict[str, Any]] = {}
@@ -263,7 +275,9 @@ async def search_sellers(
                         existing_keys.add(key)
                 existing_listings = existing.setdefault("listings", [])
                 new_listings = seller.get("listings", [])
-                seen_listing_ids = {item.get("id") for item in existing_listings if item.get("id")}
+                seen_listing_ids = {
+                    item.get("id") for item in existing_listings if item.get("id")
+                }
                 for item in new_listings:
                     item_id = item.get("id")
                     if item_id and item_id in seen_listing_ids:
@@ -271,9 +285,9 @@ async def search_sellers(
                     if item_id:
                         seen_listing_ids.add(item_id)
                     existing_listings.append(item)
-                existing["distance"] = min(
-                    float(existing.get("distance") or float("inf")),
-                    float(seller.get("distance") or float("inf")),
+                existing["vector_distance"] = min(
+                    float(existing.get("vector_distance") or float("inf")),
+                    float(seller.get("vector_distance") or float("inf")),
                 )
                 existing["score"] = max(
                     float(existing.get("score") or 0.0),
@@ -292,11 +306,16 @@ async def search_sellers(
             pubkey = match.get("normalized_pubkey") or match.get("pubkey")
             listing = match["listing"]
             listing_bucket = listings_map.setdefault(pubkey, [])
-            if not any(existing.get("id") == listing.get("id") for existing in listing_bucket):
+            if not any(
+                existing.get("id") == listing.get("id") for existing in listing_bucket
+            ):
                 listing_bucket.append(listing)
             seller = seller_pubkey_map.get(pubkey)
             if seller is not None:
-                seller_score = max(float(seller.get("score", 0.0) or 0.0), float(match.get("score", 0.0)))
+                seller_score = max(
+                    float(seller.get("score", 0.0) or 0.0),
+                    float(match.get("score", 0.0)),
+                )
                 seller["score"] = seller_score
 
     ranked_sellers: List[Dict[str, Any]] = []
@@ -317,17 +336,41 @@ async def search_sellers(
             query_text,
             settings.listings_per_seller,
         )
+        # Compute per-listing geo distances and maps links if user coords provided
+        if user_coordinates is not None:
+            user_lat, user_lon = user_coordinates
+            min_geo_distance: float | None = None
+            min_coords: tuple[float, float] | None = None
+            for listing in trimmed_listings:
+                lat = listing.get("latitude")
+                lon = listing.get("longitude")
+                if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+                    d_km = haversine_km(
+                        float(lat), float(lon), float(user_lat), float(user_lon)
+                    )
+                    listing["geo_distance_km"] = d_km
+                    listing["maps_url"] = build_maps_url(float(lat), float(lon))
+                    if min_geo_distance is None or d_km < min_geo_distance:
+                        min_geo_distance = d_km
+                        min_coords = (float(lat), float(lon))
+
+            if min_geo_distance is not None:
+                seller["geo_distance_km"] = min_geo_distance
+                if min_coords is not None:
+                    seller["latitude"], seller["longitude"] = min_coords
+                    seller["maps_url"] = build_maps_url(min_coords[0], min_coords[1])
+
         seller["listings"] = trimmed_listings
-        if seller.get("distance") is None and best_listing_score > 0:
+        if seller.get("vector_distance") is None and best_listing_score > 0:
             boosted_score = min(1.0, 0.4 + 0.2 * min(best_listing_score, 4))
             seller["score"] = max(float(seller.get("score", 0.0) or 0.0), boosted_score)
         ranked_sellers.append(seller)
 
     def _sort_key(item: Dict[str, Any]) -> tuple:
-        distance = item.get("distance")
+        vector_distance = item.get("vector_distance")
         score = float(item.get("score", 0.0) or 0.0)
-        if distance is not None:
-            adjusted_distance = float(distance) - min(score, 1.0) * 0.1
+        if vector_distance is not None:
+            adjusted_distance = float(vector_distance) - min(score, 1.0) * 0.1
             return (0, adjusted_distance)
         return (1, -score)
 
@@ -346,7 +389,9 @@ async def search_sellers(
     return ranked_sellers[:limit]
 
 
-async def get_seller_by_id(session: AsyncSession, seller_id: str) -> Dict[str, Any] | None:
+async def get_seller_by_id(
+    session: AsyncSession, seller_id: str
+) -> Dict[str, Any] | None:
     stmt = select(sellers_table).where(sellers_table.c.id == seller_id)
     result = await session.execute(stmt)
     row = result.mappings().first()

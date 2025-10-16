@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Optional, Tuple
 
 _GEOHASH_BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
@@ -49,3 +50,39 @@ def _refine_interval(interval: list[float], mask: int, value: int) -> None:
     else:
         interval[1] = midpoint
 
+
+def haversine_km(
+    lat1: float,
+    lon1: float,
+    lat2: float,
+    lon2: float,
+) -> float:
+    """Compute the great-circle distance in kilometers between two points.
+
+    Uses the haversine formula on a sphere with mean Earth radius 6371.0088 km.
+    Inputs are expected in decimal degrees.
+    """
+    # Guard against obviously invalid values
+    for v in (lat1, lon1, lat2, lon2):
+        if not isinstance(v, (int, float)):
+            return float("nan")
+
+    rlat1 = math.radians(lat1)
+    rlon1 = math.radians(lon1)
+    rlat2 = math.radians(lat2)
+    rlon2 = math.radians(lon2)
+
+    dlat = rlat2 - rlat1
+    dlon = rlon2 - rlon1
+
+    a = (
+        math.sin(dlat / 2.0) ** 2
+        + math.cos(rlat1) * math.cos(rlat2) * math.sin(dlon / 2.0) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return 6371.0088 * c
+
+
+def build_maps_url(latitude: float, longitude: float) -> str:
+    """Generate a Google Maps search URL for a given coordinate pair."""
+    return f"https://www.google.com/maps/search/?api=1&query={latitude:.6f}%2C{longitude:.6f}"

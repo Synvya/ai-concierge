@@ -22,6 +22,7 @@ import {
   Wrap,
   WrapItem,
   useToast,
+  Icon,
 } from '@chakra-ui/react'
 import { ArrowForwardIcon } from '@chakra-ui/icons'
 
@@ -229,6 +230,13 @@ export const ChatPanel = () => {
     return parts.join(' ')
   }
 
+  const formatKm = (value?: number) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return undefined
+    const km = Math.max(0, value)
+    const fractionDigits = km < 10 ? 1 : 0
+    return `${km.toFixed(fractionDigits)} km`
+  }
+
   const getMetaString = (meta: Record<string, unknown> | undefined, key: string) => {
     if (!meta) {
       return undefined
@@ -416,6 +424,17 @@ export const ChatPanel = () => {
                           {location}
                         </Text>
                       ) : null}
+                      {typeof seller.geo_distance_km === 'number' ? (
+                        <Flex gap={1} align="center">
+                          <Icon boxSize="3" color="gray.500" viewBox="0 0 24 24" aria-hidden>
+                            <path
+                              fill="currentColor"
+                              d="M12 2c-3.87 0-7 3.13-7 7c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7m0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5"
+                            />
+                          </Icon>
+                          <Text fontSize="xs" color="gray.500">≈ {formatKm(seller.geo_distance_km)} away</Text>
+                        </Flex>
+                      ) : null}
                     </Box>
                     <Stack direction="row" spacing={3} align="center">
                       {phone ? (
@@ -426,6 +445,11 @@ export const ChatPanel = () => {
                       {website ? (
                         <Link fontSize="sm" color="purple.600" href={website} target="_blank" rel="noreferrer">
                           Visit website
+                        </Link>
+                      ) : null}
+                      {seller.maps_url ? (
+                        <Link fontSize="sm" color="purple.600" href={seller.maps_url} target="_blank" rel="noreferrer">
+                          Open in Maps
                         </Link>
                       ) : null}
                     </Stack>
@@ -447,6 +471,7 @@ export const ChatPanel = () => {
                         const priceLabel = formatPrice(listing.price)
                         const tags = (listing.tags ?? []).filter(Boolean).slice(0, 3)
                         const image = pickListingImage(listing.images)
+                        const distanceLabel = formatKm(listing.geo_distance_km as number | undefined)
                         return (
                           <Box
                             key={`${seller.id}-${listing.id}`}
@@ -484,6 +509,26 @@ export const ChatPanel = () => {
                                 <Text fontSize="xs" color="gray.500">
                                   {listing.location}
                                 </Text>
+                              ) : null}
+                              {distanceLabel || listing.maps_url ? (
+                                <Flex gap={2} align="center">
+                                  {distanceLabel ? (
+                                    <Flex gap={1} align="center">
+                                      <Icon boxSize="3" color="gray.500" viewBox="0 0 24 24" aria-hidden>
+                                        <path
+                                          fill="currentColor"
+                                          d="M12 2c-3.87 0-7 3.13-7 7c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7m0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5"
+                                        />
+                                      </Icon>
+                                      <Text fontSize="xs" color="gray.500">≈ {distanceLabel} away</Text>
+                                    </Flex>
+                                  ) : null}
+                                  {listing.maps_url ? (
+                                    <Link fontSize="xs" color="purple.600" href={listing.maps_url} target="_blank" rel="noreferrer">
+                                      Open in Maps
+                                    </Link>
+                                  ) : null}
+                                </Flex>
                               ) : null}
                               {listing.url ? (
                                 <Link fontSize="sm" color="purple.600" href={listing.url} target="_blank" rel="noreferrer">
