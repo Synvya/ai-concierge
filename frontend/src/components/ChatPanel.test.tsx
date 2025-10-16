@@ -1,4 +1,5 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest'
+import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ChakraProvider } from '@chakra-ui/react'
 import { ChatPanel } from './ChatPanel'
@@ -18,7 +19,7 @@ describe('ChatPanel - Share my location', () => {
         const getCurrentPosition = vi.fn().mockImplementation((success: PositionCallback) => {
             success({ coords: { latitude: 47.6062, longitude: -122.3321 } } as GeolocationPosition)
         })
-        Object.defineProperty(global.navigator, 'geolocation', {
+        Object.defineProperty(globalThis.navigator as any, 'geolocation', {
             value: { getCurrentPosition },
             configurable: true,
         })
@@ -52,14 +53,15 @@ describe('ChatPanel - Share my location', () => {
         fireEvent.click(sendBtn)
 
         await waitFor(() => expect(chatSpy).toHaveBeenCalled())
-        const calledWith = chatSpy.mock.calls.at(-1)?.[0] as api.ChatRequestPayload
+        const lastCall = chatSpy.mock.calls[chatSpy.mock.calls.length - 1]
+        const calledWith = (lastCall?.[0] ?? {}) as api.ChatRequestPayload
         expect(calledWith.user_coordinates).toEqual({ latitude: 47.6062, longitude: -122.3321 })
         expect(typeof calledWith.user_location).toBe('string')
     })
 
     test('disables share button when geolocation unsupported', async () => {
         // Remove geolocation
-        Object.defineProperty(global.navigator, 'geolocation', { value: undefined, configurable: true })
+        Object.defineProperty(globalThis.navigator as any, 'geolocation', { value: undefined, configurable: true })
         renderWithChakra(<ChatPanel />)
         await waitFor(() => {
             const share = screen.getByRole('button', { name: /share location/i }) as HTMLButtonElement
