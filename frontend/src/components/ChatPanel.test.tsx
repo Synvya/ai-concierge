@@ -7,10 +7,34 @@ import * as api from '../lib/api'
 
 const renderWithChakra = (ui: React.ReactElement) => render(<ChakraProvider>{ui}</ChakraProvider>)
 
+// Ensure storage exists even if the test environment omits it (e.g., forks pool)
+const ensureMemoryStorage = () => {
+    const createMemoryStorage = () => {
+        const store = new Map<string, string>()
+        return {
+            get length() {
+                return store.size
+            },
+            clear: () => store.clear(),
+            getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+            key: (index: number) => Array.from(store.keys())[index] ?? null,
+            removeItem: (key: string) => void store.delete(key),
+            setItem: (key: string, value: string) => void store.set(key, String(value)),
+        } as Storage
+    }
+    if (typeof (globalThis as any).sessionStorage === 'undefined') {
+        Object.defineProperty(globalThis, 'sessionStorage', { value: createMemoryStorage(), configurable: true })
+    }
+    if (typeof (globalThis as any).localStorage === 'undefined') {
+        Object.defineProperty(globalThis, 'localStorage', { value: createMemoryStorage(), configurable: true })
+    }
+}
+
 describe('ChatPanel - Share my location', () => {
     beforeEach(() => {
-        sessionStorage.clear()
-        localStorage.clear()
+        ensureMemoryStorage()
+            ; (sessionStorage as Storage).clear()
+            ; (localStorage as Storage).clear()
         vi.restoreAllMocks()
     })
 
