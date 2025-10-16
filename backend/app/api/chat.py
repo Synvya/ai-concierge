@@ -26,6 +26,11 @@ async def chat(
 ) -> ChatResponse:
     session_id = payload.session_id or str(uuid.uuid4())
     top_k = payload.top_k or settings.search_top_k
+    user_coordinates = payload.user_coordinates
+    user_location = payload.user_location
+    coordinates_tuple = None
+    if user_coordinates is not None:
+        coordinates_tuple = (user_coordinates.latitude, user_coordinates.longitude)
 
     query_embedding = await embed_text(payload.message)
     sellers = await search_sellers(
@@ -33,6 +38,8 @@ async def chat(
         query_embedding=query_embedding,
         limit=top_k,
         query_text=payload.message,
+        user_coordinates=coordinates_tuple,
+        user_location=user_location,
     )
 
     results = [SellerResult(**seller) for seller in sellers]
@@ -60,6 +67,8 @@ async def chat(
             "embedding_length": len(query_embedding),
             "raw_results": sellers,
             "analytics": analytics_summary,
+            "user_location": user_location,
+            "user_coordinates": coordinates_tuple,
         }
 
     return ChatResponse(
@@ -69,4 +78,6 @@ async def chat(
         query=payload.message,
         top_k=top_k,
         debug_payload=debug_payload,
+        user_location=user_location,
+        user_coordinates=user_coordinates,
     )

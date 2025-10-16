@@ -18,6 +18,11 @@ async def search(
     session: AsyncSession = Depends(get_session),
 ) -> SearchResponse:
     top_k = payload.top_k or settings.search_top_k
+    user_coordinates = payload.user_coordinates
+    user_location = payload.user_location
+    coordinates_tuple = None
+    if user_coordinates is not None:
+        coordinates_tuple = (user_coordinates.latitude, user_coordinates.longitude)
 
     query_embedding = await embed_text(payload.query)
     sellers = await search_sellers(
@@ -25,6 +30,8 @@ async def search(
         query_embedding=query_embedding,
         limit=top_k,
         query_text=payload.query,
+        user_coordinates=coordinates_tuple,
+        user_location=user_location,
     )
     results = [SellerResult(**seller) for seller in sellers]
 
@@ -33,6 +40,15 @@ async def search(
         debug_payload = {
             "embedding_length": len(query_embedding),
             "raw_results": sellers,
+            "user_location": user_location,
+            "user_coordinates": coordinates_tuple,
         }
 
-    return SearchResponse(results=results, query=payload.query, top_k=top_k, debug_payload=debug_payload)
+    return SearchResponse(
+        results=results,
+        query=payload.query,
+        top_k=top_k,
+        debug_payload=debug_payload,
+        user_location=user_location,
+        user_coordinates=user_coordinates,
+    )
