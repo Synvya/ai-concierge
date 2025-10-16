@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, MetaData, String, Table, Text, select
@@ -158,6 +158,8 @@ async def search_sellers(
     query_embedding: Sequence[float],
     limit: int,
     query_text: str | None = None,
+    user_coordinates: Optional[Tuple[float, float]] = None,
+    user_location: str | None = None,
 ) -> List[Dict[str, Any]]:
     distance = sellers_table.c.embedding.cosine_distance(query_embedding).label("distance")
 
@@ -330,6 +332,16 @@ async def search_sellers(
         return (1, -score)
 
     ranked_sellers.sort(key=_sort_key)
+
+    if user_location or user_coordinates:
+        for seller in ranked_sellers:
+            if user_location and not seller.get("user_location"):
+                seller["user_location"] = user_location
+            if user_coordinates and not seller.get("user_coordinates"):
+                seller["user_coordinates"] = {
+                    "latitude": user_coordinates[0],
+                    "longitude": user_coordinates[1],
+                }
 
     return ranked_sellers[:limit]
 

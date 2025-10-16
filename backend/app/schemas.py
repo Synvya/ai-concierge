@@ -16,6 +16,11 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class GeoPoint(BaseModel):
+    latitude: float
+    longitude: float
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
@@ -23,12 +28,16 @@ class ChatRequest(BaseModel):
     history: List[ChatMessage] = Field(default_factory=list)
     top_k: Optional[int] = None
     debug: bool = False
+    user_location: Optional[str] = None
+    user_coordinates: Optional[GeoPoint] = None
 
 
 class SearchRequest(BaseModel):
     query: str
     top_k: Optional[int] = None
     debug: bool = False
+    user_location: Optional[str] = None
+    user_coordinates: Optional[GeoPoint] = None
 
 
 class ListingPrice(BaseModel):
@@ -70,6 +79,8 @@ class SellerResult(BaseModel):
     distance: Optional[float] = None
     score: float = Field(default=0.0)
     listings: List[ProductListing] = Field(default_factory=list)
+    user_location: Optional[str] = None
+    user_coordinates: Optional[GeoPoint] = None
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
         if self.distance is not None and self.distance != 0:
@@ -83,6 +94,8 @@ class ChatResponse(BaseModel):
     query: str
     top_k: int
     debug_payload: Optional[Dict[str, Any]] = None
+    user_location: Optional[str] = None
+    user_coordinates: Optional[GeoPoint] = None
 
 
 class SearchResponse(BaseModel):
@@ -90,3 +103,5 @@ class SearchResponse(BaseModel):
     query: str
     top_k: int
     debug_payload: Optional[Dict[str, Any]] = None
+    user_location: Optional[str] = None
+    user_coordinates: Optional[GeoPoint] = None
