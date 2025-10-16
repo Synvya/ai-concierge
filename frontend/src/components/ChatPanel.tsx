@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Avatar,
   Box,
@@ -16,6 +16,7 @@ import {
   Spinner,
   Stack,
   Tag,
+  TagCloseButton,
   Text,
   Tooltip,
   Wrap,
@@ -28,6 +29,7 @@ import { useClientIds } from '../hooks/useClientIds'
 import type {
   ChatMessage,
   ChatResponse,
+  GeoPoint,
   ListingPrice,
   ProductListing,
   SellerResult,
@@ -38,6 +40,7 @@ const ASSISTANT_NAME = 'Synvya Concierge'
 const ASSISTANT_AVATAR_URL = '/assets/doorman.png'
 const USER_AVATAR_URL = '/assets/user.png'
 const LINK_REGEX = /(https?:\/\/[^\s]+)/g
+const LOCATION_STORAGE_KEY = 'ai-concierge-shared-location'
 
 const SuggestedQuery = ({ label, onClick }: { label: string; onClick: (value: string) => void }) => (
   <Tag
@@ -99,6 +102,30 @@ export const ChatPanel = () => {
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
+  const [sharedLocation, setSharedLocation] = useState<{
+    label?: string
+    coords?: GeoPoint
+    status: 'idle' | 'pending' | 'granted' | 'denied'
+  }>({ status: 'idle' })
+
+  // Read cached location from session storage if present
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(LOCATION_STORAGE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached) as { label?: string; coords?: GeoPoint }
+        if (
+          parsed?.coords &&
+          typeof parsed.coords.latitude === 'number' &&
+          typeof parsed.coords.longitude === 'number'
+        ) {
+          setSharedLocation({ label: parsed.label, coords: parsed.coords, status: 'granted' })
+        }
+      }
+    } catch {
+      // ignore malformed cache
+    }
+  }, [])
 
   const handleChatResponse = useCallback((payload: ChatResponse) => {
     const assistantMessage: ChatMessage = {
@@ -131,6 +158,8 @@ export const ChatPanel = () => {
         session_id: sessionId,
         visitor_id: visitorId,
         history: nextHistory,
+        user_location: sharedLocation.status === 'granted' ? sharedLocation.label : undefined,
+        user_coordinates: sharedLocation.status === 'granted' ? sharedLocation.coords : undefined,
       })
       handleChatResponse(payload)
     } catch (error) {
@@ -487,6 +516,58 @@ export const ChatPanel = () => {
     )
   }
 
+  const geoSupported =
+    typeof navigator !== 'undefined' &&
+    !!(navigator as any).geolocation &&
+    typeof (navigator as any).geolocation.getCurrentPosition === 'function'
+
+  const requestLocation = useCallback(() => {
+    if (!geoSupported) return
+    setSharedLocation((prev) => ({ ...prev, status: 'pending' }))
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        const label = `Lat ${latitude.toFixed(4)}°, Lon ${longitude.toFixed(4)}°`
+        const coords = { latitude, longitude }
+        setSharedLocation({ label, coords, status: 'granted' })
+        try {
+          sessionStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({ label, coords }))
+        } catch {
+          // ignore cache write errors
+        }
+        toast({ title: 'Location shared', description: label, status: 'success', duration: 3000 })
+      },
+      (err) => {
+        const code = (err && (err as GeolocationPositionError).code) || 0
+        if (code === 1) {
+          setSharedLocation({ status: 'denied' })
+          toast({
+            title: 'Permission denied',
+            description: 'Allow location access to personalize nearby results.',
+            status: 'error',
+          })
+        } else if (code === 3) {
+          setSharedLocation({ status: 'idle' })
+          toast({ title: 'Location timeout', description: 'Please try again.', status: 'warning' })
+        } else {
+          setSharedLocation({ status: 'idle' })
+          toast({ title: 'Location unavailable', description: 'Please try again later.', status: 'error' })
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    )
+  }, [geoSupported, toast])
+
+  const clearLocation = useCallback(() => {
+    setSharedLocation({ status: 'idle' })
+    try {
+      sessionStorage.removeItem(LOCATION_STORAGE_KEY)
+    } catch {
+      // ignore
+    }
+    toast({ title: 'Stopped sharing location', status: 'info', duration: 2000 })
+  }, [toast])
+
   return (
     <Flex direction="column" height="100%" gap={6}>
       <Stack spacing={6}>
@@ -563,17 +644,47 @@ export const ChatPanel = () => {
               onKeyDown={onKeyDown}
               disabled={!sessionId || !visitorId}
             />
-            <InputRightElement width="4.5rem">
-              <Tooltip label={!sessionId ? 'Initialising session...' : 'Send'}>
-                <IconButton
-                  aria-label="Send"
-                  icon={<ArrowForwardIcon />}
-                  onClick={handleSubmit}
-                  isDisabled={!canSend}
-                  colorScheme="purple"
-                  variant="solid"
-                />
-              </Tooltip>
+            <InputRightElement width="15rem">
+              <Flex gap={2} align="center">
+                {sharedLocation.status === 'granted' && sharedLocation.label ? (
+                  <Tooltip label={sharedLocation.label}>
+                    <Tag size="md" colorScheme="purple" variant="subtle">
+                      Location on
+                      <TagCloseButton aria-label="Stop sharing location" onClick={clearLocation} />
+                    </Tag>
+                  </Tooltip>
+                ) : (
+                  <Tooltip
+                    label={
+                      !geoSupported
+                        ? 'Geolocation not supported in this browser'
+                        : sharedLocation.status === 'denied'
+                          ? 'Permission denied. Click to retry.'
+                          : 'Share your location to get nearby results'
+                    }
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={requestLocation}
+                      isDisabled={!geoSupported || sharedLocation.status === 'pending'}
+                      leftIcon={sharedLocation.status === 'pending' ? <Spinner size="xs" /> : undefined}
+                    >
+                      {sharedLocation.status === 'pending' ? 'Sharing…' : 'Share location'}
+                    </Button>
+                  </Tooltip>
+                )}
+                <Tooltip label={!sessionId ? 'Initialising session...' : 'Send'}>
+                  <IconButton
+                    aria-label="Send"
+                    icon={<ArrowForwardIcon />}
+                    onClick={handleSubmit}
+                    isDisabled={!canSend}
+                    colorScheme="purple"
+                    variant="solid"
+                  />
+                </Tooltip>
+              </Flex>
             </InputRightElement>
           </InputGroup>
         </Box>

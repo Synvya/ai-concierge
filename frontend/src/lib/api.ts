@@ -1,5 +1,10 @@
 import axios from 'axios'
 
+export interface GeoPoint {
+  latitude: number
+  longitude: number
+}
+
 export interface ListingPrice {
   amount?: number
   currency?: string
@@ -35,6 +40,8 @@ export interface SellerResult {
   distance?: number
   score: number
   listings?: ProductListing[]
+  user_location?: string
+  user_coordinates?: GeoPoint
 }
 
 export interface ChatMessage {
@@ -50,6 +57,8 @@ export interface ChatRequestPayload {
   history: ChatMessage[]
   top_k?: number
   debug?: boolean
+  user_location?: string
+  user_coordinates?: GeoPoint
 }
 
 export interface ChatResponse {
@@ -59,9 +68,13 @@ export interface ChatResponse {
   query: string
   top_k: number
   debug_payload?: Record<string, unknown>
+  user_location?: string
+  user_coordinates?: GeoPoint
 }
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
+
+export const LOCATION_STORAGE_KEY = 'ai-concierge-shared-location'
 
 const api = axios.create({
   baseURL,
@@ -70,7 +83,72 @@ const api = axios.create({
   },
 })
 
+type CachedLocation = { label?: string; coords?: GeoPoint }
+
+export const getCachedLocation = (): CachedLocation | null => {
+  try {
+    if (typeof sessionStorage === 'undefined') return null
+    const raw = sessionStorage.getItem(LOCATION_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as CachedLocation
+    if (
+      parsed?.coords &&
+      typeof parsed.coords.latitude === 'number' &&
+      typeof parsed.coords.longitude === 'number'
+    ) {
+      return parsed
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export const chat = async (payload: ChatRequestPayload) => {
-  const { data } = await api.post<ChatResponse>('/chat', payload)
+  let finalPayload = payload
+  if (payload.user_location === undefined && payload.user_coordinates === undefined) {
+    const cached = getCachedLocation()
+    if (cached?.coords) {
+      finalPayload = {
+        ...payload,
+        user_location: cached.label ?? payload.user_location,
+        user_coordinates: cached.coords ?? payload.user_coordinates,
+      }
+    }
+  }
+  const { data } = await api.post<ChatResponse>('/chat', finalPayload)
+  return data
+}
+
+export interface SearchRequestPayload {
+  query: string
+  top_k?: number
+  debug?: boolean
+  user_location?: string
+  user_coordinates?: GeoPoint
+}
+
+export interface SearchResponsePayload {
+  results: SellerResult[]
+  query: string
+  top_k: number
+  debug_payload?: Record<string, unknown>
+  user_location?: string
+  user_coordinates?: GeoPoint
+}
+
+export const search = async (payload: SearchRequestPayload) => {
+  let finalPayload = payload
+  if (payload.user_location === undefined && payload.user_coordinates === undefined) {
+    const cached = getCachedLocation()
+    if (cached?.coords) {
+      finalPayload = {
+        ...payload,
+        user_location: cached.label ?? payload.user_location,
+        user_coordinates: cached.coords ?? payload.user_coordinates,
+      }
+    }
+  }
+  const { data } = await api.post<SearchResponsePayload>('/search', finalPayload)
   return data
 }

@@ -17,6 +17,18 @@ Production builds are served from CloudFront at https://snovalley.synvya.com, fr
   - Uses modern component library (Chakra UI) for styling and responsive layout.
   - Communicates with backend via REST and Server-Sent Events for streaming assistant responses.
 
+### Share My Location (Frontend)
+
+The chat UI supports an optional "Share location" control:
+
+- Uses the browser Geolocation API. If unsupported, the button is disabled with a tooltip.
+- On success, coordinates are cached under `sessionStorage` key `ai-concierge-shared-location` and sent with chat/search payloads as `user_location` (label) and `user_coordinates` (lat/lon).
+- Users can stop sharing via the chip next to the send button.
+
+API helper behavior:
+
+- `chat()` and `search()` automatically attach cached coordinates if a caller did not specify them explicitly.
+
 - **Infrastructure (`infra/`)**
   - Dockerfiles for both backend and frontend, plus `docker-compose.yaml` for local development.
   - GitHub Actions workflow to build, test, and containerize both services.
