@@ -14,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
+from ..utils.geolocation import decode_geohash
 
 
 logger = logging.getLogger(__name__)
@@ -225,6 +226,29 @@ def _collect_keywords(grouped: Dict[str, List[List[str]]]) -> List[str]:
     return keywords
 
 
+def _coerce_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _extract_geohash(content: Mapping[str, Any], meta: Mapping[str, Any]) -> str | None:
+    for source in (content, meta):
+        candidate = source.get("geohash")
+        if isinstance(candidate, str):
+            trimmed = candidate.strip()
+            if trimmed:
+                return trimmed
+    return None
+
+
 def _tokenize_query(query: Optional[str]) -> List[str]:
     if not query:
         return []
@@ -327,6 +351,16 @@ def _parse_listing(row: Mapping[str, Any]) -> Dict[str, Any] | None:
     price = _parse_price(grouped)
     summary = _first_value(grouped, "summary")
     location = _first_value(grouped, "location")
+    full_address = location
+    geohash_value = _first_value(grouped, "geohash")
+    latitude = _coerce_float(_first_value(grouped, "latitude"))
+    longitude = _coerce_float(_first_value(grouped, "longitude"))
+
+    if geohash_value:
+        decoded = decode_geohash(geohash_value)
+        if decoded:
+            latitude = latitude if latitude is not None else decoded[0]
+            longitude = longitude if longitude is not None else decoded[1]
     status = _first_value(grouped, "status")
     url = (
         _first_value(grouped, "url")
@@ -340,6 +374,10 @@ def _parse_listing(row: Mapping[str, Any]) -> Dict[str, Any] | None:
         "summary": summary,
         "status": status,
         "location": location,
+        "full_address": full_address,
+        "geohash": geohash_value,
+        "latitude": latitude,
+        "longitude": longitude,
         "price": price,
         "published_at": published_at,
         "content": row.get("content"),
@@ -490,6 +528,16 @@ def _parse_classified_listing_row(row: Mapping[str, Any]) -> Tuple[str | None, D
     if not isinstance(url, str):
         url = None
 
+    geohash_value = _extract_geohash(content, meta)
+    latitude = _coerce_float(content.get("latitude") or meta.get("latitude"))
+    longitude = _coerce_float(content.get("longitude") or meta.get("longitude"))
+
+    if geohash_value:
+        decoded = decode_geohash(geohash_value)
+        if decoded:
+            latitude = latitude if latitude is not None else decoded[0]
+            longitude = longitude if longitude is not None else decoded[1]
+
     listing = _finalize_listing_payload(
         {
             "id": identifier or row.get("id"),
@@ -498,6 +546,10 @@ def _parse_classified_listing_row(row: Mapping[str, Any]) -> Tuple[str | None, D
             "content": description or summary_text,
             "status": status,
             "location": location,
+            "full_address": location,
+            "geohash": geohash_value,
+            "latitude": latitude,
+            "longitude": longitude,
             "price": price,
             "published_at": None,
             "images": images,

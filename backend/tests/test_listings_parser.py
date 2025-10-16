@@ -3,7 +3,13 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from app.repositories.listings import _parse_classified_listing_row, _parse_listing, filter_and_rank_listings
+import pytest
+
+from app.repositories.listings import (
+    _parse_classified_listing_row,
+    _parse_listing,
+    filter_and_rank_listings,
+)
 
 
 def test_parse_listing_with_price_and_tags() -> None:
@@ -15,6 +21,7 @@ def test_parse_listing_with_price_and_tags() -> None:
             ["summary", "Fresh bread baked every morning"],
             ["price", "9.50", "USD"],
             ["location", "Snoqualmie"],
+            ["geohash", "c23q7u2hn"],
             ["status", "active"],
             ["published_at", "1715731200"],
             ["image", "https://example.com/bread.jpg"],
@@ -31,6 +38,10 @@ def test_parse_listing_with_price_and_tags() -> None:
     assert listing["summary"] == "Fresh bread baked every morning"
     assert listing["price"] == {"amount": 9.5, "currency": "USD"}
     assert listing["location"] == "Snoqualmie"
+    assert listing["full_address"] == "Snoqualmie"
+    assert listing["geohash"] == "c23q7u2hn"
+    assert listing["latitude"] == pytest.approx(47.52894, rel=1e-5)
+    assert listing["longitude"] == pytest.approx(-121.82711, rel=1e-5)
     assert listing["status"] == "active"
     assert listing["images"] == ["https://example.com/bread.jpg"]
     assert listing["tags"] == ["bakery"]
@@ -120,6 +131,8 @@ def test_parse_classified_listing_row_extracts_product_details() -> None:
                 "title": "Energy Smoothie",
                 "summary": "Charge up your day",
                 "description": "**Energy Smoothie**",
+                "location": "123 Main Street, Snoqualmie, WA",
+                "geohash": "c23q7u2hn",
                 "price": {"amount": 4.99, "currency": "USD"},
                 "images": [{"url": "https://example.com/smoothie.jpg"}],
                 "categories": ["smoothie", "beverage"],
@@ -136,6 +149,10 @@ def test_parse_classified_listing_row_extracts_product_details() -> None:
     assert listing["price"] == {"amount": 4.99, "currency": "USD"}
     assert listing["images"] == ["https://example.com/smoothie.jpg"]
     assert listing["tags"] == ["smoothie", "beverage"]
+    assert listing["geohash"] == "c23q7u2hn"
+    assert listing["full_address"] == "123 Main Street, Snoqualmie, WA"
+    assert listing["latitude"] == pytest.approx(47.52894, rel=1e-5)
+    assert listing["longitude"] == pytest.approx(-121.82711, rel=1e-5)
 
 
 def test_parse_classified_listing_row_handles_string_metadata() -> None:
@@ -149,6 +166,7 @@ def test_parse_classified_listing_row_handles_string_metadata() -> None:
                 "description": "Freshly baked each morning",
                 "price": {"amount": 3.99, "currency": "USD"},
                 "seller": "npub456",
+                "location": "Pressed on Main",
             }
         ),
     }
@@ -159,3 +177,5 @@ def test_parse_classified_listing_row_handles_string_metadata() -> None:
     assert listing["title"] == "Cinnamon Muffin"
     assert listing["summary"] == "Delicious and gluten free"
     assert listing["price"] == {"amount": 3.99, "currency": "USD"}
+    assert listing.get("full_address") == "Pressed on Main"
+    assert listing.get("geohash") is None
