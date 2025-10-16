@@ -22,6 +22,10 @@ export interface ProductListing {
   content?: string
   status?: string
   location?: string
+  latitude?: number
+  longitude?: number
+  geo_distance_km?: number
+  maps_url?: string
   price?: ListingPrice
   published_at?: string
   images?: string[] | ProductListingImageObject[]
@@ -37,7 +41,11 @@ export interface SellerResult {
   meta_data?: Record<string, unknown>
   filters?: Record<string, unknown>
   content?: string
-  distance?: number
+  latitude?: number
+  longitude?: number
+  vector_distance?: number
+  geo_distance_km?: number
+  maps_url?: string
   score: number
   listings?: ProductListing[]
   user_location?: string
