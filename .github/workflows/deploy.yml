@@ -55,7 +55,7 @@ jobs:
 
       - name: Run frontend tests
         working-directory: frontend
-        run: npm run test -- --pool=forks
+        run: npm run test:ci
 
   build:
     runs-on: ubuntu-latest
