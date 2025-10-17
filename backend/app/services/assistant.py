@@ -1,19 +1,27 @@
 import asyncio
+import os
 from typing import List
 
-from openai import OpenAI
-from pydantic import SecretStr
-from tenacity import retry, stop_after_attempt, wait_random_exponential
+# Make tenacity optional at import time so tests for _build_context don't require it
+try:  # pragma: no cover
+    from tenacity import retry, stop_after_attempt, wait_random_exponential
+except ImportError:  # pragma: no cover
 
-from ..core.config import get_settings
+    def retry(*_args, **_kwargs):  # type: ignore
+        def _decorator(func):
+            return func
+
+        return _decorator
+
+    def stop_after_attempt(*_args, **_kwargs):  # type: ignore
+        return None
+
+    def wait_random_exponential(*_args, **_kwargs):  # type: ignore
+        return None
+
+
 from ..schemas import ChatMessage, SellerResult
 from ..utils.geolocation import build_maps_url, decode_geohash, haversine_km
-
-settings = get_settings()
-_secret = settings.openai_api_key
-_getter = getattr(_secret, "get_secret_value", None)
-_api_key = _getter() if callable(_getter) else None
-client = OpenAI(api_key=_api_key)
 
 
 class AssistantError(RuntimeError):
@@ -147,7 +155,17 @@ async def generate_response(
     """Call OpenAI to craft a concierge-style response."""
 
     def _call() -> str:
-        if settings.openai_api_key is None:
+        # Lazy import to avoid dependency requirements when only using _build_context in tests
+        from ..core.config import get_settings
+
+        try:
+            from openai import OpenAI  # type: ignore
+        except ImportError as exc:  # pragma: no cover
+            raise AssistantError("OpenAI SDK is not installed") from exc
+
+        settings = get_settings()
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
             raise AssistantError("OPENAI_API_KEY is not configured")
 
         system_prompt = (
@@ -175,6 +193,7 @@ async def generate_response(
         )
         messages.append({"role": "user", "content": user_prompt})
 
+        client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
             model=settings.openai_assistant_model,
             temperature=0.4,
