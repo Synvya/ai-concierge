@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synvya.com/schemas/calendar.calendar.31924.schema.json",
+  "title": "NIP-52 Calendar (31924) Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000
+    }
+  }
+}

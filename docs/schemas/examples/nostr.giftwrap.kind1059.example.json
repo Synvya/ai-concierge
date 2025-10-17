@@ -1,0 +1,20 @@
+{
+  "kind": 1059,
+  "created_at": 1760724793,
+  "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "sig": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "tags": [
+    [
+      "p",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    [
+      "e",
+      "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "wss://relay.example.com",
+      "root"
+    ]
+  ],
+  "content": "base64(serialized-seal-event)"
+}

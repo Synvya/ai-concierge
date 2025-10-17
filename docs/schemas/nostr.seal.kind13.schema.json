@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synvya.com/schemas/nostr.seal.kind13.schema.json",
+  "title": "NIP-59 Seal Event (kind 13)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "created_at",
+    "tags",
+    "content",
+    "pubkey",
+    "id",
+    "sig"
+  ],
+  "properties": {
+    "kind": {
+      "const": 13
+    },
+    "created_at": {
+      "type": "integer"
+    },
+    "pubkey": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sig": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "content": {
+      "type": "string",
+      "description": "Opaque serialization of the enclosed rumor (often base64)"
+    }
+  }
+}

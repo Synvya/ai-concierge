@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synvya.com/schemas/reservation.response.schema.json",
+  "title": "Synvya Reservation Response Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "confirmed",
+        "declined",
+        "suggested",
+        "expired",
+        "cancelled"
+      ]
+    },
+    "iso_time": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Proposed or confirmed time; null when declined/expired"
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "table": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Optional table identifier"
+    },
+    "hold_expires_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "If a soft hold is placed, when it expires"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "suggested"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "iso_time"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "confirmed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "iso_time"
+        ]
+      }
+    }
+  ]
+}

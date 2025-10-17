@@ -1,0 +1,21 @@
+{
+  "kind": 32101,
+  "created_at": 1760724793,
+  "tags": [
+    [
+      "a",
+      "32101:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:"
+    ],
+    [
+      "p",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    [
+      "e",
+      "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "wss://relay.example.com",
+      "root"
+    ]
+  ],
+  "content": "NIP44:ciphertext-placeholder-for-reservation-request"
+}

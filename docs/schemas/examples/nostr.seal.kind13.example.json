@@ -1,0 +1,20 @@
+{
+  "kind": 13,
+  "created_at": 1760724793,
+  "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "tags": [
+    [
+      "a",
+      "32101:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:"
+    ],
+    [
+      "e",
+      "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "wss://relay.example.com",
+      "root"
+    ]
+  ],
+  "content": "base64(serialized-rumor-payload)"
+}

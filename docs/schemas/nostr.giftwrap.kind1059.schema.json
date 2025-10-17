@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synvya.com/schemas/nostr.giftwrap.kind1059.schema.json",
+  "title": "NIP-59 Gift Wrap Event (kind 1059)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "created_at",
+    "tags",
+    "content",
+    "pubkey",
+    "id",
+    "sig"
+  ],
+  "properties": {
+    "kind": {
+      "const": 1059
+    },
+    "created_at": {
+      "type": "integer"
+    },
+    "pubkey": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sig": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 2
+      },
+      "description": "Must include at least one ['p', <recipient pubkey>] tag; may include 'e'/'a' per NIP-10/NIP-01."
+    },
+    "content": {
+      "type": "string",
+      "description": "Opaque serialization of the enclosed seal (often base64)"
+    }
+  }
+}
