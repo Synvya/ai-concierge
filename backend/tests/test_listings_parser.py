@@ -4,7 +4,6 @@ import json
 from datetime import datetime, timezone
 
 import pytest
-
 from app.repositories.listings import (
     _parse_classified_listing_row,
     _parse_listing,
@@ -47,7 +46,9 @@ def test_parse_listing_with_price_and_tags() -> None:
     assert listing["tags"] == ["bakery"]
     assert listing["url"] == "https://example.com/products/bread"
     assert listing["content"] == "Handmade sourdough loaf with a crisp crust."
-    assert listing["published_at"] == datetime.fromtimestamp(1715731200, tz=timezone.utc)
+    assert listing["published_at"] == datetime.fromtimestamp(
+        1715731200, tz=timezone.utc
+    )
 
 
 def test_parse_listing_with_created_at_fallback() -> None:
@@ -66,8 +67,14 @@ def test_parse_listing_with_created_at_fallback() -> None:
     listing = _parse_listing(row)
     assert listing is not None
     assert listing["id"] == "evt2"
-    assert listing["price"] == {"amount": 120.0, "currency": "USD", "frequency": "per-session"}
-    assert listing["published_at"] == datetime.fromtimestamp(1700000000, tz=timezone.utc)
+    assert listing["price"] == {
+        "amount": 120.0,
+        "currency": "USD",
+        "frequency": "per-session",
+    }
+    assert listing["published_at"] == datetime.fromtimestamp(
+        1700000000, tz=timezone.utc
+    )
 
 
 def test_filter_and_rank_listings_prioritizes_query_matches() -> None:
@@ -102,14 +109,21 @@ def test_filter_and_rank_listings_falls_back_to_recent_items() -> None:
         {"id": "newer", "title": "Modern Desk", "published_at": newer, "tags": []},
     ]
 
-    filtered, best_score = filter_and_rank_listings(listings, "garden tools", max_items=3)
+    filtered, best_score = filter_and_rank_listings(
+        listings, "garden tools", max_items=3
+    )
     assert [entry["id"] for entry in filtered] == ["newer", "older"]
     assert best_score == 0
 
 
 def test_filter_and_rank_listings_respects_zero_max_items() -> None:
     listings = [
-        {"id": "only", "title": "Test Item", "published_at": datetime.now(tz=timezone.utc), "tags": []},
+        {
+            "id": "only",
+            "title": "Test Item",
+            "published_at": datetime.now(tz=timezone.utc),
+            "tags": [],
+        },
     ]
     filtered, best_score = filter_and_rank_listings(listings, "test", max_items=0)
     assert filtered == []

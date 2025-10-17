@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+# Pylint struggles to resolve the `app` package when run from repo root.
+# Allow these imports in tests without affecting runtime correctness.
+# pylint: disable=E0611,E0401
+import os
+import sys
+
+# Ensure Pylint and runtime can resolve the `app` package from the repo root
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from app.schemas import ListingPrice, ProductListing, SellerResult
 from app.services.assistant import _build_context
 

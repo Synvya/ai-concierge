@@ -109,3 +109,11 @@ class SearchResponse(BaseModel):
     debug_payload: Optional[Dict[str, Any]] = None
     user_location: Optional[str] = None
     user_coordinates: Optional[GeoPoint] = None
+
+
+# Explicit re-exports to help strict type checkers and IDEs
+__all__ = [
+    "ListingPrice",
+    "ProductListing",
+    "SellerResult",
+]
