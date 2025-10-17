@@ -230,11 +230,11 @@ export const ChatPanel = () => {
     return parts.join(' ')
   }
 
-  const formatKm = (value?: number) => {
+  const formatMiles = (value?: number) => {
     if (typeof value !== 'number' || Number.isNaN(value)) return undefined
-    const km = Math.max(0, value)
-    const fractionDigits = km < 10 ? 1 : 0
-    return `${km.toFixed(fractionDigits)} km`
+    const miles = Math.max(0, value) * 0.621371
+    const fractionDigits = miles < 10 ? 1 : 0
+    return `${miles.toFixed(fractionDigits)} mi`
   }
 
   const getMetaString = (meta: Record<string, unknown> | undefined, key: string) => {
@@ -432,7 +432,7 @@ export const ChatPanel = () => {
                               d="M12 2c-3.87 0-7 3.13-7 7c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7m0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5"
                             />
                           </Icon>
-                          <Text fontSize="xs" color="gray.500">≈ {formatKm(seller.geo_distance_km)} away</Text>
+                          <Text fontSize="xs" color="gray.500">≈ {formatMiles(seller.geo_distance_km)} away</Text>
                         </Flex>
                       ) : null}
                     </Box>
@@ -471,7 +471,7 @@ export const ChatPanel = () => {
                         const priceLabel = formatPrice(listing.price)
                         const tags = (listing.tags ?? []).filter(Boolean).slice(0, 3)
                         const image = pickListingImage(listing.images)
-                        const distanceLabel = formatKm(listing.geo_distance_km as number | undefined)
+                        const distanceLabel = formatMiles(listing.geo_distance_km as number | undefined)
                         return (
                           <Box
                             key={`${seller.id}-${listing.id}`}
