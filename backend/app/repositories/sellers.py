@@ -86,7 +86,7 @@ def _select_canonical_key(keys: list[str]) -> str | None:
 
 def _extract_npub(keys: list[str]) -> str | None:
     """Extract the first valid npub from a list of public keys.
-    
+
     Returns the first key that starts with 'npub1' and appears to be
     a valid bech32 encoded public key.
     """
@@ -316,14 +316,14 @@ async def search_sellers(
                 seller_pubkey_map[key] = seller
 
         for match in listing_matches:
-            pubkey = match.get("normalized_pubkey") or match.get("pubkey")
+            pubkey = match.get("normalized_pubkey") or match.get("pubkey")  # type: ignore[assignment]
             listing = match["listing"]
-            listing_bucket = listings_map.setdefault(pubkey, [])
+            listing_bucket = listings_map.setdefault(pubkey, [])  # type: ignore[arg-type]
             if not any(
                 existing.get("id") == listing.get("id") for existing in listing_bucket
             ):
                 listing_bucket.append(listing)
-            seller = seller_pubkey_map.get(pubkey)
+            seller = seller_pubkey_map.get(pubkey)  # type: ignore[assignment]
             if seller is not None:
                 seller_score = max(
                     float(seller.get("score", 0.0) or 0.0),
@@ -394,7 +394,7 @@ async def search_sellers(
         # Extract npub from normalized_pubkeys
         normalized_keys = seller.get("normalized_pubkeys", [])
         seller["npub"] = _extract_npub(normalized_keys)
-        
+
         # Add user location context if provided
         if user_location and not seller.get("user_location"):
             seller["user_location"] = user_location
@@ -418,12 +418,12 @@ async def get_seller_by_id(
     seller = dict(row)
     if _should_exclude_seller(seller):
         return None
-    
+
     # Extract pubkeys and npub
     pubkeys = _extract_seller_pubkeys(seller)
     seller["normalized_pubkeys"] = pubkeys
     seller["npub"] = _extract_npub(pubkeys)
-    
+
     # Get listings
     if pubkeys:
         listings_map = await get_listings_by_public_keys(session, pubkeys)

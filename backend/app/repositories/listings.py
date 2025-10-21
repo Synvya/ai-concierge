@@ -610,7 +610,7 @@ async def _get_classified_listings_from_fallback(
 
     listings_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in result.mappings():
-        seller_pubkey, listing = _parse_classified_listing_row(row)
+        seller_pubkey, listing = _parse_classified_listing_row(row)  # type: ignore[arg-type]
         if seller_pubkey and listing:
             keys_to_store = [seller_pubkey]
             hex_pubkey = _npub_to_hex(seller_pubkey)
@@ -656,7 +656,7 @@ async def get_listings_by_public_keys(
             else:
                 listings_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
                 for row in result.mappings():
-                    listing = _parse_listing(row)
+                    listing = _parse_listing(row)  # type: ignore[arg-type]
                     if listing:
                         key = row["pubkey"]
                         targets = [key]
@@ -719,7 +719,7 @@ async def _search_classified_listings_fallback(
     fallback_entries: list[dict[str, Any]] = []
 
     for row in result.mappings():
-        seller_pubkey, listing = _parse_classified_listing_row(row)
+        seller_pubkey, listing = _parse_classified_listing_row(row)  # type: ignore[arg-type]
         if not seller_pubkey or not listing:
             continue
         entry = {
@@ -802,7 +802,7 @@ async def search_listings_by_text(
             fallback_entries: list[dict[str, Any]] = []
 
             for row in result.mappings():
-                listing = _parse_listing(row)
+                listing = _parse_listing(row)  # type: ignore[arg-type]
                 if not listing:
                     continue
                 entry = {"pubkey": row["pubkey"], "listing": listing}
