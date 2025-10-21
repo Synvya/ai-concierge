@@ -71,6 +71,8 @@ class ProductListing(BaseModel):
 class SellerResult(BaseModel):
     id: str
     name: str | None = None
+    npub: str | None = None
+    normalized_pubkeys: list[str] = Field(default_factory=list)
     meta_data: dict[str, Any] | None = None
     filters: dict[str, Any] | None = None
     content: str | None = None
