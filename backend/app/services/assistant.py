@@ -1,6 +1,5 @@
 import asyncio
 import os
-from typing import List
 
 # Make tenacity optional at import time so tests for _build_context don't require it
 try:  # pragma: no cover
@@ -28,7 +27,7 @@ class AssistantError(RuntimeError):
     pass
 
 
-def _build_context(results: List[SellerResult]) -> str:
+def _build_context(results: list[SellerResult]) -> str:
     def _format_distance_km(km: float | None) -> str | None:
         if km is None:
             return None
@@ -149,8 +148,8 @@ def _build_context(results: List[SellerResult]) -> str:
 @retry(wait=wait_random_exponential(multiplier=1, max=20), stop=stop_after_attempt(3))
 async def generate_response(
     query: str,
-    results: List[SellerResult],
-    history: List[ChatMessage],
+    results: list[SellerResult],
+    history: list[ChatMessage],
 ) -> str:
     """Call OpenAI to craft a concierge-style response."""
 

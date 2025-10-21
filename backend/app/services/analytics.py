@@ -1,14 +1,13 @@
 import asyncio
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 import boto3
 import structlog
 from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
 
 from ..core.config import get_settings
-
 
 settings = get_settings()
 logger = structlog.get_logger(__name__)
@@ -19,8 +18,8 @@ class AnalyticsService:
 
     def __init__(self) -> None:
         self._queue: asyncio.Queue[str] = asyncio.Queue()
-        self._worker_task: Optional[asyncio.Task[None]] = None
-        self._session_data: Dict[str, Dict[str, Any]] = {}
+        self._worker_task: asyncio.Task[None] | None = None
+        self._session_data: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
         self._enabled = True
 
@@ -64,7 +63,7 @@ class AnalyticsService:
                 pass
             self._worker_task = None
 
-    async def record_query(self, visitor_id: str, session_id: str, query: str) -> Dict[str, Any]:
+    async def record_query(self, visitor_id: str, session_id: str, query: str) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
         date_key = now.strftime("%Y-%m-%d")
 
@@ -148,7 +147,7 @@ class AnalyticsService:
         except ClientError as exc:
             error_code = exc.response.get("Error", {}).get("Code", "")
             if error_code in ("404", "NoSuchBucket", "NoSuchBucketPolicy"):
-                create_kwargs: Dict[str, Any] = {"Bucket": bucket}
+                create_kwargs: dict[str, Any] = {"Bucket": bucket}
                 if not settings.aws_endpoint_url and settings.s3_region != "us-east-1":
                     create_kwargs["CreateBucketConfiguration"] = {
                         "LocationConstraint": settings.s3_region

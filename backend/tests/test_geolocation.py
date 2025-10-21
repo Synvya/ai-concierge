@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from app.utils.geolocation import build_maps_url, decode_geohash, haversine_km
 
 

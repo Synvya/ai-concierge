@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
 
 _GEOHASH_BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
 
 
-def decode_geohash(geohash: str) -> Optional[Tuple[float, float]]:
+def decode_geohash(geohash: str) -> tuple[float, float] | None:
     """Decode a geohash string into a latitude/longitude pair.
 
     Returns the midpoint of the decoded bounding box. If the geohash is invalid

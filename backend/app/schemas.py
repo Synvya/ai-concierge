@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -23,68 +23,68 @@ class GeoPoint(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    session_id: Optional[str] = None
-    visitor_id: Optional[str] = None
-    history: List[ChatMessage] = Field(default_factory=list)
-    top_k: Optional[int] = None
+    session_id: str | None = None
+    visitor_id: str | None = None
+    history: list[ChatMessage] = Field(default_factory=list)
+    top_k: int | None = None
     debug: bool = False
-    user_location: Optional[str] = None
-    user_coordinates: Optional[GeoPoint] = None
+    user_location: str | None = None
+    user_coordinates: GeoPoint | None = None
 
 
 class SearchRequest(BaseModel):
     query: str
-    top_k: Optional[int] = None
+    top_k: int | None = None
     debug: bool = False
-    user_location: Optional[str] = None
-    user_coordinates: Optional[GeoPoint] = None
+    user_location: str | None = None
+    user_coordinates: GeoPoint | None = None
 
 
 class ListingPrice(BaseModel):
-    amount: Optional[float] = None
-    currency: Optional[str] = None
-    frequency: Optional[str] = None
+    amount: float | None = None
+    currency: str | None = None
+    frequency: str | None = None
 
 
 class ProductListing(BaseModel):
     id: str
     title: str
-    summary: Optional[str] = None
-    content: Optional[str] = None
-    status: Optional[str] = None
-    location: Optional[str] = None
-    full_address: Optional[str] = None
-    geohash: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    geo_distance_km: Optional[float] = None
-    maps_url: Optional[str] = None
-    price: Optional[ListingPrice] = None
-    published_at: Optional[datetime] = None
-    images: List[str] = Field(default_factory=list)
-    tags: List[str] = Field(default_factory=list)
-    url: Optional[str] = None
-    identifier: Optional[str] = None
-    raw_tags: List[List[str]] = Field(default_factory=list)
+    summary: str | None = None
+    content: str | None = None
+    status: str | None = None
+    location: str | None = None
+    full_address: str | None = None
+    geohash: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    geo_distance_km: float | None = None
+    maps_url: str | None = None
+    price: ListingPrice | None = None
+    published_at: datetime | None = None
+    images: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    url: str | None = None
+    identifier: str | None = None
+    raw_tags: list[list[str]] = Field(default_factory=list)
 
 
 class SellerResult(BaseModel):
     id: str
-    name: Optional[str] = None
-    meta_data: Optional[Dict[str, Any]] = None
-    filters: Optional[Dict[str, Any]] = None
-    content: Optional[str] = None
-    full_address: Optional[str] = None
-    geohash: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    vector_distance: Optional[float] = None
-    geo_distance_km: Optional[float] = None
+    name: str | None = None
+    meta_data: dict[str, Any] | None = None
+    filters: dict[str, Any] | None = None
+    content: str | None = None
+    full_address: str | None = None
+    geohash: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    vector_distance: float | None = None
+    geo_distance_km: float | None = None
     score: float = Field(default=0.0)
-    maps_url: Optional[str] = None
-    listings: List[ProductListing] = Field(default_factory=list)
-    user_location: Optional[str] = None
-    user_coordinates: Optional[GeoPoint] = None
+    maps_url: str | None = None
+    listings: list[ProductListing] = Field(default_factory=list)
+    user_location: str | None = None
+    user_coordinates: GeoPoint | None = None
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
         # Keep score separate from distances; do not auto-mutate based on distances.
@@ -94,21 +94,21 @@ class SellerResult(BaseModel):
 class ChatResponse(BaseModel):
     session_id: str
     answer: str
-    results: List[SellerResult]
+    results: list[SellerResult]
     query: str
     top_k: int
-    debug_payload: Optional[Dict[str, Any]] = None
-    user_location: Optional[str] = None
-    user_coordinates: Optional[GeoPoint] = None
+    debug_payload: dict[str, Any] | None = None
+    user_location: str | None = None
+    user_coordinates: GeoPoint | None = None
 
 
 class SearchResponse(BaseModel):
-    results: List[SellerResult]
+    results: list[SellerResult]
     query: str
     top_k: int
-    debug_payload: Optional[Dict[str, Any]] = None
-    user_location: Optional[str] = None
-    user_coordinates: Optional[GeoPoint] = None
+    debug_payload: dict[str, Any] | None = None
+    user_location: str | None = None
+    user_coordinates: GeoPoint | None = None
 
 
 # Explicit re-exports to help strict type checkers and IDEs

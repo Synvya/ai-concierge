@@ -1,5 +1,6 @@
 import json
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, MetaData, String, Table, Text, select
@@ -34,8 +35,8 @@ sellers_table = Table(
 )
 
 
-def _should_exclude_seller(seller: Dict[str, Any]) -> bool:
-    def has_demo_flag(data: Dict[str, Any] | None) -> bool:
+def _should_exclude_seller(seller: dict[str, Any]) -> bool:
+    def has_demo_flag(data: dict[str, Any] | None) -> bool:
         if not isinstance(data, dict):
             return False
         if data.get("hashtag_demo") is True:
@@ -55,8 +56,8 @@ def _should_exclude_seller(seller: Dict[str, Any]) -> bool:
     return has_demo_flag(meta) or has_demo_flag(filters)
 
 
-def _normalize_pubkeys(pubkeys: Iterable[str]) -> List[str]:
-    normalized: List[str] = []
+def _normalize_pubkeys(pubkeys: Iterable[str]) -> list[str]:
+    normalized: list[str] = []
     for key in pubkeys:
         if not isinstance(key, str):
             continue
@@ -72,7 +73,7 @@ def _normalize_pubkeys(pubkeys: Iterable[str]) -> List[str]:
     return normalized
 
 
-def _select_canonical_key(keys: List[str]) -> Optional[str]:
+def _select_canonical_key(keys: list[str]) -> str | None:
     for key in keys:
         if (
             isinstance(key, str)
@@ -83,8 +84,8 @@ def _select_canonical_key(keys: List[str]) -> Optional[str]:
     return keys[0].lower() if keys else None
 
 
-def _extract_seller_pubkeys(seller: Dict[str, Any]) -> List[str]:
-    candidates: List[str] = []
+def _extract_seller_pubkeys(seller: dict[str, Any]) -> list[str]:
+    candidates: list[str] = []
 
     meta = seller.get("meta_data")
     if isinstance(meta, dict):
@@ -94,7 +95,7 @@ def _extract_seller_pubkeys(seller: Dict[str, Any]) -> List[str]:
             candidates.append(meta["seller"])
 
     content_raw = seller.get("content")
-    content: Dict[str, Any] | None = None
+    content: dict[str, Any] | None = None
     if isinstance(content_raw, dict):
         content = content_raw
     elif isinstance(content_raw, str):
@@ -117,7 +118,7 @@ def _extract_seller_pubkeys(seller: Dict[str, Any]) -> List[str]:
 async def _fetch_sellers_by_public_keys(
     session: AsyncSession,
     public_keys: Sequence[str],
-) -> Dict[str, Dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     if not public_keys:
         return {}
 
@@ -140,7 +141,7 @@ async def _fetch_sellers_by_public_keys(
     ).where(pubkey_field.in_(unique_pubkeys))
 
     result = await session.execute(stmt)
-    seller_map: Dict[str, Dict[str, Any]] = {}
+    seller_map: dict[str, dict[str, Any]] = {}
     for row in result.mappings():
         seller = dict(row)
         if _should_exclude_seller(seller):
@@ -159,9 +160,9 @@ async def search_sellers(
     query_embedding: Sequence[float],
     limit: int,
     query_text: str | None = None,
-    user_coordinates: Optional[Tuple[float, float]] = None,
+    user_coordinates: tuple[float, float] | None = None,
     user_location: str | None = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     distance_expr = sellers_table.c.embedding.cosine_distance(query_embedding).label(
         "vector_distance"
     )
@@ -184,8 +185,8 @@ async def search_sellers(
     result = await session.execute(stmt)
     rows = result.mappings().all()
 
-    sellers: List[Dict[str, Any]] = []
-    seller_pubkey_map: Dict[str, Dict[str, Any]] = {}
+    sellers: list[dict[str, Any]] = []
+    seller_pubkey_map: dict[str, dict[str, Any]] = {}
     for row in rows:
         seller = dict(row)
         if _should_exclude_seller(seller):
@@ -201,15 +202,15 @@ async def search_sellers(
     public_keys = list(dict.fromkeys(seller_pubkey_map.keys()))
     listings_map = await get_listings_by_public_keys(session, public_keys)
 
-    listing_matches: List[Dict[str, Any]] = []
+    listing_matches: list[dict[str, Any]] = []
     if query_text:
         product_limit = max(limit, 1) * max(settings.listings_per_seller or 1, 1)
         listing_matches = await search_listings_by_text(
             session, query_text, product_limit
         )
 
-        normalized_matches: List[Dict[str, Any]] = []
-        missing_pubkeys: List[str] = []
+        normalized_matches: list[dict[str, Any]] = []
+        missing_pubkeys: list[str] = []
         for match in listing_matches:
             pubkey = match["pubkey"]
             candidate_keys = _normalize_pubkeys([pubkey]) or [pubkey]
@@ -255,7 +256,7 @@ async def search_sellers(
             )
             listings_map.update(extra_listings)
 
-        merged_sellers: Dict[str, Dict[str, Any]] = {}
+        merged_sellers: dict[str, dict[str, Any]] = {}
         for seller in sellers:
             normalized_keys = seller.get("normalized_pubkeys") or []
             canonical_key = _select_canonical_key(normalized_keys)
@@ -318,9 +319,9 @@ async def search_sellers(
                 )
                 seller["score"] = seller_score
 
-    ranked_sellers: List[Dict[str, Any]] = []
+    ranked_sellers: list[dict[str, Any]] = []
     for seller in sellers:
-        collected: List[Dict[str, Any]] = []
+        collected: list[dict[str, Any]] = []
         ids_seen = set()
         for key in seller.get("normalized_pubkeys", []):
             for item in listings_map.get(key, []):
@@ -366,7 +367,7 @@ async def search_sellers(
             seller["score"] = max(float(seller.get("score", 0.0) or 0.0), boosted_score)
         ranked_sellers.append(seller)
 
-    def _sort_key(item: Dict[str, Any]) -> tuple:
+    def _sort_key(item: dict[str, Any]) -> tuple:
         vector_distance = item.get("vector_distance")
         score = float(item.get("score", 0.0) or 0.0)
         if vector_distance is not None:
@@ -391,7 +392,7 @@ async def search_sellers(
 
 async def get_seller_by_id(
     session: AsyncSession, seller_id: str
-) -> Dict[str, Any] | None:
+) -> dict[str, Any] | None:
     stmt = select(sellers_table).where(sellers_table.c.id == seller_id)
     result = await session.execute(stmt)
     row = result.mappings().first()

@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 
 import pytest
+
 from app.repositories.listings import (
     _parse_classified_listing_row,
     _parse_listing,

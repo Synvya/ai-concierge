@@ -4,9 +4,9 @@ import json
 import logging
 import re
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 from sqlalchemy import Column, Integer, MetaData, String, Table, Text, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
 from ..utils.geolocation import decode_geohash
-
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -38,7 +37,7 @@ def _bech32_polymod(values: Sequence[int]) -> int:
     return chk
 
 
-def _bech32_hrp_expand(hrp: str) -> List[int]:
+def _bech32_hrp_expand(hrp: str) -> list[int]:
     return [ord(x) >> 5 for x in hrp] + [0] + [ord(x) & 31 for x in hrp]
 
 
@@ -46,7 +45,7 @@ def _bech32_verify_checksum(hrp: str, data: Sequence[int]) -> bool:
     return _bech32_polymod(_bech32_hrp_expand(hrp) + list(data)) == 1
 
 
-def _bech32_decode(bech: str) -> Tuple[Optional[str], Optional[List[int]]]:
+def _bech32_decode(bech: str) -> tuple[str | None, list[int] | None]:
     if not bech or any(ord(x) < 33 or ord(x) > 126 for x in bech):
         return None, None
     bech = bech.strip()
@@ -64,7 +63,7 @@ def _bech32_decode(bech: str) -> Tuple[Optional[str], Optional[List[int]]]:
     return hrp, data[:-6]
 
 
-def _convert_bits(data: Sequence[int], from_bits: int, to_bits: int, pad: bool = True) -> Optional[bytes]:
+def _convert_bits(data: Sequence[int], from_bits: int, to_bits: int, pad: bool = True) -> bytes | None:
     acc = 0
     bits = 0
     ret = bytearray()
@@ -85,7 +84,7 @@ def _convert_bits(data: Sequence[int], from_bits: int, to_bits: int, pad: bool =
     return bytes(ret)
 
 
-def _npub_to_hex(npub: str) -> Optional[str]:
+def _npub_to_hex(npub: str) -> str | None:
     npub = npub.strip()
     hrp, data = _bech32_decode(npub)
     if hrp != "npub" or data is None:
@@ -123,7 +122,7 @@ if settings.listings_table:
     )
 
 
-def _normalize_tags(raw_tags: Any) -> List[List[str]]:
+def _normalize_tags(raw_tags: Any) -> list[list[str]]:
     if raw_tags is None:
         return []
     if isinstance(raw_tags, str):
@@ -136,15 +135,15 @@ def _normalize_tags(raw_tags: Any) -> List[List[str]]:
     if not isinstance(data, Iterable):
         return []
 
-    normalized: List[List[str]] = []
+    normalized: list[list[str]] = []
     for item in data:
         if isinstance(item, (list, tuple)):
             normalized.append([str(part) for part in item])
     return normalized
 
 
-def _group_tags(tags: List[List[str]]) -> Dict[str, List[List[str]]]:
-    grouped: Dict[str, List[List[str]]] = defaultdict(list)
+def _group_tags(tags: list[list[str]]) -> dict[str, list[list[str]]]:
+    grouped: dict[str, list[list[str]]] = defaultdict(list)
     for tag in tags:
         if not tag:
             continue
@@ -152,7 +151,7 @@ def _group_tags(tags: List[List[str]]) -> Dict[str, List[List[str]]]:
     return grouped
 
 
-def _first_value(grouped: Dict[str, List[List[str]]], key: str) -> str | None:
+def _first_value(grouped: dict[str, list[list[str]]], key: str) -> str | None:
     values = grouped.get(key)
     if not values:
         return None
@@ -162,7 +161,7 @@ def _first_value(grouped: Dict[str, List[List[str]]], key: str) -> str | None:
     return first[0]
 
 
-def _parse_price(grouped: Dict[str, List[List[str]]]) -> Dict[str, Any] | None:
+def _parse_price(grouped: dict[str, list[list[str]]]) -> dict[str, Any] | None:
     price_entries = grouped.get("price")
     if not price_entries:
         return None
@@ -182,7 +181,7 @@ def _parse_price(grouped: Dict[str, List[List[str]]]) -> Dict[str, Any] | None:
     if amount is None and currency is None:
         return None
 
-    payload: Dict[str, Any] = {}
+    payload: dict[str, Any] = {}
     if amount is not None:
         payload["amount"] = amount
     if currency:
@@ -193,7 +192,7 @@ def _parse_price(grouped: Dict[str, List[List[str]]]) -> Dict[str, Any] | None:
 
 
 def _parse_published_at(
-    grouped: Dict[str, List[List[str]]], created_at: int | None
+    grouped: dict[str, list[list[str]]], created_at: int | None
 ) -> datetime | None:
     published_raw = _first_value(grouped, "published_at")
     if published_raw and published_raw.isdigit():
@@ -209,7 +208,7 @@ def _parse_published_at(
     return None
 
 
-def _collect_images(grouped: Dict[str, List[List[str]]]) -> List[str]:
+def _collect_images(grouped: dict[str, list[list[str]]]) -> list[str]:
     images = []
     for key in ("image", "thumb", "picture", "x", "media"):
         for entry in grouped.get(key, []):
@@ -218,7 +217,7 @@ def _collect_images(grouped: Dict[str, List[List[str]]]) -> List[str]:
     return images
 
 
-def _collect_keywords(grouped: Dict[str, List[List[str]]]) -> List[str]:
+def _collect_keywords(grouped: dict[str, list[list[str]]]) -> list[str]:
     keywords = []
     for entry in grouped.get("t", []):
         if entry and entry[0]:
@@ -249,7 +248,7 @@ def _extract_geohash(content: Mapping[str, Any], meta: Mapping[str, Any]) -> str
     return None
 
 
-def _tokenize_query(query: Optional[str]) -> List[str]:
+def _tokenize_query(query: str | None) -> list[str]:
     if not query:
         return []
     return [token for token in re.findall(r"[A-Za-z0-9]+", query.lower()) if len(token) > 1]
@@ -259,7 +258,7 @@ def _listing_match_score(listing: Mapping[str, Any], tokens: Sequence[str]) -> i
     if not tokens:
         return 0
 
-    haystack_parts: List[str] = []
+    haystack_parts: list[str] = []
     for key in ("title", "summary", "content", "location", "status", "identifier"):
         value = listing.get(key)
         if isinstance(value, str):
@@ -284,10 +283,10 @@ def _listing_match_score(listing: Mapping[str, Any], tokens: Sequence[str]) -> i
 
 
 def filter_and_rank_listings(
-    listings: Sequence[Dict[str, Any]],
-    query: Optional[str],
+    listings: Sequence[dict[str, Any]],
+    query: str | None,
     max_items: int,
-) -> Tuple[List[Dict[str, Any]], float]:
+) -> tuple[list[dict[str, Any]], float]:
     """Filter listings for relevance to the query and return them sorted by score and recency."""
     if not listings:
         return [], 0.0
@@ -297,7 +296,7 @@ def filter_and_rank_listings(
     tokens = _tokenize_query(query)
     zero_point = datetime.fromtimestamp(0, tz=timezone.utc)
 
-    scored_entries: List[Tuple[int, datetime, Dict[str, Any]]] = []
+    scored_entries: list[tuple[int, datetime, dict[str, Any]]] = []
     seen_ids = set()
     for listing in listings:
         listing_id = listing.get("id")
@@ -339,7 +338,7 @@ def filter_and_rank_listings(
     return trimmed, best_score
 
 
-def _parse_listing(row: Mapping[str, Any]) -> Dict[str, Any] | None:
+def _parse_listing(row: Mapping[str, Any]) -> dict[str, Any] | None:
     tags = _normalize_tags(row.get("tags"))
     grouped = _group_tags(tags)
     title = _first_value(grouped, "title")
@@ -368,7 +367,7 @@ def _parse_listing(row: Mapping[str, Any]) -> Dict[str, Any] | None:
         or _first_value(grouped, "r")
     )
 
-    listing: Dict[str, Any] = {
+    listing: dict[str, Any] = {
         "id": row.get("event_id") or row.get("id"),
         "title": title,
         "summary": summary,
@@ -391,7 +390,7 @@ def _parse_listing(row: Mapping[str, Any]) -> Dict[str, Any] | None:
     return {key: value for key, value in listing.items() if value is not None or key in {"content", "images", "tags", "raw_tags"}}
 
 
-def _finalize_listing_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _finalize_listing_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in payload.items()
@@ -399,7 +398,7 @@ def _finalize_listing_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _parse_classified_listing_row(row: Mapping[str, Any]) -> Tuple[str | None, Dict[str, Any] | None]:
+def _parse_classified_listing_row(row: Mapping[str, Any]) -> tuple[str | None, dict[str, Any] | None]:
     meta_raw = row.get("meta_data")
     if isinstance(meta_raw, str):
         try:
@@ -446,7 +445,7 @@ def _parse_classified_listing_row(row: Mapping[str, Any]) -> Tuple[str | None, D
     raw_summary = content.get("summary")
     description = content.get("description")
 
-    summary_text: Optional[str] = None
+    summary_text: str | None = None
     if isinstance(raw_summary, str):
         trimmed = raw_summary.strip()
         summary_text = trimmed or raw_summary
@@ -465,7 +464,7 @@ def _parse_classified_listing_row(row: Mapping[str, Any]) -> Tuple[str | None, D
             summary_text = fallback_stripped or fallback_summary
 
     price_data = content.get("price")
-    price: Dict[str, Any] | None = None
+    price: dict[str, Any] | None = None
     if isinstance(price_data, Mapping):
         amount = price_data.get("amount")
         currency = price_data.get("currency") or meta.get("price_currency")
@@ -481,7 +480,7 @@ def _parse_classified_listing_row(row: Mapping[str, Any]) -> Tuple[str | None, D
         else:
             numeric_amount = None
 
-        price_parts: Dict[str, Any] = {}
+        price_parts: dict[str, Any] = {}
         if numeric_amount is not None:
             price_parts["amount"] = numeric_amount
         if isinstance(currency, str) and currency:
@@ -501,7 +500,7 @@ def _parse_classified_listing_row(row: Mapping[str, Any]) -> Tuple[str | None, D
     if categories:
         categories = list(dict.fromkeys(categories))
 
-    images: List[str] = []
+    images: list[str] = []
     raw_images = content.get("images")
     if isinstance(raw_images, Iterable):
         for entry in raw_images:
@@ -583,7 +582,7 @@ def _disable_listings_table(context: str) -> None:
 async def _get_classified_listings_from_fallback(
     session: AsyncSession,
     public_keys: Sequence[str],
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     if not public_keys:
         return {}
 
@@ -609,7 +608,7 @@ async def _get_classified_listings_from_fallback(
 
     result = await session.execute(stmt)
 
-    listings_map: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    listings_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in result.mappings():
         seller_pubkey, listing = _parse_classified_listing_row(row)
         if seller_pubkey and listing:
@@ -626,7 +625,7 @@ async def _get_classified_listings_from_fallback(
 async def get_listings_by_public_keys(
     session: AsyncSession,
     public_keys: Sequence[str],
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     if not public_keys:
         return {}
 
@@ -655,7 +654,7 @@ async def get_listings_by_public_keys(
                     logger.warning("listings_query_failed error=%s", exc)
                     await session.rollback()
             else:
-                listings_map: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+                listings_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
                 for row in result.mappings():
                     listing = _parse_listing(row)
                     if listing:
@@ -684,7 +683,7 @@ async def _search_classified_listings_fallback(
     session: AsyncSession,
     query: str,
     limit: int,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     tokens = _tokenize_query(query)
     lowered_query = query.strip().lower()
     pattern = f"%{lowered_query}%"
@@ -716,8 +715,8 @@ async def _search_classified_listings_fallback(
 
     result = await session.execute(stmt)
 
-    matches: List[Dict[str, Any]] = []
-    fallback_entries: List[Dict[str, Any]] = []
+    matches: list[dict[str, Any]] = []
+    fallback_entries: list[dict[str, Any]] = []
 
     for row in result.mappings():
         seller_pubkey, listing = _parse_classified_listing_row(row)
@@ -753,9 +752,9 @@ async def _search_classified_listings_fallback(
 
 async def search_listings_by_text(
     session: AsyncSession,
-    query: Optional[str],
+    query: str | None,
     limit: int,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     if not query or not query.strip():
         return []
 
@@ -799,8 +798,8 @@ async def search_listings_by_text(
                 logger.warning("listings_search_failed error=%s", exc)
                 await session.rollback()
         else:
-            matches: List[Dict[str, Any]] = []
-            fallback_entries: List[Dict[str, Any]] = []
+            matches: list[dict[str, Any]] = []
+            fallback_entries: list[dict[str, Any]] = []
 
             for row in result.mappings():
                 listing = _parse_listing(row)

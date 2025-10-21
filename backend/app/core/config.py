@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import Optional
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,7 +15,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="local")
     api_prefix: str = Field(default="/api")
 
-    openai_api_key: Optional[SecretStr] = Field(default=None, alias="OPENAI_API_KEY")
+    openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_assistant_model: str = Field(default="gpt-4.1-mini")
     openai_embedding_model: str = Field(default="text-embedding-3-small")
 
@@ -25,9 +24,9 @@ class Settings(BaseSettings):
     db_user: str = Field(default="postgres")
     db_password: SecretStr = Field(default=SecretStr("postgres"))
     db_name: str = Field(default="concierge")
-    db_schema: Optional[str] = Field(default="nostr")
+    db_schema: str | None = Field(default="nostr")
     db_table: str = Field(default="sellers")
-    listings_table: Optional[str] = Field(default="classified_listings", alias="DB_LISTINGS_TABLE")
+    listings_table: str | None = Field(default="classified_listings", alias="DB_LISTINGS_TABLE")
     db_pool_size: int = Field(default=5)
     db_max_overflow: int = Field(default=10)
 
@@ -37,11 +36,11 @@ class Settings(BaseSettings):
 
     s3_analytics_bucket: str = Field(default="ai-concierge-analytics-dev")
     s3_region: str = Field(default="us-east-1")
-    aws_access_key_id: Optional[str] = Field(default=None, alias="AWS_ACCESS_KEY_ID")
-    aws_secret_access_key: Optional[SecretStr] = Field(
+    aws_access_key_id: str | None = Field(default=None, alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: SecretStr | None = Field(
         default=None, alias="AWS_SECRET_ACCESS_KEY"
     )
-    aws_endpoint_url: Optional[str] = Field(default=None, alias="AWS_ENDPOINT_URL")
+    aws_endpoint_url: str | None = Field(default=None, alias="AWS_ENDPOINT_URL")
 
     analytics_flush_interval_seconds: int = Field(default=60)
     frontend_base_url: str = Field(default="http://localhost:5173")

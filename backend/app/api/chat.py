@@ -13,7 +13,6 @@ from ..services.analytics import analytics_service
 from ..services.assistant import generate_response
 from ..services.embedding import embed_text
 
-
 router = APIRouter(prefix="/chat", tags=["chat"])
 settings = get_settings()
 logger = logging.getLogger(__name__)
