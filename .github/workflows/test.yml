@@ -27,6 +27,7 @@ jobs:
       - name: Tests (pytest)
         env:
           PYTHONUNBUFFERED: '1'
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: pytest -q
 
   frontend:
