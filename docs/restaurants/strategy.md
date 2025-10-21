@@ -116,6 +116,40 @@ Do **not** use the deprecated `d` tag for addressable identification.
 
 ---
 
+## Relay Strategy
+
+### Development
+- Use public test relays for development and testing
+- Recommended relays:
+  - `wss://relay.damus.io`
+  - `wss://nos.lol`
+  - `wss://relay.nostr.band`
+- Configure relays in client settings
+- Test harness publishes to configured relays
+
+### Production
+- Businesses should configure their preferred relays
+- Multiple relay support for redundancy
+- AI agents should:
+  1. Check business profile for relay hints (future: NIP-65)
+  2. Use common public relays as fallback
+  3. Subscribe to multiple relays simultaneously
+  4. Handle relay failures gracefully with timeout/retry logic
+
+### Relay Selection Criteria
+- **Uptime**: Choose relays with high availability
+- **Performance**: Low latency and fast response times
+- **Privacy**: Consider relay policies on data retention
+- **Geographic proximity**: Reduce latency for regional businesses
+
+### Future: NIP-65 Relay Lists
+- Businesses publish preferred relay lists
+- AI agents query NIP-65 relay metadata
+- Dynamic relay discovery and failover
+- Better message delivery guarantees
+
+---
+
 ## Vision
 
 This protocol creates a **message-based commerce fabric** — every booking, order, or payment begins as a secure message over Nostr.  

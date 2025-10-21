@@ -65,21 +65,75 @@ Each level can be validated independently using the schemas above.
 
 ---
 
-## ✅ How to Validate (CLI Example)
+## ✅ How to Validate
+
+### CLI Validation
 
 You can validate any example against its schema using a JSON Schema validator (e.g. `ajv-cli` or `python-jsonschema`):
 
-### Using `ajv-cli` (Node.js)
+#### Using `ajv-cli` (Node.js)
 ```bash
 npx ajv validate -s reservation.request.schema.json -d examples/reservation.request.example.json
 ```
 
-### Using Python
+#### Using Python
 ```bash
 python -m jsonschema -i examples/reservation.response.suggested.example.json reservation.response.schema.json
 ```
 
 All provided examples should pass validation successfully.
+
+### Programmatic Validation (TypeScript)
+
+The business client implements validation using `ajv` and `ajv-formats`:
+
+```typescript
+import Ajv from "ajv";
+import addFormats from "ajv-formats";
+import requestSchema from "./reservation.request.schema.json";
+import responseSchema from "./reservation.response.schema.json";
+
+// Initialize AJV with format support (for date-time validation)
+const ajv = new Ajv({ allErrors: true });
+addFormats(ajv);
+
+// Compile schemas
+const validateRequest = ajv.compile(requestSchema);
+const validateResponse = ajv.compile(responseSchema);
+
+// Validate a request
+const requestPayload = {
+  party_size: 2,
+  iso_time: "2025-10-20T19:00:00-07:00",
+  notes: "Window seat please"
+};
+
+const isValid = validateRequest(requestPayload);
+if (!isValid) {
+  console.error("Validation errors:", validateRequest.errors);
+  // Errors include: field path, message, and failing value
+}
+
+// Validate a response
+const responsePayload = {
+  status: "confirmed",
+  iso_time: "2025-10-20T19:00:00-07:00",
+  message: "See you then!"
+};
+
+if (validateResponse(responsePayload)) {
+  console.log("Valid response!");
+}
+```
+
+**Full Implementation:**  
+See `client/src/lib/reservationEvents.ts` for complete validation, encryption, and parsing logic.
+
+**Key Features:**
+- Type-safe validation with detailed error messages
+- Date-time format validation via `ajv-formats`
+- Automatic schema compilation at module load
+- Integration with NIP-44 encryption for payload security
 
 ---
 

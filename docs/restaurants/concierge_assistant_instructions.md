@@ -127,11 +127,116 @@ User → Concierge → Restaurant
 
 ---
 
+## Relay Configuration
+
+The AI Concierge should implement the following relay strategy:
+
+### Relay Discovery
+1. **Check business profile** for relay hints (future: NIP-65 relay lists)
+2. **Use common public relays** as fallback:
+   - `wss://relay.damus.io`
+   - `wss://nos.lol`
+   - `wss://relay.nostr.band`
+3. **Subscribe to multiple relays** simultaneously for redundancy
+4. **Handle relay failures** gracefully with timeout and retry logic
+
+### Connection Management
+- Establish WebSocket connections to all target relays
+- Subscribe to `kind:1059` events with `#p` tag = concierge pubkey
+- Keep subscriptions open for real-time responses
+- Implement exponential backoff for reconnection
+- Log relay errors for debugging
+
+### Publishing Strategy
+- Publish to **all** business's known relays
+- Wait for at least one successful publication
+- Retry failed publishes with exponential backoff
+- Consider message successfully sent after N confirmations
+
+---
+
+## Message Parsing
+
+After receiving a gift wrap, follow this process:
+
+### 1. Unwrap the Gift Wrap
+```typescript
+import { unwrapEvent } from "nostr-tools/nip59";
+
+const rumor = unwrapEvent(giftWrap, conciergePrivateKey);
+// rumor is now the unsigned inner event
+```
+
+### 2. Decrypt Rumor Content
+```typescript
+import { decryptMessage } from "./nip44";
+
+const decrypted = decryptMessage(
+  rumor.content, 
+  conciergePrivateKey, 
+  rumor.pubkey // business's pubkey
+);
+const payload = JSON.parse(decrypted);
+```
+
+### 3. Validate Against Schema
+```typescript
+import Ajv from "ajv";
+import addFormats from "ajv-formats";
+import responseSchema from "./reservation.response.schema.json";
+
+const ajv = new Ajv({ allErrors: true });
+addFormats(ajv);
+const validate = ajv.compile(responseSchema);
+
+if (!validate(payload)) {
+  console.error("Validation errors:", validate.errors);
+  throw new Error("Invalid reservation response");
+}
+```
+
+### 4. Extract Thread Context
+```typescript
+import { getThreadContext } from "./nip10";
+
+const context = getThreadContext(rumor);
+const rootEventId = context.rootId || rumor.id;
+// Use rootEventId to group messages in same thread
+```
+
+### 5. Handle by Type
+- **confirmed**: Await calendar event (kind 31923) in Phase 2
+- **declined**: Notify user, end thread
+- **suggested**: Present alternative to user for decision
+- **expired**: Mark thread as closed
+- **cancelled**: Update status, notify user
+
+---
+
 ## Error Handling
 
-- Retry if Gift Wrap fails to propagate (relay errors).
-- If message expires (NIP-40), mark thread as closed.
-- Deduplicate using Addressable Event `a` tag identity.
+### Common Errors and Solutions
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| **Decryption failure** | Wrong recipient key or corrupted data | Verify pubkey in gift wrap `p` tag matches concierge pubkey |
+| **Schema validation** | Malformed payload | Log validation errors, request well-formed message |
+| **Network timeout** | Relay unreachable | Try alternate relays, implement exponential backoff |
+| **No response** | Business offline or busy | Implement timeout (e.g., 5 minutes), then mark as pending |
+| **Duplicate messages** | Same event from multiple relays | Deduplicate by `rumor.id` before processing |
+
+### Error Recovery
+- **Retry logic**: Exponential backoff with max attempts
+- **Fallback relays**: Switch to different relay on failure
+- **User notification**: Inform user of delays or failures
+- **Logging**: Capture all errors for debugging
+
+### Validation Errors
+If schema validation fails:
+1. Log the full validation error details
+2. Capture the invalid payload for debugging
+3. Do **not** crash - handle gracefully
+4. Optionally: Send error message back to business (future)
 
 ---
 

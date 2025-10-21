@@ -105,10 +105,118 @@ Gift Wrap (1059) → Seal (13) → Rumor (32102)
 
 ---
 
+## Testing During Development
+
+### Test Harness
+The business client includes a built-in test harness (dev mode only) at `/app/test-harness`.
+
+**Features:**
+- Simulates AI agent sending reservation requests
+- Uses ephemeral keypair for testing
+- Allows testing all negotiation flows (accept/decline/suggest)
+- Quick example buttons for common scenarios
+- Visible only in development (`import.meta.env.DEV`)
+
+**Usage:**
+1. Start the dev server: `cd client && npm run dev -- --host 127.0.0.1 --port 3000`
+2. Navigate to Test Harness page in the navigation menu
+3. Fill in reservation details (party size, date/time, notes, contact)
+4. Click "Send Reservation Request"
+5. View the request in the Reservations inbox
+6. Test accept/decline/suggest flows with action dialogs
+7. Verify threading and conversation grouping
+
+**Important Notes:**
+- Test messages are **real Nostr events** published to configured relays
+- The test harness creates a new agent identity each session
+- Responses you send will be visible in the conversation thread
+- Use this to verify the full message exchange cycle before building the AI agent
+
+### Running Tests
+```bash
+cd client
+npm test              # Run all unit tests
+npm run lint          # Check for linting errors
+npm run build         # Build for production
+```
+
+### CI/CD
+- GitHub Actions automatically runs tests on every PR
+- Tests must pass before merging
+- Located: `.github/workflows/test.yml`
+
+---
+
+## ⚠️ Current Implementation Notes
+
+### Proof of Work (NIP-13)
+- Library implemented but **not currently enforced on outgoing messages**
+- Library can mine events with target difficulty
+- Future versions will require minimum difficulty for relay acceptance
+- Relays may reject events without adequate PoW
+- **Phase 2 will enable PoW enforcement**
+
+### Expiration (NIP-40)
+- **Not yet implemented** in Phase 1
+- Future versions will automatically expire old requests using `expiration` tag
+- Manually track expiration in application logic for now
+- Consider implementing client-side expiration checks
+
+### Calendar Events (NIP-52)
+- Calendar events (kinds 31923, 31924, 31925) **not yet implemented**
+- Phase 1 focuses on message-based negotiation only (32101/32102)
+- Confirmed reservations stored in local React state only
+- **Phase 2 will add calendar integration for finalized bookings**
+
+### Relay Configuration
+- Currently configured in Settings page
+- Default relays used if none configured
+- Multiple relay support for redundancy
+- Future: NIP-65 relay list discovery
+
+---
+
+## Implementation Reference
+
+### File Structure
+```
+client/src/
+├── lib/
+│   ├── nip44.ts              # NIP-44 encryption/decryption
+│   ├── nip59.ts              # NIP-59 gift wrap utilities
+│   ├── nip10.ts              # NIP-10 threading
+│   ├── nip13.ts              # NIP-13 proof of work (library only)
+│   ├── reservationEvents.ts  # Build/parse 32101/32102
+│   └── relayPool.ts          # Relay connection management
+├── services/
+│   └── reservationService.ts # Subscription and message handling
+├── state/
+│   └── useReservations.ts    # Zustand store for reservations
+├── pages/
+│   ├── Reservations.tsx      # Inbox UI
+│   └── TestHarness.tsx       # Dev testing tool
+└── types/
+    └── reservation.ts        # TypeScript types
+```
+
+### Key Functions
+- `buildReservationRequest()`: Create encrypted 32101 rumor
+- `buildReservationResponse()`: Create encrypted 32102 rumor
+- `wrapEvent()`: Wrap rumor in NIP-59 gift wrap
+- `unwrapEvent()`: Unwrap and decrypt gift wrap
+- `parseReservationRequest()`: Parse and validate 32101
+- `parseReservationResponse()`: Parse and validate 32102
+
+---
+
 ## Future Work
 
-- Notifications for new messages (WebSocket or push).
-- Support for `order.request` and `order.response` using same structure.
-- Optional relay configuration (`kind:10050` Preferred DM Relays).
+- **Phase 2**: Calendar events (NIP-52) and finalization flow
+- **Phase 2**: NIP-13 Proof of Work enforcement
+- **Phase 2**: NIP-40 Expiration timestamps
+- **Phase 3**: Notifications for new messages (WebSocket or push)
+- **Phase 3**: Support for `order.request` and `order.response`
+- **Phase 3**: NIP-65 relay list discovery and preference
+- **Phase 3**: Integration with POS systems for availability
 
 ---
