@@ -196,7 +196,7 @@ async def generate_response(
         response = client.chat.completions.create(
             model=settings.openai_assistant_model,
             temperature=0.4,
-            messages=messages,
+            messages=messages,  # type: ignore[arg-type]
         )
         choice = response.choices[0].message
         return choice.content or "I couldn't find anything right now, please try again."
