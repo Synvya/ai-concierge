@@ -19,8 +19,8 @@ import { hexToBytes } from '@noble/hashes/utils';
  * @returns 32-byte conversation key
  */
 export function getConversationKey(privateKey: string, publicKey: string): Uint8Array {
-  const privateKeyBytes = hexToBytes(privateKey);
-  return getConversationKeyFromLib(privateKeyBytes, publicKey);
+    const privateKeyBytes = hexToBytes(privateKey);
+    return getConversationKeyFromLib(privateKeyBytes, publicKey);
 }
 
 /**
@@ -33,7 +33,7 @@ export function getConversationKey(privateKey: string, publicKey: string): Uint8
  * @returns Base64-encoded encrypted payload
  */
 export function encrypt(plaintext: string, conversationKey: Uint8Array, nonce?: Uint8Array): string {
-  return encryptLib(plaintext, conversationKey, nonce);
+    return encryptLib(plaintext, conversationKey, nonce);
 }
 
 /**
@@ -45,7 +45,7 @@ export function encrypt(plaintext: string, conversationKey: Uint8Array, nonce?: 
  * @throws Error if payload is malformed or MAC verification fails
  */
 export function decrypt(payload: string, conversationKey: Uint8Array): string {
-  return decryptLib(payload, conversationKey);
+    return decryptLib(payload, conversationKey);
 }
 
 /**
@@ -58,13 +58,13 @@ export function decrypt(payload: string, conversationKey: Uint8Array): string {
  * @returns Base64-encoded encrypted payload
  */
 export function encryptMessage(
-  plaintext: string,
-  senderPrivateKey: string,
-  recipientPublicKey: string
+    plaintext: string,
+    senderPrivateKey: string,
+    recipientPublicKey: string
 ): string {
-  const senderPrivateKeyBytes = hexToBytes(senderPrivateKey);
-  const conversationKey = getConversationKeyFromLib(senderPrivateKeyBytes, recipientPublicKey);
-  return encrypt(plaintext, conversationKey);
+    const senderPrivateKeyBytes = hexToBytes(senderPrivateKey);
+    const conversationKey = getConversationKeyFromLib(senderPrivateKeyBytes, recipientPublicKey);
+    return encrypt(plaintext, conversationKey);
 }
 
 /**
@@ -78,11 +78,11 @@ export function encryptMessage(
  * @throws Error if decryption fails
  */
 export function decryptMessage(
-  payload: string,
-  recipientPrivateKey: string,
-  senderPublicKey: string
+    payload: string,
+    recipientPrivateKey: string,
+    senderPublicKey: string
 ): string {
-  const recipientPrivateKeyBytes = hexToBytes(recipientPrivateKey);
-  const conversationKey = getConversationKeyFromLib(recipientPrivateKeyBytes, senderPublicKey);
-  return decrypt(payload, conversationKey);
+    const recipientPrivateKeyBytes = hexToBytes(recipientPrivateKey);
+    const conversationKey = getConversationKeyFromLib(recipientPrivateKeyBytes, senderPublicKey);
+    return decrypt(payload, conversationKey);
 }
