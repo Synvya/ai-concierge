@@ -42,9 +42,9 @@ export interface ReservationRequest {
 /**
  * Status of a reservation response
  */
-export type ReservationStatus = 
+export type ReservationStatus =
     | "confirmed"
-    | "declined" 
+    | "declined"
     | "suggested"
     | "expired"
     | "cancelled";
