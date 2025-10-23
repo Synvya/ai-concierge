@@ -28,6 +28,7 @@ import { ArrowForwardIcon } from '@chakra-ui/icons'
 
 import { useClientIds } from '../hooks/useClientIds'
 import { useNostrIdentity } from '../hooks/useNostrIdentity'
+import { useReservations } from '../contexts/ReservationContext'
 import type {
   ChatMessage,
   ChatResponse,
@@ -47,6 +48,8 @@ import { buildReservationRequest } from '../lib/nostr/reservationEvents'
 import { wrapEvent } from '../lib/nostr/nip59'
 import { publishToRelays } from '../lib/nostr/relayPool'
 import { npubToHex } from '../lib/nostr/keys'
+import type { ReservationMessage } from '../services/reservationMessenger'
+import type { Rumor } from '../lib/nostr/nip59'
 
 const ASSISTANT_NAME = 'Synvya Concierge'
 const ASSISTANT_AVATAR_URL = '/assets/doorman.png'
@@ -111,6 +114,7 @@ const initialMessages: ChatMessage[] = [
 export const ChatPanel = () => {
   const { visitorId, sessionId, resetSession } = useClientIds()
   const nostrIdentity = useNostrIdentity()
+  const { addOutgoingMessage } = useReservations()
   const toast = useToast()
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
@@ -214,6 +218,23 @@ export const ChatPanel = () => {
 
       await publishToRelays(giftWrap, relays)
 
+      // Add to reservation context for tracking
+      // Convert EventTemplate to Rumor by adding required id field
+      const rumorWithId: Rumor = {
+        ...rumor,
+        id: giftWrap.id, // Use gift wrap ID as rumor ID
+        pubkey: nostrIdentity.publicKeyHex,
+      };
+      
+      const reservationMessage: ReservationMessage = {
+        rumor: rumorWithId,
+        type: 'request',
+        payload: request,
+        senderPubkey: nostrIdentity.publicKeyHex,
+        giftWrap,
+      }
+      addOutgoingMessage(reservationMessage, restaurant.name || 'Unknown Restaurant', restaurant.npub)
+
       // Show success message
       const confirmationMessage: ChatMessage = {
         role: 'assistant',
@@ -237,7 +258,7 @@ export const ChatPanel = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [nostrIdentity, toast])
+  }, [nostrIdentity, toast, addOutgoingMessage])
 
   const handleSubmit = useCallback(async () => {
     if (!sessionId || !visitorId || !inputValue.trim()) {

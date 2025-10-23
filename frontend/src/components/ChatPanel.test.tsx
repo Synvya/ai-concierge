@@ -3,9 +3,16 @@ import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ChakraProvider } from '@chakra-ui/react'
 import { ChatPanel } from './ChatPanel'
+import { ReservationProvider } from '../contexts/ReservationContext'
 import * as api from '../lib/api'
 
-const renderWithChakra = (ui: React.ReactElement) => render(<ChakraProvider>{ui}</ChakraProvider>)
+const renderWithChakra = (ui: React.ReactElement) => render(
+  <ChakraProvider>
+    <ReservationProvider>
+      {ui}
+    </ReservationProvider>
+  </ChakraProvider>
+)
 
 // Ensure storage exists even if the test environment omits it (e.g., forks pool)
 const ensureMemoryStorage = () => {
