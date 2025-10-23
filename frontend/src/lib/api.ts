@@ -38,6 +38,7 @@ export interface ProductListing {
 export interface SellerResult {
   id: string
   name?: string
+  npub?: string
   meta_data?: Record<string, unknown>
   filters?: Record<string, unknown>
   content?: string

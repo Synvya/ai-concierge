@@ -27,6 +27,7 @@ import {
 import { ArrowForwardIcon } from '@chakra-ui/icons'
 
 import { useClientIds } from '../hooks/useClientIds'
+import { useNostrIdentity } from '../hooks/useNostrIdentity'
 import type {
   ChatMessage,
   ChatResponse,
@@ -36,6 +37,16 @@ import type {
   SellerResult,
 } from '../lib/api'
 import { chat } from '../lib/api'
+import {
+  parseReservationIntent,
+  isReservationComplete,
+  getMissingDetailPrompt,
+  type ReservationIntent,
+} from '../lib/parseReservationIntent'
+import { buildReservationRequest } from '../lib/nostr/reservationEvents'
+import { wrapEvent } from '../lib/nostr/nip59'
+import { publishToRelays } from '../lib/nostr/relayPool'
+import { npubToHex } from '../lib/nostr/keys'
 
 const ASSISTANT_NAME = 'Synvya Concierge'
 const ASSISTANT_AVATAR_URL = '/assets/doorman.png'
@@ -99,10 +110,13 @@ const initialMessages: ChatMessage[] = [
 
 export const ChatPanel = () => {
   const { visitorId, sessionId, resetSession } = useClientIds()
+  const nostrIdentity = useNostrIdentity()
   const toast = useToast()
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
+  const [currentSearchResults, setCurrentSearchResults] = useState<SellerResult[]>([])
+  const [pendingIntent, setPendingIntent] = useState<ReservationIntent | null>(null)
   const [sharedLocation, setSharedLocation] = useState<{
     label?: string
     coords?: GeoPoint
@@ -135,12 +149,95 @@ export const ChatPanel = () => {
       attachments: payload.results,
     }
     setMessages((prev) => [...prev, assistantMessage])
+    // Track search results for reservation intent matching
+    if (payload.results && payload.results.length > 0) {
+      setCurrentSearchResults(payload.results)
+    }
   }, [])
 
   const canSend = useMemo(
     () => Boolean(inputValue.trim()) && Boolean(sessionId) && Boolean(visitorId) && !isLoading,
     [inputValue, sessionId, visitorId, isLoading],
   )
+
+  const sendReservationRequest = useCallback(async (
+    restaurant: SellerResult,
+    intent: ReservationIntent
+  ) => {
+    if (!nostrIdentity) {
+      toast({
+        title: 'Nostr keys not available',
+        description: 'Please refresh the page and try again.',
+        status: 'error',
+      })
+      return
+    }
+
+    if (!restaurant.npub) {
+      toast({
+        title: 'Restaurant not available',
+        description: 'This restaurant does not support Nostr reservations.',
+        status: 'error',
+      })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+
+      const restaurantPubkeyHex = npubToHex(restaurant.npub)
+      if (!restaurantPubkeyHex) {
+        throw new Error('Invalid restaurant public key')
+      }
+
+      // Build reservation request
+      const request = {
+        party_size: intent.partySize!,
+        iso_time: intent.time!,
+        notes: intent.notes,
+      }
+
+      const rumor = buildReservationRequest(
+        request,
+        nostrIdentity.privateKeyHex,
+        restaurantPubkeyHex
+      )
+
+      const giftWrap = wrapEvent(rumor, nostrIdentity.privateKeyHex, restaurantPubkeyHex)
+
+      // Publish to default relays
+      const relays = [
+        'wss://relay.damus.io',
+        'wss://nos.lol',
+        'wss://relay.nostr.band',
+      ]
+
+      await publishToRelays(giftWrap, relays)
+
+      // Show success message
+      const confirmationMessage: ChatMessage = {
+        role: 'assistant',
+        content: `Great! I've sent your reservation request to ${restaurant.name} for ${intent.partySize} people at ${new Date(intent.time!).toLocaleString()}.${intent.notes ? ` Note: "${intent.notes}"` : ''}\n\nYou'll receive a response from the restaurant shortly.`,
+      }
+      setMessages((prev) => [...prev, confirmationMessage])
+      setPendingIntent(null)
+
+      toast({
+        title: 'Reservation request sent',
+        description: `Sent to ${restaurant.name}`,
+        status: 'success',
+      })
+    } catch (error) {
+      console.error('Failed to send reservation:', error)
+      toast({
+        title: 'Failed to send reservation',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        status: 'error',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [nostrIdentity, toast])
 
   const handleSubmit = useCallback(async () => {
     if (!sessionId || !visitorId || !inputValue.trim()) {
@@ -151,8 +248,54 @@ export const ChatPanel = () => {
     const nextHistory = [...messages, userMessage]
     setMessages(nextHistory)
     setInputValue('')
-    setIsLoading(true)
 
+    // Check for reservation intent
+    const intent = parseReservationIntent(inputValue, currentSearchResults)
+
+    if (intent) {
+      // Merge with pending intent if exists
+      const mergedIntent: ReservationIntent = {
+        ...pendingIntent,
+        ...intent,
+      }
+
+      // Check if complete
+      if (isReservationComplete(mergedIntent)) {
+        // Find restaurant with npub
+        const restaurant = currentSearchResults.find(
+          (r) => r.name === mergedIntent.restaurantName && r.npub
+        )
+
+        if (!restaurant) {
+          const assistantMessage: ChatMessage = {
+            role: 'assistant',
+            content: "I couldn't find that restaurant in the current search results. Could you search for the restaurant first, then request a reservation?",
+          }
+          setMessages((prev) => [...prev, assistantMessage])
+          setPendingIntent(null)
+          return
+        }
+
+        // Send reservation request
+        await sendReservationRequest(restaurant, mergedIntent)
+        return
+      } else {
+        // Prompt for missing details
+        const prompt = getMissingDetailPrompt(mergedIntent)
+        if (prompt) {
+          const assistantMessage: ChatMessage = {
+            role: 'assistant',
+            content: prompt,
+          }
+          setMessages((prev) => [...prev, assistantMessage])
+          setPendingIntent(mergedIntent)
+          return
+        }
+      }
+    }
+
+    // Normal chat flow
+    setIsLoading(true)
     try {
       const payload = await chat({
         message: userMessage.content,
@@ -173,7 +316,7 @@ export const ChatPanel = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [sessionId, visitorId, inputValue, messages, toast, handleChatResponse])
+  }, [sessionId, visitorId, inputValue, messages, currentSearchResults, pendingIntent, toast, handleChatResponse, sendReservationRequest, sharedLocation])
 
   const handleSuggestedQuery = (query: string) => {
     setInputValue(query)
@@ -182,6 +325,8 @@ export const ChatPanel = () => {
   const startNewSession = () => {
     resetSession()
     setMessages(initialMessages)
+    setCurrentSearchResults([])
+    setPendingIntent(null)
   }
 
   const onKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (event) => {
