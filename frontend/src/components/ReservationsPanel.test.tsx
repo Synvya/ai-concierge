@@ -44,7 +44,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       expect(screen.getByText(/no reservations yet/i)).toBeInTheDocument();
       expect(screen.getByText(/when you make a reservation/i)).toBeInTheDocument();
     });
@@ -57,7 +57,7 @@ describe('ReservationsPanel', () => {
       });
 
       const { container } = renderWithProviders(<ReservationsPanel />);
-      
+
       // Check for SVG icon
       const icon = container.querySelector('svg');
       expect(icon).toBeInTheDocument();
@@ -113,7 +113,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       expect(screen.getByText("Mario's Pizza")).toBeInTheDocument();
       expect(screen.getByText('La Terraza')).toBeInTheDocument();
       expect(screen.getByText('The Olive Garden')).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       expect(screen.getByText(/4/)).toBeInTheDocument();
       expect(screen.getByText(/people/i)).toBeInTheDocument();
     });
@@ -145,7 +145,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       // Text is split across elements, so use a function matcher
       const text = screen.getByText((content, element) => {
         return element?.textContent === '1 person';
@@ -161,7 +161,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       // Should show formatted date (exact format depends on locale)
       const dateText = screen.getByText(/oct/i);
       expect(dateText).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       expect(screen.getByText(/window seat please/i)).toBeInTheDocument();
     });
 
@@ -187,7 +187,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       expect(screen.getByText('Sent')).toBeInTheDocument();
       expect(screen.getByText('Confirmed')).toBeInTheDocument();
       expect(screen.getByText('Declined')).toBeInTheDocument();
@@ -201,7 +201,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       // Should show relative time (e.g., "5m ago")
       const timestamps = screen.getAllByText(/ago/i);
       expect(timestamps.length).toBeGreaterThan(0);
@@ -233,7 +233,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       // Verify all three restaurants are rendered
       expect(screen.getByText('Restaurant A')).toBeInTheDocument();
       expect(screen.getByText('Restaurant B')).toBeInTheDocument();
@@ -258,7 +258,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       const headers = screen.getAllByText('Reservations');
       expect(headers.length).toBeGreaterThan(0);
       expect(screen.getByText(/track your reservation requests/i)).toBeInTheDocument();
@@ -272,7 +272,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       // In empty state, the heading should be "No reservations yet", not "Reservations"
       expect(screen.queryByText(/track your reservation requests/i)).not.toBeInTheDocument();
       expect(screen.getByText(/no reservations yet/i)).toBeInTheDocument();
@@ -307,7 +307,7 @@ describe('ReservationsPanel', () => {
       });
 
       renderWithProviders(<ReservationsPanel />);
-      
+
       // Use getAllByText for badges that might appear multiple times
       expect(screen.getAllByText('Sent').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Confirmed').length).toBeGreaterThan(0);

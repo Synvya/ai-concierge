@@ -7,11 +7,11 @@ import { ReservationProvider } from '../contexts/ReservationContext'
 import * as api from '../lib/api'
 
 const renderWithChakra = (ui: React.ReactElement) => render(
-  <ChakraProvider>
-    <ReservationProvider>
-      {ui}
-    </ReservationProvider>
-  </ChakraProvider>
+    <ChakraProvider>
+        <ReservationProvider>
+            {ui}
+        </ReservationProvider>
+    </ChakraProvider>
 )
 
 // Ensure storage exists even if the test environment omits it (e.g., forks pool)
