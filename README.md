@@ -7,10 +7,35 @@ Live site: https://snovalley.synvya.com
 ## Features
 - FastAPI backend with OpenAI-powered conversational search and retrieval from PostgreSQL + pgvector.
 - React + Chakra UI frontend delivering a modern, responsive chat experience.
+- **Natural language reservation messaging** via Nostr protocol (NIP-59 gift wrap) for private, end-to-end encrypted communication with businesses.
 - Configurable database connection (host, credentials, schema, table) via environment variables.
 - Analytics collection for visitor, session, and query metrics persisted to Amazon S3 (or MinIO locally).
 - Docker Compose stack for local development including Postgres and MinIO.
 - Automated AWS deployment via GitHub Actions (container image + ECS service update). Infrastructure is managed manually in AWS (see `infra/`).
+
+## Reservation Features (Phase I)
+
+The AI Concierge supports natural language reservation requests using the Nostr protocol for secure, private messaging:
+
+### How It Works
+1. **Search for businesses**: "Find Italian restaurants near me"
+2. **Natural language booking**: "Book a table for 4 at Mario's Pizza tonight at 7pm"
+3. **Interactive follow-up**: If details are missing, the assistant prompts for party size, time, or restaurant name
+4. **Encrypted messaging**: Reservation requests are encrypted using NIP-44 and wrapped with NIP-59 gift wrap
+5. **Real-time updates**: View all reservations in the Reservations panel, with live status updates from restaurants
+
+### Key Components
+- **Browser-based Nostr identity**: Each browser generates and persists an npub/nsec keypair in localStorage
+- **NIP-59 Gift Wrap**: End-to-end encrypted direct messages to restaurant public keys
+- **Relay network**: Configurable Nostr relays for message delivery (default: Damus, nos.lol, relay.nostr.band)
+- **Reservations panel**: Track all your reservation conversations with status badges (sent/confirmed/declined/suggested)
+
+### Requirements
+- Restaurants must have a valid Nostr public key (npub) in their business data
+- Frontend connects to Nostr relays (configurable via `VITE_NOSTR_RELAYS`)
+- Business client (e.g., [synvya-client-2](https://github.com/Synvya/synvya-client-2)) to receive and respond to reservations
+
+See [`docs/manual-testing-reservations.md`](docs/manual-testing-reservations.md) for detailed manual testing procedures.
 
 ## Prerequisites
 - Python 3.11+
@@ -64,6 +89,8 @@ npm run dev
 - In local mode the backend writes to MinIO using the same AWS SDK calls.
 
 ## Configuration
+
+### Backend Environment Variables
 | Variable | Description |
 | --- | --- |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | PostgreSQL connection details |
@@ -74,6 +101,12 @@ npm run dev
 | `S3_ANALYTICS_BUCKET`, `S3_REGION` | Target bucket and AWS region for analytics |
 | `AWS_ENDPOINT_URL` | Optional S3-compatible endpoint (use MinIO locally) |
 | `FRONTEND_BASE_URL` | Origin allowed by CORS (set to https://snovalley.synvya.com in production) |
+
+### Frontend Environment Variables
+| Variable | Description | Default |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | Backend API URL (leave empty for relative /api path in dev) | *(empty)* |
+| `VITE_NOSTR_RELAYS` | Comma-separated Nostr relay URLs for reservation messaging | `wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band` |
 
 ## Testing
 ```bash
