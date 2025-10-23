@@ -28,12 +28,86 @@ This design avoids fragmented API integrations and builds a **universal agent-to
 
 4. **NIP References**
    - **NIP-01:** Core protocol + Addressable Events
+   - **NIP-09:** Event Deletion
    - **NIP-10:** Threaded conversations (`root` and `reply` markers)
    - **NIP-13:** Proof of Work (light anti-spam)
    - **NIP-40:** Expiration timestamps
    - **NIP-44:** Versioned encryption (for rumor payloads)
    - **NIP-52:** Calendar events
    - **NIP-59:** Gift Wrap (mandatory for all inter-party messages)
+   - **NIP-89:** Application Handlers (for capability discovery)
+
+---
+
+## Handler Discovery (NIP-89)
+
+Before AI agents can send reservation requests, they must **discover which restaurants support reservations**. This is accomplished using **NIP-89 Application Handlers**, which provide a standardized way for applications to announce their capabilities.
+
+### Three-Event Pattern
+
+When a restaurant with `businessType === "restaurant"` publishes their profile, three additional events are automatically published:
+
+1. **Handler Information (kind 31990)**
+   - Declares support for `kind:32101` (reservation.request) and `kind:32102` (reservation.response)
+   - Tagged with `["d", "synvya-restaurants-v1.0"]` for identification
+   - Content is empty (refer to kind 0 profile for restaurant metadata)
+
+2. **Handler Recommendation for 32101 (kind 31989)**
+   - Recommends the restaurant's 31990 handler for processing reservation requests
+   - Tagged with `["d", "32101"]`
+   - Includes `["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]`
+
+3. **Handler Recommendation for 32102 (kind 31989)**
+   - Recommends the restaurant's 31990 handler for processing reservation responses
+   - Tagged with `["d", "32102"]`
+   - Includes same `a` tag format as above
+
+### Publishing Lifecycle
+
+- **Created:** Handler events are published automatically when a restaurant publishes their profile
+- **Deleted:** Handler events are removed via NIP-09 deletion events (kind 5) when the business changes from "restaurant" to another type
+- **Updated:** Republishing the profile republishes the handler events (replaceable events)
+
+### AI Agent Discovery Flow
+
+```typescript
+// Step 1: Find all restaurants by querying kind 0 profiles
+const restaurants = await pool.querySync(relays, {
+  kinds: [0],
+  "#l": ["restaurant"],
+  "#L": ["business.type"]
+});
+
+// Step 2: Check which restaurants handle reservations
+const restaurantPubkeys = restaurants.map(e => e.pubkey);
+const recommendations = await pool.querySync(relays, {
+  kinds: [31989],
+  authors: restaurantPubkeys,
+  "#d": ["32101"]  // Looking for reservation.request handlers
+});
+
+// Step 3: (Optional) Fetch detailed handler information
+for (const rec of recommendations) {
+  const aTag = rec.tags.find(t => t[0] === "a" && t[1].startsWith("31990:"));
+  if (aTag) {
+    const [kind, pubkey, dTag] = aTag[1].split(":");
+    const handlerInfo = await pool.get(relays, {
+      kinds: [31990],
+      authors: [pubkey],
+      "#d": [dTag]
+    });
+    // handlerInfo contains k tags listing supported event kinds
+  }
+}
+```
+
+### Benefits
+
+- **Decentralized Discovery:** No central registry or API required
+- **Standards-Compliant:** Uses official NIP-89 for application handlers
+- **Explicit Opt-In:** Restaurants choose to enable reservation support
+- **Efficient Queries:** AI agents can filter capabilities before sending requests
+- **Composable:** Same pattern can extend to orders, payments, and other capabilities
 
 ---
 

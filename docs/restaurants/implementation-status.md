@@ -82,6 +82,19 @@ This document tracks the implementation status of the Synvya reservation messagi
   - Detailed error messages
   - Located: `client/src/lib/reservationEvents.ts`
 
+### NIP-89 Application Handlers
+- ✅ Handler event builders (kind 31990, kind 31989)
+- ✅ Auto-publish on restaurant profile creation
+- ✅ Auto-delete on business type change
+- ✅ Three-event pattern:
+  - One kind 31990 (handler info declaring support for 32101 & 32102)
+  - One kind 31989 with `d:"32101"` (recommendation for reservation.request)
+  - One kind 31989 with `d:"32102"` (recommendation for reservation.response)
+- ✅ NIP-09 deletion events for cleanup
+- ✅ Full test coverage
+- 📍 Located: `client/src/lib/handlerEvents.ts`
+- 📍 Integration: `client/src/components/BusinessProfileForm.tsx`
+
 ---
 
 ## 🔧 Partially Implemented

@@ -24,6 +24,163 @@ All messages are exchanged using **NIP-59 Gift Wrap (mandatory)**.
 
 ---
 
+## Discovering Reservation-Capable Restaurants
+
+Before sending reservation requests, AI agents must **discover which restaurants support reservations** using **NIP-89 Application Handlers**.
+
+### Discovery Flow
+
+#### Step 1: Find All Restaurants
+
+Query for kind 0 profile events with business type "restaurant":
+
+```typescript
+import { SimplePool } from "nostr-tools";
+
+const pool = new SimplePool();
+const relays = [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.nostr.band"
+];
+
+const restaurants = await pool.querySync(relays, {
+  kinds: [0],
+  "#l": ["restaurant"],
+  "#L": ["business.type"]
+});
+
+// Extract pubkeys and parse restaurant metadata
+const restaurantData = restaurants.map(event => ({
+  pubkey: event.pubkey,
+  profile: JSON.parse(event.content),
+  tags: event.tags
+}));
+```
+
+#### Step 2: Check for Reservation Support
+
+Query for NIP-89 handler recommendation events (kind 31989) to find which restaurants accept reservations:
+
+```typescript
+const restaurantPubkeys = restaurants.map(e => e.pubkey);
+
+const recommendations = await pool.querySync(relays, {
+  kinds: [31989],
+  authors: restaurantPubkeys,
+  "#d": ["32101"]  // Looking for reservation.request handlers
+});
+
+// Build a Set of restaurants that support reservations
+const reservationCapableRestaurants = new Set(
+  recommendations.map(e => e.pubkey)
+);
+
+// Filter restaurants to only reservation-capable ones
+const availableRestaurants = restaurantData.filter(r =>
+  reservationCapableRestaurants.has(r.pubkey)
+);
+```
+
+#### Step 3: (Optional) Fetch Handler Details
+
+If you need detailed handler information, parse the `a` tag from the recommendation to find the handler info event:
+
+```typescript
+for (const rec of recommendations) {
+  // Find the 'a' tag that references the handler info (kind 31990)
+  const aTag = rec.tags.find(t => 
+    t[0] === "a" && t[1].startsWith("31990:")
+  );
+  
+  if (aTag) {
+    // Parse: "31990:<pubkey>:<d-identifier>"
+    const [kind, pubkey, dIdentifier] = aTag[1].split(":");
+    const relayHint = aTag[2]; // Optional relay hint
+    
+    // Query for the handler info event
+    const handlerInfo = await pool.get(
+      relayHint ? [relayHint, ...relays] : relays,
+      {
+        kinds: [31990],
+        authors: [pubkey],
+        "#d": [dIdentifier]  // "synvya-restaurants-v1.0"
+      }
+    );
+    
+    if (handlerInfo) {
+      // Extract supported event kinds from 'k' tags
+      const supportedKinds = handlerInfo.tags
+        .filter(t => t[0] === "k")
+        .map(t => t[1]);
+      
+      console.log(`Restaurant ${pubkey} supports: ${supportedKinds.join(", ")}`);
+      // Expected: ["32101", "32102"]
+    }
+  }
+}
+```
+
+### Expected Handler Structure
+
+Restaurants that support reservations publish three events:
+
+1. **Handler Info (kind 31990)**
+   ```json
+   {
+     "kind": 31990,
+     "pubkey": "<restaurant_pubkey>",
+     "tags": [
+       ["d", "synvya-restaurants-v1.0"],
+       ["k", "32101"],
+       ["k", "32102"]
+     ],
+     "content": ""
+   }
+   ```
+
+2. **Handler Recommendation for 32101 (kind 31989)**
+   ```json
+   {
+     "kind": 31989,
+     "pubkey": "<restaurant_pubkey>",
+     "tags": [
+       ["d", "32101"],
+       ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "wss://relay.damus.io", "all"]
+     ],
+     "content": ""
+   }
+   ```
+
+3. **Handler Recommendation for 32102 (kind 31989)**
+   ```json
+   {
+     "kind": 31989,
+     "pubkey": "<restaurant_pubkey>",
+     "tags": [
+       ["d", "32102"],
+       ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "wss://relay.damus.io", "all"]
+     ],
+     "content": ""
+   }
+   ```
+
+### Error Handling
+
+- **No recommendations found:** Restaurant does not accept AI reservations
+- **Missing handler info:** Use kind 0 profile data, assume standard protocol
+- **Network timeouts:** Query multiple relays, use whichever responds first
+- **Invalid handler format:** Log warning and skip restaurant
+
+### Optimization Tips
+
+- **Cache results:** Store reservation-capable restaurant list for 5-10 minutes
+- **Batch queries:** Query multiple restaurants simultaneously
+- **Relay hints:** Use the relay hint from the `a` tag when fetching handler info
+- **Fallback:** If NIP-89 queries fail, fall back to manual restaurant selection
+
+---
+
 ## Sending a Reservation Request
 
 1. **Create Rumor**
