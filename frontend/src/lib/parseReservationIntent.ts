@@ -85,7 +85,7 @@ export function parseReservationIntent(
  */
 function extractTime(message: string): string | undefined {
   const now = new Date();
-  
+
   // Get current date components in local time
   let year = now.getFullYear();
   let month = now.getMonth();
