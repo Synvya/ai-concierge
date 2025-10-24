@@ -543,6 +543,7 @@ class TestRelayMetrics:
                 relay_pool, "_ensure_client", new_callable=AsyncMock
             ) as mock_client,
             patch("app.services.nostr_relay.Filter") as mock_filter,
+            patch("app.services.nostr_relay.PublicKey") as mock_pk_class,
             patch(
                 "app.services.nostr_relay.asyncio.wait_for", new_callable=AsyncMock
             ) as mock_wait_for,
@@ -550,6 +551,10 @@ class TestRelayMetrics:
             mock_client_instance = MagicMock()
             mock_event = MagicMock()
             mock_event.author.return_value.to_hex.return_value = "test_hex"
+
+            # Mock PublicKey.parse
+            mock_pk = MagicMock()
+            mock_pk_class.parse.return_value = mock_pk
 
             # Mock Filter chain
             mock_filter_instance = MagicMock()
