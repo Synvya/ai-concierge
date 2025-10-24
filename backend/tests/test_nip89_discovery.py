@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from app.schemas import SellerResult
 from app.services.nostr_relay import CacheEntry, NostrRelayPool
 
@@ -255,9 +254,9 @@ class TestNostrRelayPool:
 
         stats = relay_pool.get_cache_stats()
 
-        assert stats["size"] == 3
-        assert stats["valid_entries"] == 2
-        assert stats["expired_entries"] == 1
+        assert stats["cache"]["size"] == 3
+        assert stats["cache"]["valid_entries"] == 2
+        assert stats["cache"]["expired_entries"] == 1
 
     @pytest.mark.asyncio
     async def test_close(self, relay_pool):
@@ -526,14 +525,25 @@ class TestRelayMetrics:
     async def test_relay_metrics_tracking(self, relay_pool):
         """Test that relay metrics track query latency."""
         # Mock successful query
-        with patch.object(
-            relay_pool, "_ensure_client", new_callable=AsyncMock
-        ) as mock_client:
+        with (
+            patch.object(relay_pool, "_ensure_client", new_callable=AsyncMock) as mock_client,
+            patch("app.services.nostr_relay.Filter") as mock_filter,
+            patch("app.services.nostr_relay.asyncio.wait_for", new_callable=AsyncMock) as mock_wait_for,
+        ):
             mock_client_instance = MagicMock()
             mock_event = MagicMock()
             mock_event.author.return_value.to_hex.return_value = "test_hex"
+            
+            # Mock Filter chain
+            mock_filter_instance = MagicMock()
+            mock_filter.return_value = mock_filter_instance
+            mock_filter_instance.kinds.return_value = mock_filter_instance
+            mock_filter_instance.authors.return_value = mock_filter_instance
+            mock_filter_instance.custom_tag.return_value = mock_filter_instance
+            
             mock_client_instance.get_events.return_value = [mock_event]
             mock_client.return_value = mock_client_instance
+            mock_wait_for.return_value = [mock_event]
 
             # Perform query
             await relay_pool._query_relays(["test_hex"])
