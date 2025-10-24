@@ -1,5 +1,4 @@
 import asyncio
-import os
 from typing import Any
 
 
@@ -169,7 +168,7 @@ async def generate_response(
             raise AssistantError("OpenAI SDK is not installed") from exc
 
         settings = get_settings()
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = settings.openai_api_key.get_secret_value() if settings.openai_api_key else None
         if not api_key:
             raise AssistantError("OPENAI_API_KEY is not configured")
 
