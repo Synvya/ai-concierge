@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from app.schemas import SellerResult
 from app.services.nostr_relay import CacheEntry, NostrRelayPool
 
@@ -372,7 +371,8 @@ class TestGlobalRelayPoolManagement:
     async def test_shutdown_relay_pool(self):
         """Test shutting down the global relay pool."""
         import app.services.nostr_relay as nostr_module
-        from app.services.nostr_relay import get_relay_pool, shutdown_relay_pool
+        from app.services.nostr_relay import (get_relay_pool,
+                                              shutdown_relay_pool)
 
         nostr_module._relay_pool = None
 
@@ -416,12 +416,12 @@ class TestCacheHitRate:
             assert relay_pool._cache_misses == 0
 
             # Second query - cache miss (new npub)
-            result2 = await relay_pool.check_handlers(["npub1test456"])
+            await relay_pool.check_handlers(["npub1test456"])
             assert relay_pool._cache_hits == 1
             assert relay_pool._cache_misses == 1
 
             # Third query - cache hit again
-            result3 = await relay_pool.check_handlers(["npub1test123"])
+            await relay_pool.check_handlers(["npub1test123"])
             assert relay_pool._cache_hits == 2
             assert relay_pool._cache_misses == 1
 
@@ -570,18 +570,20 @@ class TestBatchQueries:
         """Test that multiple npubs can be queried in one request."""
         npubs = ["npub1test1", "npub1test2", "npub1test3"]
 
-        with patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex:
-            with patch.object(relay_pool, "_query_relays", new_callable=AsyncMock) as mock_query:
-                mock_npub_to_hex.side_effect = lambda x: f"hex_{x}"
-                mock_query.return_value = []
+        with (
+            patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
+            patch.object(relay_pool, "_query_relays", new_callable=AsyncMock) as mock_query,
+        ):
+            mock_npub_to_hex.side_effect = lambda x: f"hex_{x}"
+            mock_query.return_value = []
 
-                results = await relay_pool.check_handlers(npubs)
+            await relay_pool.check_handlers(npubs)
 
-                # Should call _query_relays once with all hex pubkeys
-                assert mock_query.call_count == 1
-                called_hex_pks = mock_query.call_args[0][0]
-                assert len(called_hex_pks) == 3
-                assert all(f"hex_{npub}" in called_hex_pks for npub in npubs)
+            # Should call _query_relays once with all hex pubkeys
+            assert mock_query.call_count == 1
+            called_hex_pks = mock_query.call_args[0][0]
+            assert len(called_hex_pks) == 3
+            assert all(f"hex_{npub}" in called_hex_pks for npub in npubs)
 
     @pytest.mark.asyncio
     async def test_batch_query_with_mixed_cache_hits(self, relay_pool):
@@ -593,20 +595,22 @@ class TestBatchQueries:
 
         npubs = ["npub1cached", "npub1new1", "npub1new2"]
 
-        with patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex:
-            with patch.object(relay_pool, "_query_relays", new_callable=AsyncMock) as mock_query:
-                mock_npub_to_hex.side_effect = lambda x: f"hex_{x}"
-                mock_query.return_value = []
+        with (
+            patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
+            patch.object(relay_pool, "_query_relays", new_callable=AsyncMock) as mock_query,
+        ):
+            mock_npub_to_hex.side_effect = lambda x: f"hex_{x}"
+            mock_query.return_value = []
 
-                results = await relay_pool.check_handlers(npubs)
+            results = await relay_pool.check_handlers(npubs)
 
-                # Should get cached result for npub1cached
-                assert results["npub1cached"] is True
-                assert relay_pool._cache_hits == 1
+            # Should get cached result for npub1cached
+            assert results["npub1cached"] is True
+            assert relay_pool._cache_hits == 1
 
-                # Should query only the uncached npubs
-                assert mock_query.call_count == 1
-                called_hex_pks = mock_query.call_args[0][0]
-                assert len(called_hex_pks) == 2
-                assert "hex_npub1new1" in called_hex_pks
-                assert "hex_npub1new2" in called_hex_pks
+            # Should query only the uncached npubs
+            assert mock_query.call_count == 1
+            called_hex_pks = mock_query.call_args[0][0]
+            assert len(called_hex_pks) == 2
+            assert "hex_npub1new1" in called_hex_pks
+            assert "hex_npub1new2" in called_hex_pks
