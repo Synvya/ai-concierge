@@ -276,6 +276,8 @@ export const ChatPanel = () => {
       )
 
       const giftWrap = wrapEvent(rumor, nostrIdentity.privateKeyHex, restaurantPubkeyHex)
+      
+      console.log('📤 Sent reservation request - Thread ID:', giftWrap.id)
 
       // Publish to default relays
       const relays = [

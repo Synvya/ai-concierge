@@ -217,6 +217,12 @@ function updateThreadWithMessage(
 
     // Response without a matching thread - log warning and ignore
     console.warn('Received response for unknown thread:', threadId);
+    console.warn('Available threads:', threads.map(t => t.threadId));
+    console.warn('Response details:', {
+      giftWrapId: message.giftWrap.id,
+      rumorTags: message.rumor.tags,
+      extractedThreadId: threadId,
+    });
     return threads;
   }
 }
