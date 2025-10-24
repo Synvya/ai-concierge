@@ -285,7 +285,7 @@ class NostrRelayPool:
             # Query with timeout using fetch_events which expects a Duration (timedelta)
             timeout_duration = timedelta(seconds=self.query_timeout)
             events_result = await client.fetch_events(filter_obj, timeout_duration)
-            
+
             # Convert Events object to list
             events = events_result.to_vec()
 

@@ -576,8 +576,10 @@ class TestRelayMetrics:
             # Mock fetch_events to return Events object with to_vec() method
             mock_events_result = MagicMock()
             mock_events_result.to_vec.return_value = [mock_event]
-            mock_client_instance.fetch_events = AsyncMock(return_value=mock_events_result)
-            
+            mock_client_instance.fetch_events = AsyncMock(
+                return_value=mock_events_result
+            )
+
             mock_ensure.return_value = mock_client_instance
 
             # Perform query
