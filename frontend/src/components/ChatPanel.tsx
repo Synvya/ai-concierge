@@ -284,14 +284,58 @@ export const ChatPanel = () => {
       // Check if complete
       if (isReservationComplete(mergedIntent)) {
         // Find restaurant with npub
-        const restaurant = currentSearchResults.find(
+        let restaurant = currentSearchResults.find(
           (r) => r.name === mergedIntent.restaurantName && r.npub
         )
+
+        // If restaurant not in current results, search for it
+        if (!restaurant && mergedIntent.restaurantName) {
+          setIsLoading(true)
+          
+          try {
+            const payload = await chat({
+              message: mergedIntent.restaurantName,
+              session_id: sessionId,
+              visitor_id: visitorId,
+              history: nextHistory,
+              user_location: sharedLocation.status === 'granted' ? sharedLocation.label : undefined,
+              user_coordinates: sharedLocation.status === 'granted' ? sharedLocation.coords : undefined,
+            })
+            
+            // Update search results
+            if (payload.results && payload.results.length > 0) {
+              setCurrentSearchResults(payload.results)
+              
+              // Try to find the restaurant again (fuzzy match)
+              restaurant = payload.results.find(
+                (r) => r.name?.toLowerCase().includes(mergedIntent.restaurantName!.toLowerCase()) && r.npub
+              )
+              
+              const searchMessage: ChatMessage = {
+                role: 'assistant',
+                content: payload.answer,
+                attachments: payload.results,
+              }
+              setMessages((prev) => [...prev, searchMessage])
+            }
+            
+            setIsLoading(false)
+          } catch (error) {
+            setIsLoading(false)
+            toast({
+              title: 'Failed to search for restaurant',
+              description: 'Please try again.',
+              status: 'error',
+            })
+            setPendingIntent(null)
+            return
+          }
+        }
 
         if (!restaurant) {
           const assistantMessage: ChatMessage = {
             role: 'assistant',
-            content: "I couldn't find that restaurant in the current search results. Could you search for the restaurant first, then request a reservation?",
+            content: "I couldn't find that restaurant. Could you provide more details or try searching for it first?",
           }
           setMessages((prev) => [...prev, assistantMessage])
           setPendingIntent(null)
