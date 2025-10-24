@@ -148,7 +148,8 @@ class NostrRelayPool:
             Hex public key string, or None if conversion fails
         """
         try:
-            pk = PublicKey.from_bech32(npub)
+            # PublicKey.parse() handles hex, bech32 (npub), and NIP-21 uri formats
+            pk = PublicKey.parse(npub)
             return pk.to_hex()
         except Exception as e:
             logger.warning(f"Failed to convert npub {npub}: {e}")

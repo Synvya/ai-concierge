@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     @classmethod
     def parse_nostr_relays(cls, v: str | list[str]) -> list[str]:
         """Parse comma-separated string or list of relay URLs.
-        
+
         Using mode='after' to run after pydantic's type coercion,
         so we handle the string before pydantic tries to JSON-decode it.
         """
