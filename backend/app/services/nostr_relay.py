@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from nostr_sdk import Client, Event, Filter, PublicKey
+from nostr_sdk import Client, Event, Filter, Kind, PublicKey, RelayUrl
 
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,9 @@ class NostrRelayPool:
             # Add relays
             for relay_url in self.relays:
                 try:
-                    await self.client.add_relay(relay_url)
+                    # Wrap string URL in RelayUrl instance
+                    relay = RelayUrl.parse(relay_url)
+                    await self.client.add_relay(relay)
                     if relay_url in self.relay_metrics:
                         self.relay_metrics[relay_url].status = "connected"
                     logger.info(f"Added Nostr relay: {relay_url}")
@@ -254,7 +256,7 @@ class NostrRelayPool:
             # These are recommendations for reservation.request handlers
             filter_obj = (
                 Filter()
-                .kinds([31989])  # Handler recommendations
+                .kinds([Kind(31989)])  # Handler recommendations  
                 .authors(hex_pubkeys)  # From these restaurants
                 .custom_tag("d", ["32101"])  # For reservation.request
             )
