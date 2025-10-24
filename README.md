@@ -101,6 +101,10 @@ npm run dev
 | `S3_ANALYTICS_BUCKET`, `S3_REGION` | Target bucket and AWS region for analytics |
 | `AWS_ENDPOINT_URL` | Optional S3-compatible endpoint (use MinIO locally) |
 | `FRONTEND_BASE_URL` | Origin allowed by CORS (set to https://snovalley.synvya.com in production) |
+| `NOSTR_RELAYS` | Comma-separated Nostr relay URLs for NIP-89 handler discovery (default: `wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band`) |
+| `NIP89_CACHE_TTL` | NIP-89 handler discovery cache TTL in seconds (default: 300) |
+| `NOSTR_CONNECTION_TIMEOUT` | WebSocket connection timeout in seconds (default: 5) |
+| `NOSTR_QUERY_TIMEOUT` | Relay query timeout in seconds (default: 3) |
 
 ### Frontend Environment Variables
 | Variable | Description | Default |

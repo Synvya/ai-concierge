@@ -73,6 +73,10 @@ class SellerResult(BaseModel):
     name: str | None = None
     npub: str | None = None
     normalized_pubkeys: list[str] = Field(default_factory=list)
+    supports_reservations: bool | None = Field(
+        default=None,
+        description="Whether restaurant supports reservations via Nostr (NIP-89 discovery)",
+    )
     meta_data: dict[str, Any] | None = None
     filters: dict[str, Any] | None = None
     content: str | None = None

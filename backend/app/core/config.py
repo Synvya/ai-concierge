@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +44,33 @@ class Settings(BaseSettings):
 
     analytics_flush_interval_seconds: int = Field(default=60)
     frontend_base_url: str = Field(default="http://localhost:5173")
+
+    # Nostr relay configuration for NIP-89 handler discovery
+    nostr_relays: list[str] = Field(
+        default=[
+            "wss://relay.damus.io",
+            "wss://nos.lol",
+            "wss://relay.nostr.band",
+        ],
+        description="Comma-separated or list of Nostr relay URLs for NIP-89 discovery",
+    )
+    nip89_cache_ttl: int = Field(
+        default=300, description="NIP-89 handler discovery cache TTL in seconds"
+    )
+    nostr_connection_timeout: int = Field(
+        default=5, description="WebSocket connection timeout in seconds"
+    )
+    nostr_query_timeout: int = Field(
+        default=3, description="Relay query timeout in seconds"
+    )
+
+    @field_validator("nostr_relays", mode="before")
+    @classmethod
+    def parse_nostr_relays(cls, v: str | list[str]) -> list[str]:
+        """Parse comma-separated string or list of relay URLs."""
+        if isinstance(v, str):
+            return [url.strip() for url in v.split(",") if url.strip()]
+        return v
 
     @property
     def async_db_url(self) -> str:
