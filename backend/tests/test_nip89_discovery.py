@@ -43,21 +43,21 @@ class TestNostrRelayPool:
         # Valid npub format (this is a real example format)
         npub = "npub1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7"
 
-        # Mock the PublicKey.from_bech32 behavior
+        # Mock the PublicKey.parse behavior
         with patch("app.services.nostr_relay.PublicKey") as mock_pk:
             mock_pk_instance = MagicMock()
             mock_pk_instance.to_hex.return_value = "abcd1234" * 8
-            mock_pk.from_bech32.return_value = mock_pk_instance
+            mock_pk.parse.return_value = mock_pk_instance
 
             hex_key = relay_pool._npub_to_hex(npub)
 
             assert hex_key == "abcd1234" * 8
-            mock_pk.from_bech32.assert_called_once_with(npub)
+            mock_pk.parse.assert_called_once_with(npub)
 
     def test_npub_to_hex_handles_invalid_npub(self, relay_pool):
         """Test that invalid npubs return None."""
         with patch("app.services.nostr_relay.PublicKey") as mock_pk:
-            mock_pk.from_bech32.side_effect = Exception("Invalid bech32")
+            mock_pk.parse.side_effect = Exception("Invalid bech32")
 
             hex_key = relay_pool._npub_to_hex("invalid_npub")
 
