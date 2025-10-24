@@ -110,7 +110,7 @@ const initialMessages: ChatMessage[] = [
 export const ChatPanel = () => {
   const { visitorId, sessionId, resetSession } = useClientIds()
   const nostrIdentity = useNostrIdentity()
-  const { addOutgoingMessage } = useReservations()
+  const { addOutgoingMessage, reservationThreads } = useReservations()
   const toast = useToast()
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
@@ -120,6 +120,7 @@ export const ChatPanel = () => {
     coords?: GeoPoint
     status: 'idle' | 'pending' | 'granted' | 'denied'
   }>({ status: 'idle' })
+  const [processedResponses, setProcessedResponses] = useState<Set<string>>(new Set())
 
   // Read cached location from session storage if present
   useEffect(() => {
@@ -139,6 +140,90 @@ export const ChatPanel = () => {
       // ignore malformed cache
     }
   }, [])
+
+  // Watch for new reservation responses and notify user
+  useEffect(() => {
+    reservationThreads.forEach((thread) => {
+      // Get the latest response message
+      const responseMessages = thread.messages.filter((m) => m.type === 'response')
+      if (responseMessages.length === 0) return
+
+      const latestResponse = responseMessages[responseMessages.length - 1]
+      const responseId = latestResponse.giftWrap.id
+
+      // Check if we've already processed this response
+      if (processedResponses.has(responseId)) return
+
+      // Mark as processed
+      setProcessedResponses((prev) => new Set(prev).add(responseId))
+
+      // Get response details
+      const response = latestResponse.payload as any
+      const status = response.status
+      const restaurantName = thread.restaurantName
+
+      // Format the notification message
+      let notificationTitle = ''
+      let notificationDescription = ''
+      let toastStatus: 'success' | 'info' | 'warning' | 'error' = 'info'
+
+      switch (status) {
+        case 'confirmed':
+          notificationTitle = '✅ Reservation Confirmed!'
+          notificationDescription = `Your reservation at ${restaurantName} has been confirmed${
+            response.iso_time ? ` for ${new Date(response.iso_time).toLocaleString()}` : ''
+          }.${response.table ? ` Table: ${response.table}` : ''}`
+          toastStatus = 'success'
+          break
+        case 'suggested':
+          notificationTitle = '💡 Alternative Time Suggested'
+          notificationDescription = `${restaurantName} suggested ${
+            response.iso_time ? new Date(response.iso_time).toLocaleString() : 'an alternative time'
+          } instead.`
+          toastStatus = 'info'
+          break
+        case 'declined':
+          notificationTitle = '❌ Reservation Declined'
+          notificationDescription = `${restaurantName} could not accommodate your request.${
+            response.message ? ` ${response.message}` : ''
+          }`
+          toastStatus = 'warning'
+          break
+        case 'expired':
+          notificationTitle = '⏰ Reservation Expired'
+          notificationDescription = `Your hold at ${restaurantName} has expired.`
+          toastStatus = 'warning'
+          break
+        case 'cancelled':
+          notificationTitle = '🚫 Reservation Cancelled'
+          notificationDescription = `Your reservation at ${restaurantName} was cancelled.`
+          toastStatus = 'error'
+          break
+        default:
+          notificationTitle = '📬 Reservation Update'
+          notificationDescription = `${restaurantName} sent a response about your reservation.`
+      }
+
+      // Show toast notification
+      toast({
+        title: notificationTitle,
+        description: notificationDescription,
+        status: toastStatus,
+        duration: 8000,
+        isClosable: true,
+        position: 'top',
+      })
+
+      // Add message to chat
+      const chatMessage: ChatMessage = {
+        role: 'assistant',
+        content: `${notificationTitle}\n\n${notificationDescription}${
+          response.message ? `\n\nMessage: "${response.message}"` : ''
+        }`,
+      }
+      setMessages((prev) => [...prev, chatMessage])
+    })
+  }, [reservationThreads, processedResponses, toast])
 
   const sendReservationRequest = useCallback(async (
     restaurant: SellerResult,
@@ -554,7 +639,7 @@ export const ChatPanel = () => {
                   >
                     <Box>
                       <Flex align="center" gap={2} flexWrap="wrap">
-                        <Heading size="sm">{displayName}</Heading>
+                      <Heading size="sm">{displayName}</Heading>
                         {seller.supports_reservations === true && (
                           <Tooltip
                             label="This restaurant accepts reservations via Nostr messaging"
