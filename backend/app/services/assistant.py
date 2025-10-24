@@ -270,8 +270,20 @@ async def generate_response(
         context_block = (
             _build_context(results) if results else "No relevant businesses found."
         )
+        
+        # Add instruction based on whether we have results
+        result_instruction = ""
+        if results:
+            result_instruction = (
+                "\n\nIMPORTANT: The above businesses were found based on the search. "
+                "Even if the match isn't perfect, present what's available to the user. "
+                "Don't say you couldn't find anything when results are provided."
+            )
+        
         user_prompt = (
-            f"User question: {query}\n\n" f"Business context:\n{context_block}"
+            f"User question: {query}\n\n" 
+            f"Business context:\n{context_block}"
+            f"{result_instruction}"
         )
         messages.append({"role": "user", "content": user_prompt})
 
