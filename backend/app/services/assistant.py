@@ -132,12 +132,19 @@ def _build_context(results: list[SellerResult]) -> str:
         address_str = seller_address or "Unknown"
         map_str = f"\n   Map: {seller_map}" if seller_map else ""
 
+        # Reservation support info
+        reservation_str = ""
+        if hasattr(result, "supports_reservations") and result.supports_reservations:
+            restaurant_id = getattr(result, "id", "Unknown")
+            npub_str = getattr(result, "npub", "")
+            reservation_str = f"\n   Supports Reservations: Yes (ID: {restaurant_id}, npub: {npub_str})"
+        
         lines.append(
             f"{idx}. {result.name or 'Unknown'} (score: {result.score:.3f})\n"
             f"   Summary: {result.content or 'No description provided.'}\n"
             f"   Address: {address_str}\n"
             f"   Coordinates: {coords_str}\n"
-            f"   Distance: {distance_str}{map_str}\n"
+            f"   Distance: {distance_str}{map_str}{reservation_str}\n"
             f"   City: {location_city or 'Unknown'}\n"
             f"   Tags: {tags}"
             f"{warnings_block}"
@@ -168,7 +175,11 @@ async def generate_response(
             raise AssistantError("OpenAI SDK is not installed") from exc
 
         settings = get_settings()
-        api_key = settings.openai_api_key.get_secret_value() if settings.openai_api_key else None
+        api_key = (
+            settings.openai_api_key.get_secret_value()
+            if settings.openai_api_key
+            else None
+        )
         if not api_key:
             raise AssistantError("OPENAI_API_KEY is not configured")
 
