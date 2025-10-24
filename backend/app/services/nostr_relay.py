@@ -254,10 +254,13 @@ class NostrRelayPool:
 
             # Build filter for kind 31989 events with d:32101
             # These are recommendations for reservation.request handlers
+            # Convert hex pubkeys to PublicKey instances
+            author_pks = [PublicKey.parse(hex_pk) for hex_pk in hex_pubkeys]
+            
             filter_obj = (
                 Filter()
                 .kinds([Kind(31989)])  # Handler recommendations
-                .authors(hex_pubkeys)  # From these restaurants
+                .authors(author_pks)  # From these restaurants
                 .custom_tag("d", ["32101"])  # For reservation.request
             )
 

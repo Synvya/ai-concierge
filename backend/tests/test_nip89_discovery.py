@@ -202,11 +202,16 @@ class TestNostrRelayPool:
         with (
             patch.object(relay_pool, "_ensure_client") as mock_ensure,
             patch("app.services.nostr_relay.Filter") as mock_filter_class,
+            patch("app.services.nostr_relay.PublicKey") as mock_pk_class,
             patch("app.services.nostr_relay.asyncio.wait_for") as mock_wait_for,
         ):
 
             mock_client = AsyncMock()
             mock_ensure.return_value = mock_client
+
+            # Mock PublicKey.parse to return a mock PublicKey for each hex
+            mock_pks = [MagicMock(), MagicMock()]
+            mock_pk_class.parse.side_effect = mock_pks
 
             mock_filter = MagicMock()
             mock_filter.kinds.return_value = mock_filter
@@ -220,14 +225,15 @@ class TestNostrRelayPool:
             events = await relay_pool._query_relays(hex_pubkeys)
 
             assert events == mock_events
-            # Verify filter was built correctly (Kind wrapper is now used)
+            # Verify filter was built correctly (Kind and PublicKey wrappers are now used)
             mock_filter.kinds.assert_called_once()
             # Check that it was called with a list containing a Kind instance
             call_args = mock_filter.kinds.call_args[0][0]
             assert len(call_args) == 1
             # Kind objects have a repr like "Kind { inner: Custom(31989) }"
             assert "Kind" in repr(call_args[0]) or "31989" in str(call_args[0])
-            mock_filter.authors.assert_called_once_with(hex_pubkeys)
+            # Authors should be called with PublicKey instances
+            mock_filter.authors.assert_called_once_with(mock_pks)
             mock_filter.custom_tag.assert_called_once_with("d", ["32101"])
 
     def test_clear_cache(self, relay_pool):
