@@ -1,0 +1,62 @@
+{
+  "content": "",
+  "created_at": 1761252906,
+  "id": "a564c7f4a848b32a890537180294cbc6a9ea029dcb91bde0199c387f69987b0c",
+  "kind": 31989,
+  "pubkey": "e01e4b0b3677204161b8d13d0a7b88e5d2e7dac2f7d2cc5530a3bc1dca3fbd2f",
+  "sig": "bc8a1592a1f9d3425fce18c0351eeef34975ba5e1c550d16f3f41c56177a85320644a039112c6a64dfce274b40d3af4bbedb1348d70c91c61dd75bb9934131b5",
+  "tags": [
+    [
+      "d",
+      "32101"
+    ],
+    [
+      "a",
+      "31990:e01e4b0b3677204161b8d13d0a7b88e5d2e7dac2f7d2cc5530a3bc1dca3fbd2f:synvya-restaurants-v1.0",
+      "wss://relay.damus.io",
+      "all"
+    ]
+  ]
+}
+{
+  "content": "",
+  "created_at": 1761252906,
+  "id": "6b0c17ce1665ca15fbf9fad6b2a91701db8dfd66185af0a9ad686c791f710a00",
+  "kind": 31989,
+  "pubkey": "e01e4b0b3677204161b8d13d0a7b88e5d2e7dac2f7d2cc5530a3bc1dca3fbd2f",
+  "sig": "2968c3a81be47af7af390cc8b86dcac4458327135e964091e665f34a93683544804a0221ed9f880e3b6bb03c88547372f995af86efcebd316e82e13d3b6dfb16",
+  "tags": [
+    [
+      "d",
+      "32102"
+    ],
+    [
+      "a",
+      "31990:e01e4b0b3677204161b8d13d0a7b88e5d2e7dac2f7d2cc5530a3bc1dca3fbd2f:synvya-restaurants-v1.0",
+      "wss://relay.damus.io",
+      "all"
+    ]
+  ]
+}
+{
+  "content": "",
+  "created_at": 1761252906,
+  "id": "3dd071c978c90685273558e9043dfcba4b645b82ad94a4748bf7f7fb57d9055c",
+  "kind": 31990,
+  "pubkey": "e01e4b0b3677204161b8d13d0a7b88e5d2e7dac2f7d2cc5530a3bc1dca3fbd2f",
+  "sig": "97f2930e44b6ffe8d1a0f0548641d17f42f4ed5ffce31c62ed4da581428a3471fcee52dee8519f4cb76a99317d87f980cad687635b1055a67b94f2082349fb42",
+  "tags": [
+    [
+      "d",
+      "synvya-restaurants-v1.0"
+    ],
+    [
+      "k",
+      "32101"
+    ],
+    [
+      "k",
+      "32102"
+    ]
+  ]
+}

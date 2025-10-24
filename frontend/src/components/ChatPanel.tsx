@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Avatar,
   Badge,
@@ -120,7 +120,7 @@ export const ChatPanel = () => {
     coords?: GeoPoint
     status: 'idle' | 'pending' | 'granted' | 'denied'
   }>({ status: 'idle' })
-  const [processedResponses, setProcessedResponses] = useState<Set<string>>(new Set())
+  const processedResponsesRef = useRef<Set<string>>(new Set())
 
   // Read cached location from session storage if present
   useEffect(() => {
@@ -152,10 +152,10 @@ export const ChatPanel = () => {
       const responseId = latestResponse.giftWrap.id
 
       // Check if we've already processed this response
-      if (processedResponses.has(responseId)) return
+      if (processedResponsesRef.current.has(responseId)) return
 
-      // Mark as processed
-      setProcessedResponses((prev) => new Set(prev).add(responseId))
+      // Mark as processed immediately to prevent duplicate processing
+      processedResponsesRef.current.add(responseId)
 
       // Get response details
       const response = latestResponse.payload as any
@@ -223,7 +223,7 @@ export const ChatPanel = () => {
       }
       setMessages((prev) => [...prev, chatMessage])
     })
-  }, [reservationThreads, processedResponses, toast])
+  }, [reservationThreads, toast])
 
   const sendReservationRequest = useCallback(async (
     restaurant: SellerResult,
