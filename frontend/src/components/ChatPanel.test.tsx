@@ -1,6 +1,6 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest'
+import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { ChakraProvider } from '@chakra-ui/react'
 import { ChatPanel } from './ChatPanel'
 import { ReservationProvider } from '../contexts/ReservationContext'
@@ -99,6 +99,122 @@ describe('ChatPanel - Share my location', () => {
         const btn = screen.getByRole('button', { name: /share location/i }) as HTMLButtonElement
         expect(btn.disabled).toBe(true)
     })
+})
+
+describe('ChatPanel - Reservation Badge', () => {
+    beforeEach(() => {
+        ensureMemoryStorage()
+            ; (sessionStorage as Storage).clear()
+            ; (localStorage as Storage).clear()
+        vi.restoreAllMocks()
+        vi.unstubAllGlobals()
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    test('displays badge when restaurant supports reservations', async () => {
+        const mockResponse = {
+            session_id: 'test-session',
+            answer: 'Here are some restaurants',
+            results: [
+                {
+                    id: '1',
+                    name: "Mario's Pizza",
+                    npub: 'npub1test123',
+                    supports_reservations: true,
+                    score: 0.9,
+                    listings: [
+                        {
+                            id: 'listing-1',
+                            title: 'Margherita Pizza',
+                            summary: 'Classic pizza with fresh mozzarella',
+                        },
+                    ],
+                },
+            ],
+            query: 'pizza',
+            top_k: 5,
+        }
+        const mockChat = vi.spyOn(api, 'chat').mockResolvedValue(mockResponse)
+
+        renderWithChakra(<ChatPanel />)
+
+        // Wait for initialization
+        await waitFor(() => {
+            const sends = screen.getAllByRole('button', { name: /send/i })
+            expect(sends.length).toBeGreaterThan(0)
+        })
+
+        const input = screen.getAllByPlaceholderText('Ask for what you need...')[0] as HTMLInputElement
+        fireEvent.change(input, { target: { value: 'find pizza' } })
+        const sendBtns = screen.getAllByRole('button', { name: /send/i })
+        fireEvent.click(sendBtns[0])
+
+        await waitFor(() => {
+            expect(mockChat).toHaveBeenCalled()
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText("Mario's Pizza")).toBeInTheDocument()
+        })
+
+        const badge = screen.getByText(/book via concierge/i)
+        expect(badge).toBeInTheDocument()
+        
+        // Check that the emoji is present with proper aria-label
+        const emoji = screen.getByLabelText('magic wand')
+        expect(emoji).toBeInTheDocument()
+    })
+
+    test('hides badge when supports_reservations is false', async () => {
+        const mockChat = vi.spyOn(api, 'chat').mockResolvedValue({
+            session_id: 'test-session',
+            answer: 'Here are some restaurants',
+            results: [
+                {
+                    id: '1',
+                    name: "Joe's Burgers",
+                    npub: 'npub1test456',
+                    supports_reservations: false,
+                    score: 0.9,
+                    listings: [
+                        {
+                            id: 'listing-1',
+                            title: 'Classic Burger',
+                            summary: 'Juicy beef burger with all the fixings',
+                        },
+                    ],
+                },
+            ],
+            query: 'burgers',
+            top_k: 5,
+        })
+
+        renderWithChakra(<ChatPanel />)
+
+        await waitFor(() => {
+            const sends = screen.getAllByRole('button', { name: /send/i })
+            expect(sends.length).toBeGreaterThan(0)
+        })
+
+        const input = screen.getAllByPlaceholderText('Ask for what you need...')[0] as HTMLInputElement
+        fireEvent.change(input, { target: { value: 'find burgers' } })
+        const sendBtns = screen.getAllByRole('button', { name: /send/i })
+        fireEvent.click(sendBtns[0])
+
+        await waitFor(() => {
+            expect(mockChat).toHaveBeenCalled()
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText("Joe's Burgers")).toBeInTheDocument()
+        })
+
+        expect(screen.queryByText(/book via concierge/i)).not.toBeInTheDocument()
+    })
+
 })
 
 

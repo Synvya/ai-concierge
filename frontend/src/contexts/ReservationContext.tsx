@@ -58,6 +58,10 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
   const [subscription, setSubscription] = useState<ReservationSubscription | null>(null);
   const nostrIdentity = useNostrIdentity();
 
+  const handleIncomingMessage = useCallback((message: ReservationMessage) => {
+    setThreads((prev) => updateThreadWithMessage(prev, message));
+  }, []);
+
   // Start subscription when identity is available
   useEffect(() => {
     if (!nostrIdentity) {
@@ -88,11 +92,7 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
     return () => {
       sub.stop();
     };
-  }, [nostrIdentity]);
-
-  const handleIncomingMessage = useCallback((message: ReservationMessage) => {
-    setThreads((prev) => updateThreadWithMessage(prev, message));
-  }, []);
+  }, [nostrIdentity, handleIncomingMessage]);
 
   const addOutgoingMessage = useCallback(
     (message: ReservationMessage, restaurantName: string, restaurantNpub: string) => {
