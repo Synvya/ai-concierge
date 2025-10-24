@@ -66,10 +66,23 @@ class Settings(BaseSettings):
 
     @field_validator("nostr_relays", mode="before")
     @classmethod
-    def parse_nostr_relays(cls, v: str | list[str]) -> list[str]:
+    def parse_nostr_relays(cls, v: str | list[str] | None) -> list[str]:
         """Parse comma-separated string or list of relay URLs."""
+        if v is None or v == "":
+            # Return default relays if not set
+            return [
+                "wss://relay.damus.io",
+                "wss://nos.lol",
+                "wss://relay.nostr.band",
+            ]
         if isinstance(v, str):
-            return [url.strip() for url in v.split(",") if url.strip()]
+            relays = [url.strip() for url in v.split(",") if url.strip()]
+            # If string was empty or only whitespace, return defaults
+            return relays if relays else [
+                "wss://relay.damus.io",
+                "wss://nos.lol",
+                "wss://relay.nostr.band",
+            ]
         return v
 
     @property
