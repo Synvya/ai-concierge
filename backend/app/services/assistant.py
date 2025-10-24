@@ -138,7 +138,7 @@ def _build_context(results: list[SellerResult]) -> str:
             restaurant_id = getattr(result, "id", "Unknown")
             npub_str = getattr(result, "npub", "")
             reservation_str = f"\n   Supports Reservations: Yes (ID: {restaurant_id}, npub: {npub_str})"
-        
+
         lines.append(
             f"{idx}. {result.name or 'Unknown'} (score: {result.score:.3f})\n"
             f"   Summary: {result.content or 'No description provided.'}\n"

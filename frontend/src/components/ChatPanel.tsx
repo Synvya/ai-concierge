@@ -171,10 +171,14 @@ export const ChatPanel = () => {
       }
 
       // Build reservation request
-      const request = {
+      const request: Record<string, any> = {
         party_size: intent.partySize!,
         iso_time: intent.time!,
-        notes: intent.notes,
+      }
+      
+      // Only include notes if it's a non-empty string
+      if (intent.notes && intent.notes.trim()) {
+        request.notes = intent.notes
       }
 
       const rumor = buildReservationRequest(
