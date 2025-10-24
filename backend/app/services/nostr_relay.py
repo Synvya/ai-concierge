@@ -15,7 +15,16 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from nostr_sdk import Alphabet, Client, Event, Filter, Kind, PublicKey, RelayUrl, SingleLetterTag
+from nostr_sdk import (
+    Alphabet,
+    Client,
+    Event,
+    Filter,
+    Kind,
+    PublicKey,
+    RelayUrl,
+    SingleLetterTag,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -256,25 +265,29 @@ class NostrRelayPool:
             # These are recommendations for reservation.request handlers
             # Convert hex pubkeys to PublicKey instances
             author_pks = [PublicKey.parse(hex_pk) for hex_pk in hex_pubkeys]
-            
+
             # Create SingleLetterTag for 'd' tag
             d_tag = SingleLetterTag.lowercase(Alphabet.D)
-            
+
             filter_obj = (
                 Filter()
                 .kinds([Kind(31989)])  # Handler recommendations
                 .authors(author_pks)  # From these restaurants
-                .custom_tags(d_tag, ["32101"])  # For reservation.request (use custom_tags for list)
+                .custom_tags(
+                    d_tag, ["32101"]
+                )  # For reservation.request (use custom_tags for list)
             )
 
             logger.debug(
                 f"Querying relays for {len(hex_pubkeys)} authors, kind 31989, d:32101"
             )
 
-            # Query with timeout
-            events = await asyncio.wait_for(
-                client.get_events([filter_obj]), timeout=self.query_timeout
-            )
+            # Query with timeout using fetch_events which expects a Duration (timedelta)
+            timeout_duration = timedelta(seconds=self.query_timeout)
+            events_result = await client.fetch_events(filter_obj, timeout_duration)
+            
+            # Convert Events object to list
+            events = events_result.to_vec()
 
             # Track successful query metrics
             latency_ms = (time.time() - start_time) * 1000
@@ -288,7 +301,7 @@ class NostrRelayPool:
             logger.info(
                 f"Found {len(events)} NIP-89 handler events in {latency_ms:.0f}ms"
             )
-            return list(events)
+            return events  # Already a list from to_vec()
 
         except asyncio.TimeoutError:
             latency_ms = (time.time() - start_time) * 1000

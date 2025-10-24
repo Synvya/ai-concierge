@@ -204,7 +204,6 @@ class TestNostrRelayPool:
             patch("app.services.nostr_relay.Filter") as mock_filter_class,
             patch("app.services.nostr_relay.PublicKey") as mock_pk_class,
             patch("app.services.nostr_relay.SingleLetterTag") as mock_tag_class,
-            patch("app.services.nostr_relay.asyncio.wait_for") as mock_wait_for,
         ):
 
             mock_client = AsyncMock()
@@ -224,8 +223,11 @@ class TestNostrRelayPool:
             mock_filter.custom_tags.return_value = mock_filter
             mock_filter_class.return_value = mock_filter
 
+            # Mock fetch_events to return Events object with to_vec() method
             mock_events = [MagicMock(), MagicMock()]
-            mock_wait_for.return_value = mock_events
+            mock_events_result = MagicMock()
+            mock_events_result.to_vec.return_value = mock_events
+            mock_client.fetch_events = AsyncMock(return_value=mock_events_result)
 
             events = await relay_pool._query_relays(hex_pubkeys)
 
@@ -547,15 +549,12 @@ class TestRelayMetrics:
         with (
             patch.object(
                 relay_pool, "_ensure_client", new_callable=AsyncMock
-            ) as mock_client,
+            ) as mock_ensure,
             patch("app.services.nostr_relay.Filter") as mock_filter,
             patch("app.services.nostr_relay.PublicKey") as mock_pk_class,
             patch("app.services.nostr_relay.SingleLetterTag") as mock_tag_class,
-            patch(
-                "app.services.nostr_relay.asyncio.wait_for", new_callable=AsyncMock
-            ) as mock_wait_for,
         ):
-            mock_client_instance = MagicMock()
+            mock_client_instance = AsyncMock()
             mock_event = MagicMock()
             mock_event.author.return_value.to_hex.return_value = "test_hex"
 
@@ -574,9 +573,12 @@ class TestRelayMetrics:
             mock_filter_instance.authors.return_value = mock_filter_instance
             mock_filter_instance.custom_tags.return_value = mock_filter_instance
 
-            mock_client_instance.get_events.return_value = [mock_event]
-            mock_client.return_value = mock_client_instance
-            mock_wait_for.return_value = [mock_event]
+            # Mock fetch_events to return Events object with to_vec() method
+            mock_events_result = MagicMock()
+            mock_events_result.to_vec.return_value = [mock_event]
+            mock_client_instance.fetch_events = AsyncMock(return_value=mock_events_result)
+            
+            mock_ensure.return_value = mock_client_instance
 
             # Perform query
             await relay_pool._query_relays(["test_hex"])
