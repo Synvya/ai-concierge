@@ -1,5 +1,6 @@
 import asyncio
 import os
+from typing import Any
 
 
 # Make tenacity optional at import time so tests for _build_context don't require it
@@ -151,10 +152,14 @@ async def generate_response(
     query: str,
     results: list[SellerResult],
     history: list[ChatMessage],
-) -> str:
-    """Call OpenAI to craft a concierge-style response."""
+) -> tuple[str, dict[str, Any] | None]:
+    """Call OpenAI to craft a concierge-style response.
 
-    def _call() -> str:
+    Returns:
+        tuple: (response_text, function_call_data or None)
+    """
+
+    def _call() -> tuple[str, dict[str, Any] | None]:
         # Lazy import to avoid dependency requirements when only using _build_context in tests
         from ..core.config import get_settings
 
@@ -177,15 +182,67 @@ async def generate_response(
             "If any location data is missing or uncertain, explicitly mention that limitation. "
             "\n\n"
             "RESERVATION CAPABILITIES:\n"
-            "- When a business has 'supports_reservations: true', you CAN help make reservations via a secure messaging system.\n"
-            "- If the user wants to book at a reservation-capable business, confirm the details (party size, date/time, special requests).\n"
-            "- Guide them through providing: party size, preferred date/time, and any notes (dietary restrictions, seating preferences, etc.).\n"
-            "- Once you have these details, the system will handle sending the reservation request to the business.\n"
+            "- When a business has 'supports_reservations: true', you CAN help make reservations.\n"
+            "- If the user wants to book, use the send_reservation_request function when you have:\n"
+            "  1. Identified a specific restaurant with supports_reservations: true\n"
+            "  2. Confirmed party size (number of guests)\n"
+            "  3. Confirmed date and time in ISO 8601 format\n"
+            "- Ask clarifying questions if any details are missing or ambiguous.\n"
+            "- Parse natural language times (e.g., 'tomorrow at 3pm', 'tonight at 7') into ISO 8601 format.\n"
             "- If 'supports_reservations' is false or missing, suggest they contact the business directly.\n"
             "\n"
             "Respond concisely with at most three recommendations, include the city and a verbatim highlight drawn from the context, "
             "and suggest a follow-up only when it clearly adds value."
         )
+
+        # Define the send_reservation_request function for OpenAI function calling
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "send_reservation_request",
+                    "description": "Send a reservation request to a restaurant via Nostr protocol. Only call this when you have confirmed all required details with the user.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "restaurant_id": {
+                                "type": "string",
+                                "description": "The database ID of the restaurant (from business context)",
+                            },
+                            "restaurant_name": {
+                                "type": "string",
+                                "description": "The name of the restaurant",
+                            },
+                            "npub": {
+                                "type": "string",
+                                "description": "The Nostr public key (npub) of the restaurant",
+                            },
+                            "party_size": {
+                                "type": "integer",
+                                "description": "Number of guests (1-20)",
+                                "minimum": 1,
+                                "maximum": 20,
+                            },
+                            "iso_time": {
+                                "type": "string",
+                                "description": "ISO 8601 datetime with timezone, e.g. 2025-10-25T15:00:00-07:00",
+                            },
+                            "notes": {
+                                "type": "string",
+                                "description": "Optional special requests, dietary restrictions, or seating preferences",
+                            },
+                        },
+                        "required": [
+                            "restaurant_id",
+                            "restaurant_name",
+                            "npub",
+                            "party_size",
+                            "iso_time",
+                        ],
+                    },
+                },
+            }
+        ]
         messages = [
             {"role": "system", "content": system_prompt},
         ]
@@ -206,8 +263,26 @@ async def generate_response(
             model=settings.openai_assistant_model,
             temperature=0.4,
             messages=messages,  # type: ignore[arg-type]
+            tools=tools,  # type: ignore[arg-type]
+            tool_choice="auto",
         )
         choice = response.choices[0].message
-        return choice.content or "I couldn't find anything right now, please try again."
+
+        # Check if OpenAI wants to call a function
+        function_call_data = None
+        if choice.tool_calls:
+            tool_call = choice.tool_calls[0]
+            if tool_call.function.name == "send_reservation_request":
+                import json
+
+                function_call_data = {
+                    "action": "send_reservation_request",
+                    **json.loads(tool_call.function.arguments),
+                }
+
+        response_text = (
+            choice.content or "I couldn't find anything right now, please try again."
+        )
+        return response_text, function_call_data
 
     return await asyncio.to_thread(_call)

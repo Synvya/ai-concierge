@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.config import get_settings
 from ..db import get_session
 from ..repositories.sellers import search_sellers
-from ..schemas import ChatRequest, ChatResponse, SellerResult
+from ..schemas import ChatRequest, ChatResponse, ReservationAction, SellerResult
 from ..services.analytics import analytics_service
 from ..services.assistant import generate_response
 from ..services.embedding import embed_text
@@ -44,7 +44,17 @@ async def chat(
 
     results = [SellerResult(**seller) for seller in sellers]
 
-    answer = await generate_response(payload.message, results, payload.history)
+    answer, function_call_data = await generate_response(
+        payload.message, results, payload.history
+    )
+
+    # Convert function call data to ReservationAction if present
+    reservation_action = None
+    if function_call_data:
+        try:
+            reservation_action = ReservationAction(**function_call_data)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to create ReservationAction: %s", exc)
 
     analytics_summary = None
     try:
@@ -59,7 +69,9 @@ async def chat(
     except asyncio.TimeoutError:
         logger.warning("analytics_record_timeout session_id=%s", session_id)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("analytics_record_failed session_id=%s error=%s", session_id, exc)
+        logger.warning(
+            "analytics_record_failed session_id=%s error=%s", session_id, exc
+        )
 
     debug_payload = None
     if payload.debug and analytics_summary is not None:
@@ -80,4 +92,5 @@ async def chat(
         debug_payload=debug_payload,
         user_location=user_location,
         user_coordinates=user_coordinates,
+        reservation_action=reservation_action,
     )

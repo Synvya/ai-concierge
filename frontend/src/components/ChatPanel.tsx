@@ -39,12 +39,7 @@ import type {
   SellerResult,
 } from '../lib/api'
 import { chat } from '../lib/api'
-import {
-  parseReservationIntent,
-  isReservationComplete,
-  getMissingDetailPrompt,
-  type ReservationIntent,
-} from '../lib/parseReservationIntent'
+import type { ReservationIntent } from '../lib/parseReservationIntent'
 import { buildReservationRequest } from '../lib/nostr/reservationEvents'
 import { wrapEvent } from '../lib/nostr/nip59'
 import { publishToRelays } from '../lib/nostr/relayPool'
@@ -120,8 +115,6 @@ export const ChatPanel = () => {
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
-  const [currentSearchResults, setCurrentSearchResults] = useState<SellerResult[]>([])
-  const [pendingIntent, setPendingIntent] = useState<ReservationIntent | null>(null)
   const [sharedLocation, setSharedLocation] = useState<{
     label?: string
     coords?: GeoPoint
@@ -146,24 +139,6 @@ export const ChatPanel = () => {
       // ignore malformed cache
     }
   }, [])
-
-  const handleChatResponse = useCallback((payload: ChatResponse) => {
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      content: payload.answer,
-      attachments: payload.results,
-    }
-    setMessages((prev) => [...prev, assistantMessage])
-    // Track search results for reservation intent matching
-    if (payload.results && payload.results.length > 0) {
-      setCurrentSearchResults(payload.results)
-    }
-  }, [])
-
-  const canSend = useMemo(
-    () => Boolean(inputValue.trim()) && Boolean(sessionId) && Boolean(visitorId) && !isLoading,
-    [inputValue, sessionId, visitorId, isLoading],
-  )
 
   const sendReservationRequest = useCallback(async (
     restaurant: SellerResult,
@@ -242,7 +217,6 @@ export const ChatPanel = () => {
         content: `Great! I've sent your reservation request to ${restaurant.name} for ${intent.partySize} people at ${new Date(intent.time!).toLocaleString()}.${intent.notes ? ` Note: "${intent.notes}"` : ''}\n\nYou'll receive a response from the restaurant shortly.`,
       }
       setMessages((prev) => [...prev, confirmationMessage])
-      setPendingIntent(null)
 
       toast({
         title: 'Reservation request sent',
@@ -261,6 +235,43 @@ export const ChatPanel = () => {
     }
   }, [nostrIdentity, toast, addOutgoingMessage])
 
+  const handleChatResponse = useCallback(async (payload: ChatResponse) => {
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: payload.answer,
+      attachments: payload.results,
+    }
+    setMessages((prev) => [...prev, assistantMessage])
+
+    // Handle reservation action from backend
+    if (payload.reservation_action) {
+      const action = payload.reservation_action
+      // Find the restaurant in the results
+      const restaurant = payload.results.find(r => r.id === action.restaurant_id)
+      
+      if (restaurant && restaurant.npub) {
+        // Automatically send the reservation request
+        await sendReservationRequest(restaurant, {
+          restaurantName: action.restaurant_name,
+          partySize: action.party_size,
+          time: action.iso_time,
+          notes: action.notes,
+        })
+      } else {
+        toast({
+          title: 'Restaurant not found',
+          description: 'Could not find the restaurant to complete the reservation.',
+          status: 'error',
+        })
+      }
+    }
+  }, [sendReservationRequest, toast])
+
+  const canSend = useMemo(
+    () => Boolean(inputValue.trim()) && Boolean(sessionId) && Boolean(visitorId) && !isLoading,
+    [inputValue, sessionId, visitorId, isLoading],
+  )
+
   const handleSubmit = useCallback(async () => {
     if (!sessionId || !visitorId || !inputValue.trim()) {
       return
@@ -271,107 +282,7 @@ export const ChatPanel = () => {
     setMessages(nextHistory)
     setInputValue('')
 
-    // Check for reservation intent
-    const intent = parseReservationIntent(inputValue, currentSearchResults)
-
-    if (intent) {
-      // Merge with pending intent if exists
-      const mergedIntent: ReservationIntent = {
-        ...pendingIntent,
-        ...intent,
-      }
-
-      // Check if complete
-      if (isReservationComplete(mergedIntent)) {
-        // Find restaurant with npub
-        let restaurant = currentSearchResults.find(
-          (r) => r.name === mergedIntent.restaurantName && r.npub
-        )
-
-        // If restaurant not in current results, search for it
-        if (!restaurant && mergedIntent.restaurantName) {
-          setIsLoading(true)
-          
-          try {
-            const payload = await chat({
-              message: mergedIntent.restaurantName,
-              session_id: sessionId,
-              visitor_id: visitorId,
-              history: nextHistory,
-              user_location: sharedLocation.status === 'granted' ? sharedLocation.label : undefined,
-              user_coordinates: sharedLocation.status === 'granted' ? sharedLocation.coords : undefined,
-            })
-            
-            // Update search results
-            if (payload.results && payload.results.length > 0) {
-              setCurrentSearchResults(payload.results)
-              
-              // Try to find the restaurant again (fuzzy match)
-              restaurant = payload.results.find(
-                (r) => r.name?.toLowerCase().includes(mergedIntent.restaurantName!.toLowerCase()) && r.npub
-              )
-              
-              const searchMessage: ChatMessage = {
-                role: 'assistant',
-                content: payload.answer,
-                attachments: payload.results,
-              }
-              setMessages((prev) => [...prev, searchMessage])
-            }
-            
-            setIsLoading(false)
-          } catch (error) {
-            setIsLoading(false)
-            toast({
-              title: 'Failed to search for restaurant',
-              description: 'Please try again.',
-              status: 'error',
-            })
-            setPendingIntent(null)
-            return
-          }
-        }
-
-        if (!restaurant) {
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: "I couldn't find that restaurant. Could you provide more details or try searching for it first?",
-          }
-          setMessages((prev) => [...prev, assistantMessage])
-          setPendingIntent(null)
-          return
-        }
-
-        // Check if restaurant supports reservations
-        if (restaurant.supports_reservations !== true) {
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: "This restaurant doesn't support online reservations yet. Try calling them directly or visiting their website.",
-          }
-          setMessages((prev) => [...prev, assistantMessage])
-          setPendingIntent(null)
-          return
-        }
-
-        // Send reservation request
-        await sendReservationRequest(restaurant, mergedIntent)
-        return
-      } else {
-        // Prompt for missing details
-        const prompt = getMissingDetailPrompt(mergedIntent)
-        if (prompt) {
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: prompt,
-          }
-          setMessages((prev) => [...prev, assistantMessage])
-          setPendingIntent(mergedIntent)
-          return
-        }
-      }
-    }
-
-    // Normal chat flow
+    // Always send to backend - let OpenAI handle the intelligence
     setIsLoading(true)
     try {
       const payload = await chat({
@@ -382,7 +293,7 @@ export const ChatPanel = () => {
         user_location: sharedLocation.status === 'granted' ? sharedLocation.label : undefined,
         user_coordinates: sharedLocation.status === 'granted' ? sharedLocation.coords : undefined,
       })
-      handleChatResponse(payload)
+      await handleChatResponse(payload)
     } catch (error) {
       toast({
         title: 'Something went wrong',
@@ -393,7 +304,7 @@ export const ChatPanel = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [sessionId, visitorId, inputValue, messages, currentSearchResults, pendingIntent, toast, handleChatResponse, sendReservationRequest, sharedLocation])
+  }, [sessionId, visitorId, inputValue, messages, toast, handleChatResponse, sharedLocation])
 
   const handleSuggestedQuery = (query: string) => {
     setInputValue(query)
@@ -402,8 +313,6 @@ export const ChatPanel = () => {
   const startNewSession = () => {
     resetSession()
     setMessages(initialMessages)
-    setCurrentSearchResults([])
-    setPendingIntent(null)
   }
 
   const onKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (event) => {

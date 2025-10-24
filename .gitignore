@@ -31,3 +31,4 @@ frontend/.env
 
 #internal
 internal/*
+third_party_readonly/*
