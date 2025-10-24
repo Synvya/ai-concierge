@@ -197,6 +197,8 @@ async def generate_response(
             "  1. Identified a specific restaurant with supports_reservations: true\n"
             "  2. Confirmed party size (number of guests)\n"
             "  3. Confirmed date and time in ISO 8601 format\n"
+            "- IMPORTANT: Check the conversation history for previous business recommendations.\n"
+            "  If the user confirms a reservation from a previous message, use the details from history.\n"
             "- Ask clarifying questions if any details are missing or ambiguous.\n"
             "- Parse natural language times (e.g., 'tomorrow at 3pm', 'tonight at 7') into ISO 8601 format.\n"
             "- If 'supports_reservations' is false or missing, suggest they contact the business directly.\n"
@@ -211,7 +213,7 @@ async def generate_response(
                 "type": "function",
                 "function": {
                     "name": "send_reservation_request",
-                    "description": "Send a reservation request to a restaurant via Nostr protocol. Only call this when you have confirmed all required details with the user.",
+                    "description": "Send a reservation request to a restaurant via Nostr protocol. Only call this when you have confirmed all required details with the user. Check conversation history for restaurant details (restaurant_id, restaurant_name, npub) from previous messages if not in current context.",
                     "parameters": {
                         "type": "object",
                         "properties": {
