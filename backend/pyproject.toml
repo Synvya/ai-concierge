@@ -56,6 +56,11 @@ ignore = [
     "PLW0603",   # Global statement (used intentionally)
 ]
 
+[tool.ruff.lint.isort]
+force-single-line = false
+lines-after-imports = 2
+known-first-party = ["app"]
+
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = false
