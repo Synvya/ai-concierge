@@ -352,10 +352,9 @@ class TestGlobalRelayPoolManagement:
     @pytest.mark.asyncio
     async def test_get_relay_pool_creates_singleton(self):
         """Test that get_relay_pool creates a singleton instance."""
-        from app.services.nostr_relay import _relay_pool, get_relay_pool
-
         # Reset global state
         import app.services.nostr_relay as nostr_module
+        from app.services.nostr_relay import get_relay_pool
 
         nostr_module._relay_pool = None
 
@@ -372,18 +371,16 @@ class TestGlobalRelayPoolManagement:
     @pytest.mark.asyncio
     async def test_shutdown_relay_pool(self):
         """Test shutting down the global relay pool."""
-        from app.services.nostr_relay import get_relay_pool, shutdown_relay_pool
-
         import app.services.nostr_relay as nostr_module
+        from app.services.nostr_relay import get_relay_pool, shutdown_relay_pool
 
         nostr_module._relay_pool = None
 
         relays = ["wss://relay.test.io"]
-        pool = await get_relay_pool(relays)
+        await get_relay_pool(relays)
 
         assert nostr_module._relay_pool is not None
 
         await shutdown_relay_pool()
 
         assert nostr_module._relay_pool is None
-
