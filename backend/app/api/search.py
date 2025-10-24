@@ -7,6 +7,7 @@ from ..repositories.sellers import search_sellers
 from ..schemas import SearchRequest, SearchResponse, SellerResult
 from ..services.embedding import embed_text
 
+
 router = APIRouter(prefix="/search", tags=["search"])
 settings = get_settings()
 

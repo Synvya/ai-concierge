@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import sys
 
+
 # Ensure Pylint and runtime can resolve the `app` package from the repo root
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

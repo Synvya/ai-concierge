@@ -17,6 +17,7 @@ from typing import Any
 
 from nostr_sdk import Client, Event, Filter, PublicKey
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -244,7 +245,7 @@ class NostrRelayPool:
             List of kind 31989 events with d:32101
         """
         start_time = time.time()
-        
+
         try:
             client = await self._ensure_client()
 
@@ -275,27 +276,29 @@ class NostrRelayPool:
                     metrics.total_latency_ms += latency_ms
                     metrics.consecutive_errors = 0  # Reset on success
 
-            logger.info(f"Found {len(events)} NIP-89 handler events in {latency_ms:.0f}ms")
+            logger.info(
+                f"Found {len(events)} NIP-89 handler events in {latency_ms:.0f}ms"
+            )
             return list(events)
 
         except asyncio.TimeoutError:
             latency_ms = (time.time() - start_time) * 1000
             logger.warning(f"Relay query timed out after {self.query_timeout}s")
-            
+
             # Track timeout as error
             for relay_url in self.relays:
                 if relay_url in self.relay_metrics:
                     self._record_query_error(relay_url, "Timeout")
-            
+
             return []
         except Exception as e:
             logger.error(f"Relay query failed: {e}")
-            
+
             # Track error
             for relay_url in self.relays:
                 if relay_url in self.relay_metrics:
                     self._record_query_error(relay_url, str(e))
-            
+
             return []
 
     def _record_query_error(self, relay_url: str, error: str) -> None:
@@ -331,7 +334,7 @@ class NostrRelayPool:
         valid_entries = sum(
             1 for entry in self.cache.values() if entry.expires_at > now
         )
-        
+
         total_requests = self._cache_hits + self._cache_misses
         hit_rate = self._cache_hits / total_requests if total_requests > 0 else 0.0
 
@@ -424,4 +427,3 @@ async def shutdown_relay_pool() -> None:
         await _relay_pool.close()
         _relay_pool = None
         logger.info("Shutdown global Nostr relay pool")
-

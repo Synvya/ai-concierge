@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.config import get_settings
 from ..utils.geolocation import decode_geohash
 
+
 logger = logging.getLogger(__name__)
 settings = get_settings()
 metadata = MetaData(schema=settings.db_schema)
