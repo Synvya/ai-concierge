@@ -382,12 +382,20 @@ async def search_sellers(
         ranked_sellers.append(seller)
 
     def _sort_key(item: dict[str, Any]) -> tuple:
+        # Detect if this is a classified listing vs a business profile
+        item_id = item.get("id", "")
+        is_classified_listing = isinstance(item_id, str) and item_id.startswith("classified_listing:")
+        
+        # Business profiles should rank higher than classified listings
+        # by placing them in priority group 0, classified listings in group 1
+        priority_group = 1 if is_classified_listing else 0
+        
         vector_distance = item.get("vector_distance")
         score = float(item.get("score", 0.0) or 0.0)
         if vector_distance is not None:
             adjusted_distance = float(vector_distance) - min(score, 1.0) * 0.1
-            return (0, adjusted_distance)
-        return (1, -score)
+            return (priority_group, 0, adjusted_distance)
+        return (priority_group, 1, -score)
 
     ranked_sellers.sort(key=_sort_key)
 
