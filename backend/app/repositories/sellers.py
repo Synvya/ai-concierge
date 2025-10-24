@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
+from ..services.nostr_relay import get_relay_pool
 from ..utils.geolocation import build_maps_url, haversine_km
 from .listings import (
     _npub_to_hex,
@@ -404,6 +405,42 @@ async def search_sellers(
                 "longitude": user_coordinates[1],
             }
 
+    # Check NIP-89 handler support for restaurants with npubs
+    npubs_to_check = [
+        seller["npub"] for seller in ranked_sellers if seller.get("npub")
+    ]
+
+    if npubs_to_check:
+        try:
+            relay_pool = await get_relay_pool(
+                relays=settings.nostr_relays,
+                cache_ttl=settings.nip89_cache_ttl,
+                connection_timeout=settings.nostr_connection_timeout,
+                query_timeout=settings.nostr_query_timeout,
+            )
+            handler_support = await relay_pool.check_handlers(npubs_to_check)
+
+            # Apply results to sellers
+            for seller in ranked_sellers:
+                npub = seller.get("npub")
+                if npub:
+                    seller["supports_reservations"] = handler_support.get(npub)
+                else:
+                    seller["supports_reservations"] = False
+        except Exception as e:
+            # Log error but don't fail the search
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to check NIP-89 handlers: {e}")
+            # Set all to None on error (fail open)
+            for seller in ranked_sellers:
+                seller["supports_reservations"] = None
+    else:
+        # No npubs to check
+        for seller in ranked_sellers:
+            seller["supports_reservations"] = False
+
     return ranked_sellers[:limit]
 
 
@@ -434,4 +471,26 @@ async def get_seller_by_id(
         seller["listings"] = all_listings
     else:
         seller["listings"] = []
+
+    # Check NIP-89 handler support
+    npub = seller.get("npub")
+    if npub:
+        try:
+            relay_pool = await get_relay_pool(
+                relays=settings.nostr_relays,
+                cache_ttl=settings.nip89_cache_ttl,
+                connection_timeout=settings.nostr_connection_timeout,
+                query_timeout=settings.nostr_query_timeout,
+            )
+            handler_support = await relay_pool.check_handlers([npub])
+            seller["supports_reservations"] = handler_support.get(npub)
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to check NIP-89 handler for {seller_id}: {e}")
+            seller["supports_reservations"] = None
+    else:
+        seller["supports_reservations"] = False
+
     return seller
