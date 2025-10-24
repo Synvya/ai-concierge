@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from app.schemas import SellerResult
 from app.services.nostr_relay import CacheEntry, NostrRelayPool
 
@@ -374,9 +373,9 @@ class TestGlobalRelayPoolManagement:
     @pytest.mark.asyncio
     async def test_shutdown_relay_pool(self):
         """Test shutting down the global relay pool."""
-        import app.services.nostr_relay as nostr_module
-
         from app.services.nostr_relay import get_relay_pool, shutdown_relay_pool
+
+        import app.services.nostr_relay as nostr_module
 
         nostr_module._relay_pool = None
 
