@@ -8,6 +8,7 @@ from .core.config import get_settings
 from .core.logging import setup_logging
 from .services.analytics import analytics_service
 
+
 settings = get_settings()
 setup_logging()
 

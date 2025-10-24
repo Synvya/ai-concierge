@@ -120,9 +120,10 @@ class TestNostrRelayPool:
         hex2 = "ef567890" * 8
 
         # Mock the entire flow
-        with patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex, patch.object(
-            relay_pool, "_query_relays"
-        ) as mock_query:
+        with (
+            patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
+            patch.object(relay_pool, "_query_relays") as mock_query,
+        ):
 
             mock_npub_to_hex.side_effect = lambda npub: hex1 if npub == npub1 else hex2
 
@@ -163,9 +164,10 @@ class TestNostrRelayPool:
         """Test that check_handlers handles query errors gracefully."""
         npub = "npub1test123"
 
-        with patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex, patch.object(
-            relay_pool, "_query_relays"
-        ) as mock_query:
+        with (
+            patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
+            patch.object(relay_pool, "_query_relays") as mock_query,
+        ):
 
             mock_npub_to_hex.return_value = "abcd1234" * 8
             mock_query.side_effect = Exception("Connection failed")
@@ -178,9 +180,10 @@ class TestNostrRelayPool:
     @pytest.mark.asyncio
     async def test_query_relays_timeout(self, relay_pool):
         """Test that _query_relays handles timeout."""
-        with patch.object(relay_pool, "_ensure_client") as mock_ensure, patch(
-            "app.services.nostr_relay.asyncio.wait_for"
-        ) as mock_wait_for:
+        with (
+            patch.object(relay_pool, "_ensure_client") as mock_ensure,
+            patch("app.services.nostr_relay.asyncio.wait_for") as mock_wait_for,
+        ):
 
             mock_client = AsyncMock()
             mock_ensure.return_value = mock_client
@@ -195,11 +198,11 @@ class TestNostrRelayPool:
         """Test that _query_relays builds correct filter."""
         hex_pubkeys = ["abcd1234" * 8, "ef567890" * 8]
 
-        with patch.object(relay_pool, "_ensure_client") as mock_ensure, patch(
-            "app.services.nostr_relay.Filter"
-        ) as mock_filter_class, patch(
-            "app.services.nostr_relay.asyncio.wait_for"
-        ) as mock_wait_for:
+        with (
+            patch.object(relay_pool, "_ensure_client") as mock_ensure,
+            patch("app.services.nostr_relay.Filter") as mock_filter_class,
+            patch("app.services.nostr_relay.asyncio.wait_for") as mock_wait_for,
+        ):
 
             mock_client = AsyncMock()
             mock_ensure.return_value = mock_client
@@ -252,9 +255,9 @@ class TestNostrRelayPool:
 
         stats = relay_pool.get_cache_stats()
 
-        assert stats["size"] == 3
-        assert stats["valid_entries"] == 2
-        assert stats["expired_entries"] == 1
+        assert stats["cache"]["size"] == 3
+        assert stats["cache"]["valid_entries"] == 2
+        assert stats["cache"]["expired_entries"] == 1
 
     @pytest.mark.asyncio
     async def test_close(self, relay_pool):
@@ -384,3 +387,256 @@ class TestGlobalRelayPoolManagement:
         await shutdown_relay_pool()
 
         assert nostr_module._relay_pool is None
+
+
+class TestCacheHitRate:
+    """Tests for cache hit rate tracking."""
+
+    @pytest.fixture
+    def relay_pool(self):
+        """Create a NostrRelayPool instance for testing."""
+        return NostrRelayPool(
+            relays=["wss://relay.test.io"],
+            cache_ttl=300,
+        )
+
+    @pytest.mark.asyncio
+    async def test_cache_hit_rate_tracking(self, relay_pool):
+        """Test that cache hits and misses are tracked correctly."""
+        # Populate cache
+        relay_pool.cache["nip89:npub1test123"] = CacheEntry(
+            value=True, expires_at=datetime.now() + timedelta(seconds=300)
+        )
+
+        # Mock the relay query
+        with patch.object(
+            relay_pool, "_query_relays", new_callable=AsyncMock
+        ) as mock_query:
+            mock_query.return_value = []
+
+            # First query - cache hit
+            result1 = await relay_pool.check_handlers(["npub1test123"])
+            assert result1["npub1test123"] is True
+            assert relay_pool._cache_hits == 1
+            assert relay_pool._cache_misses == 0
+
+            # Second query - cache miss (new npub)
+            await relay_pool.check_handlers(["npub1test456"])
+            assert relay_pool._cache_hits == 1
+            assert relay_pool._cache_misses == 1
+
+            # Third query - cache hit again
+            await relay_pool.check_handlers(["npub1test123"])
+            assert relay_pool._cache_hits == 2
+            assert relay_pool._cache_misses == 1
+
+    @pytest.mark.asyncio
+    async def test_get_cache_stats_includes_hit_rate(self, relay_pool):
+        """Test that cache stats include hit rate."""
+        # Populate cache
+        relay_pool.cache["nip89:npub1test123"] = CacheEntry(
+            value=True, expires_at=datetime.now() + timedelta(seconds=300)
+        )
+        relay_pool._cache_hits = 8
+        relay_pool._cache_misses = 2
+
+        stats = relay_pool.get_cache_stats()
+
+        assert "cache" in stats
+        assert stats["cache"]["hit_rate"] == 0.8
+        assert stats["cache"]["total_hits"] == 8
+        assert stats["cache"]["total_misses"] == 2
+
+
+class TestCircuitBreaker:
+    """Tests for circuit breaker functionality."""
+
+    @pytest.fixture
+    def relay_pool(self):
+        """Create a NostrRelayPool with circuit breaker for testing."""
+        return NostrRelayPool(
+            relays=["wss://relay.test.io"],
+            cache_ttl=300,
+            circuit_breaker_threshold=3,
+            circuit_breaker_timeout=60,
+        )
+
+    def test_record_query_error_opens_circuit(self, relay_pool):
+        """Test that consecutive errors open the circuit breaker."""
+        relay_url = "wss://relay.test.io"
+
+        # Record errors up to threshold
+        for i in range(3):
+            relay_pool._record_query_error(relay_url, f"Error {i}")
+
+        metrics = relay_pool.relay_metrics[relay_url]
+        assert metrics.status == "circuit_open"
+        assert metrics.consecutive_errors == 3
+        assert metrics.circuit_open_until is not None
+
+    def test_circuit_breaker_resets_on_success(self, relay_pool):
+        """Test that successful queries reset consecutive errors."""
+        relay_url = "wss://relay.test.io"
+
+        # Record some errors
+        relay_pool._record_query_error(relay_url, "Error 1")
+        relay_pool._record_query_error(relay_url, "Error 2")
+
+        assert relay_pool.relay_metrics[relay_url].consecutive_errors == 2
+
+        # Simulate successful query by setting consecutive_errors to 0
+        relay_pool.relay_metrics[relay_url].consecutive_errors = 0
+
+        assert relay_pool.relay_metrics[relay_url].consecutive_errors == 0
+        assert relay_pool.relay_metrics[relay_url].status != "circuit_open"
+
+    def test_circuit_breaker_closes_after_timeout(self, relay_pool):
+        """Test that circuit breaker closes after timeout expires."""
+        relay_url = "wss://relay.test.io"
+
+        # Open circuit breaker
+        for i in range(3):
+            relay_pool._record_query_error(relay_url, f"Error {i}")
+
+        metrics = relay_pool.relay_metrics[relay_url]
+        assert metrics.status == "circuit_open"
+
+        # Set circuit_open_until to the past
+        metrics.circuit_open_until = datetime.now() - timedelta(seconds=1)
+
+        # Get cache stats should close the circuit
+        stats = relay_pool.get_cache_stats()
+
+        assert stats["relays"][relay_url]["status"] == "connected"
+        assert relay_pool.relay_metrics[relay_url].consecutive_errors == 0
+
+
+class TestRelayMetrics:
+    """Tests for relay performance metrics."""
+
+    @pytest.fixture
+    def relay_pool(self):
+        """Create a NostrRelayPool for testing metrics."""
+        return NostrRelayPool(
+            relays=["wss://relay1.test.io", "wss://relay2.test.io"],
+            cache_ttl=300,
+        )
+
+    @pytest.mark.asyncio
+    async def test_relay_metrics_tracking(self, relay_pool):
+        """Test that relay metrics track query latency."""
+        # Mock successful query
+        with (
+            patch.object(
+                relay_pool, "_ensure_client", new_callable=AsyncMock
+            ) as mock_client,
+            patch("app.services.nostr_relay.Filter") as mock_filter,
+            patch(
+                "app.services.nostr_relay.asyncio.wait_for", new_callable=AsyncMock
+            ) as mock_wait_for,
+        ):
+            mock_client_instance = MagicMock()
+            mock_event = MagicMock()
+            mock_event.author.return_value.to_hex.return_value = "test_hex"
+
+            # Mock Filter chain
+            mock_filter_instance = MagicMock()
+            mock_filter.return_value = mock_filter_instance
+            mock_filter_instance.kinds.return_value = mock_filter_instance
+            mock_filter_instance.authors.return_value = mock_filter_instance
+            mock_filter_instance.custom_tag.return_value = mock_filter_instance
+
+            mock_client_instance.get_events.return_value = [mock_event]
+            mock_client.return_value = mock_client_instance
+            mock_wait_for.return_value = [mock_event]
+
+            # Perform query
+            await relay_pool._query_relays(["test_hex"])
+
+            # Check that metrics were updated
+            for relay_url in relay_pool.relays:
+                metrics = relay_pool.relay_metrics[relay_url]
+                assert metrics.query_count == 1
+                assert metrics.total_latency_ms > 0
+                assert metrics.avg_latency_ms > 0
+
+    def test_get_cache_stats_includes_relay_metrics(self, relay_pool):
+        """Test that cache stats include relay metrics."""
+        stats = relay_pool.get_cache_stats()
+
+        assert "relays" in stats
+        assert len(stats["relays"]) == 2
+
+        for relay_url in relay_pool.relays:
+            assert relay_url in stats["relays"]
+            relay_stats = stats["relays"][relay_url]
+            assert "status" in relay_stats
+            assert "query_count" in relay_stats
+            assert "error_count" in relay_stats
+            assert "avg_latency_ms" in relay_stats
+
+
+class TestBatchQueries:
+    """Tests for batch query optimization."""
+
+    @pytest.fixture
+    def relay_pool(self):
+        """Create a NostrRelayPool for testing batch queries."""
+        return NostrRelayPool(
+            relays=["wss://relay.test.io"],
+            cache_ttl=300,
+        )
+
+    @pytest.mark.asyncio
+    async def test_batch_query_multiple_npubs(self, relay_pool):
+        """Test that multiple npubs can be queried in one request."""
+        npubs = ["npub1test1", "npub1test2", "npub1test3"]
+
+        with (
+            patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
+            patch.object(
+                relay_pool, "_query_relays", new_callable=AsyncMock
+            ) as mock_query,
+        ):
+            mock_npub_to_hex.side_effect = lambda x: f"hex_{x}"
+            mock_query.return_value = []
+
+            await relay_pool.check_handlers(npubs)
+
+            # Should call _query_relays once with all hex pubkeys
+            assert mock_query.call_count == 1
+            called_hex_pks = mock_query.call_args[0][0]
+            assert len(called_hex_pks) == 3
+            assert all(f"hex_{npub}" in called_hex_pks for npub in npubs)
+
+    @pytest.mark.asyncio
+    async def test_batch_query_with_mixed_cache_hits(self, relay_pool):
+        """Test batch query with some npubs cached and some not."""
+        # Populate cache with one npub
+        relay_pool.cache["nip89:npub1cached"] = CacheEntry(
+            value=True, expires_at=datetime.now() + timedelta(seconds=300)
+        )
+
+        npubs = ["npub1cached", "npub1new1", "npub1new2"]
+
+        with (
+            patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
+            patch.object(
+                relay_pool, "_query_relays", new_callable=AsyncMock
+            ) as mock_query,
+        ):
+            mock_npub_to_hex.side_effect = lambda x: f"hex_{x}"
+            mock_query.return_value = []
+
+            results = await relay_pool.check_handlers(npubs)
+
+            # Should get cached result for npub1cached
+            assert results["npub1cached"] is True
+            assert relay_pool._cache_hits == 1
+
+            # Should query only the uncached npubs
+            assert mock_query.call_count == 1
+            called_hex_pks = mock_query.call_args[0][0]
+            assert len(called_hex_pks) == 2
+            assert "hex_npub1new1" in called_hex_pks
+            assert "hex_npub1new2" in called_hex_pks

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     environment: str
+    nip89: dict[str, Any] | None = None
 
 
 class ChatMessage(BaseModel):

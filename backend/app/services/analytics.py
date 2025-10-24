@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError, EndpointConnectionError, NoCredenti
 
 from ..core.config import get_settings
 
+
 settings = get_settings()
 logger = structlog.get_logger(__name__)
 

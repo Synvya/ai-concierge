@@ -17,6 +17,7 @@ from .listings import (
     search_listings_by_text,
 )
 
+
 settings = get_settings()
 
 metadata = MetaData(schema=settings.db_schema)

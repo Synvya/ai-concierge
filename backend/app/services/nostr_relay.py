@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 from nostr_sdk import Client, Event, Filter, PublicKey
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,28 @@ class CacheEntry:
 
     value: bool
     expires_at: datetime
+
+
+@dataclass
+class RelayMetrics:
+    """Performance metrics for a relay."""
+
+    url: str
+    status: str = "disconnected"  # disconnected, connected, circuit_open
+    query_count: int = 0
+    error_count: int = 0
+    consecutive_errors: int = 0
+    total_latency_ms: float = 0.0
+    last_error: str | None = None
+    last_error_time: datetime | None = None
+    circuit_open_until: datetime | None = None
+
+    @property
+    def avg_latency_ms(self) -> float:
+        """Calculate average query latency."""
+        if self.query_count == 0:
+            return 0.0
+        return self.total_latency_ms / self.query_count
 
 
 class NostrRelayPool:
@@ -41,6 +65,8 @@ class NostrRelayPool:
         cache_ttl: int = 300,
         connection_timeout: int = 5,
         query_timeout: int = 3,
+        circuit_breaker_threshold: int = 3,
+        circuit_breaker_timeout: int = 60,
     ):
         """
         Initialize relay pool.
@@ -50,15 +76,24 @@ class NostrRelayPool:
             cache_ttl: Cache time-to-live in seconds (default: 300)
             connection_timeout: Connection timeout in seconds (default: 5)
             query_timeout: Query timeout in seconds (default: 3)
+            circuit_breaker_threshold: Consecutive errors before opening circuit (default: 3)
+            circuit_breaker_timeout: Seconds to wait before retrying failed relay (default: 60)
         """
         self.relays = relays
         self.cache_ttl = timedelta(seconds=cache_ttl)
         self.connection_timeout = connection_timeout
         self.query_timeout = query_timeout
+        self.circuit_breaker_threshold = circuit_breaker_threshold
+        self.circuit_breaker_timeout = timedelta(seconds=circuit_breaker_timeout)
 
         self.client: Client | None = None
         self.cache: dict[str, CacheEntry] = {}
+        self.relay_metrics: dict[str, RelayMetrics] = {
+            url: RelayMetrics(url=url) for url in relays
+        }
         self._connection_lock = asyncio.Lock()
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     async def _ensure_client(self) -> Client:
         """Ensure client is initialized and connected to relays."""
@@ -77,8 +112,16 @@ class NostrRelayPool:
             for relay_url in self.relays:
                 try:
                     await self.client.add_relay(relay_url)
+                    if relay_url in self.relay_metrics:
+                        self.relay_metrics[relay_url].status = "connected"
                     logger.info(f"Added Nostr relay: {relay_url}")
                 except Exception as e:
+                    if relay_url in self.relay_metrics:
+                        self.relay_metrics[relay_url].status = "disconnected"
+                        self.relay_metrics[relay_url].error_count += 1
+                        self.relay_metrics[relay_url].consecutive_errors += 1
+                        self.relay_metrics[relay_url].last_error = str(e)
+                        self.relay_metrics[relay_url].last_error_time = datetime.now()
                     logger.warning(f"Failed to add relay {relay_url}: {e}")
 
             # Connect to relays
@@ -86,9 +129,7 @@ class NostrRelayPool:
                 await asyncio.wait_for(
                     self.client.connect(), timeout=self.connection_timeout
                 )
-                logger.info(
-                    f"Connected to {len(self.relays)} Nostr relays"
-                )
+                logger.info(f"Connected to {len(self.relays)} Nostr relays")
             except asyncio.TimeoutError:
                 logger.warning("Relay connection timed out, continuing anyway")
             except Exception as e:
@@ -140,9 +181,11 @@ class NostrRelayPool:
 
             if cached and cached.expires_at > now:
                 results[npub] = cached.value
+                self._cache_hits += 1
                 logger.debug(f"Cache hit for {npub}: {cached.value}")
             else:
                 uncached_npubs.append(npub)
+                self._cache_misses += 1
 
         # Query relays for uncached npubs
         if uncached_npubs:
@@ -201,6 +244,8 @@ class NostrRelayPool:
         Returns:
             List of kind 31989 events with d:32101
         """
+        start_time = time.time()
+
         try:
             client = await self._ensure_client()
 
@@ -222,17 +267,56 @@ class NostrRelayPool:
                 client.get_events([filter_obj]), timeout=self.query_timeout
             )
 
-            logger.info(f"Found {len(events)} NIP-89 handler events")
+            # Track successful query metrics
+            latency_ms = (time.time() - start_time) * 1000
+            for relay_url in self.relays:
+                if relay_url in self.relay_metrics:
+                    metrics = self.relay_metrics[relay_url]
+                    metrics.query_count += 1
+                    metrics.total_latency_ms += latency_ms
+                    metrics.consecutive_errors = 0  # Reset on success
+
+            logger.info(
+                f"Found {len(events)} NIP-89 handler events in {latency_ms:.0f}ms"
+            )
             return list(events)
 
         except asyncio.TimeoutError:
-            logger.warning(
-                f"Relay query timed out after {self.query_timeout}s"
-            )
+            latency_ms = (time.time() - start_time) * 1000
+            logger.warning(f"Relay query timed out after {self.query_timeout}s")
+
+            # Track timeout as error
+            for relay_url in self.relays:
+                if relay_url in self.relay_metrics:
+                    self._record_query_error(relay_url, "Timeout")
+
             return []
         except Exception as e:
             logger.error(f"Relay query failed: {e}")
+
+            # Track error
+            for relay_url in self.relays:
+                if relay_url in self.relay_metrics:
+                    self._record_query_error(relay_url, str(e))
+
             return []
+
+    def _record_query_error(self, relay_url: str, error: str) -> None:
+        """Record a query error and potentially open circuit breaker."""
+        metrics = self.relay_metrics[relay_url]
+        metrics.error_count += 1
+        metrics.consecutive_errors += 1
+        metrics.last_error = error
+        metrics.last_error_time = datetime.now()
+
+        # Open circuit breaker if threshold exceeded
+        if metrics.consecutive_errors >= self.circuit_breaker_threshold:
+            metrics.status = "circuit_open"
+            metrics.circuit_open_until = datetime.now() + self.circuit_breaker_timeout
+            logger.warning(
+                f"Circuit breaker opened for {relay_url} "
+                f"({metrics.consecutive_errors} consecutive errors)"
+            )
 
     def clear_cache(self) -> None:
         """Clear the entire NIP-89 cache."""
@@ -241,20 +325,50 @@ class NostrRelayPool:
 
     def get_cache_stats(self) -> dict[str, Any]:
         """
-        Get cache statistics.
+        Get cache statistics including hit rate and relay metrics.
 
         Returns:
-            Dictionary with cache size and valid entry count
+            Dictionary with cache stats and relay performance metrics
         """
         now = datetime.now()
         valid_entries = sum(
             1 for entry in self.cache.values() if entry.expires_at > now
         )
 
+        total_requests = self._cache_hits + self._cache_misses
+        hit_rate = self._cache_hits / total_requests if total_requests > 0 else 0.0
+
+        # Build relay metrics
+        relay_stats = {}
+        for url, metrics in self.relay_metrics.items():
+            # Check if circuit breaker should be closed
+            if (
+                metrics.status == "circuit_open"
+                and metrics.circuit_open_until
+                and metrics.circuit_open_until < now
+            ):
+                metrics.status = "connected"
+                metrics.consecutive_errors = 0
+                metrics.circuit_open_until = None
+                logger.info(f"Circuit breaker closed for {url}, retrying")
+
+            relay_stats[url] = {
+                "status": metrics.status,
+                "query_count": metrics.query_count,
+                "error_count": metrics.error_count,
+                "avg_latency_ms": round(metrics.avg_latency_ms, 2),
+            }
+
         return {
-            "size": len(self.cache),
-            "valid_entries": valid_entries,
-            "expired_entries": len(self.cache) - valid_entries,
+            "cache": {
+                "size": len(self.cache),
+                "valid_entries": valid_entries,
+                "expired_entries": len(self.cache) - valid_entries,
+                "hit_rate": round(hit_rate, 3),
+                "total_hits": self._cache_hits,
+                "total_misses": self._cache_misses,
+            },
+            "relays": relay_stats,
         }
 
     async def close(self) -> None:
@@ -313,4 +427,3 @@ async def shutdown_relay_pool() -> None:
         await _relay_pool.close()
         _relay_pool = None
         logger.info("Shutdown global Nostr relay pool")
-
