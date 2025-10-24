@@ -14,4 +14,4 @@ httpx>=0.26.0
 structlog>=23.2.0
 greenlet>=3.0.3
 pytest
-nostr-sdk>=0.32.0 
+nostr-sdk>=0.32.0
