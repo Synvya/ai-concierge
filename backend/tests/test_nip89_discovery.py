@@ -196,6 +196,7 @@ class TestNostrRelayPool:
     @pytest.mark.asyncio
     async def test_query_relays_with_filter(self, relay_pool):
         """Test that _query_relays builds correct filter."""
+
         hex_pubkeys = ["abcd1234" * 8, "ef567890" * 8]
 
         with (
@@ -219,8 +220,12 @@ class TestNostrRelayPool:
             events = await relay_pool._query_relays(hex_pubkeys)
 
             assert events == mock_events
-            # Verify filter was built correctly
-            mock_filter.kinds.assert_called_once_with([31989])
+            # Verify filter was built correctly (Kind wrapper is now used)
+            mock_filter.kinds.assert_called_once()
+            # Check that it was called with a list containing Kind(31989)
+            call_args = mock_filter.kinds.call_args[0][0]
+            assert len(call_args) == 1
+            assert str(call_args[0]).startswith("Kind")
             mock_filter.authors.assert_called_once_with(hex_pubkeys)
             mock_filter.custom_tag.assert_called_once_with("d", ["32101"])
 

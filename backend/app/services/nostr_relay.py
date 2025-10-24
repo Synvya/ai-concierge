@@ -256,7 +256,7 @@ class NostrRelayPool:
             # These are recommendations for reservation.request handlers
             filter_obj = (
                 Filter()
-                .kinds([Kind(31989)])  # Handler recommendations  
+                .kinds([Kind(31989)])  # Handler recommendations
                 .authors(hex_pubkeys)  # From these restaurants
                 .custom_tag("d", ["32101"])  # For reservation.request
             )
