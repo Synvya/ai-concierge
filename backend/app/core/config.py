@@ -26,7 +26,9 @@ class Settings(BaseSettings):
     db_name: str = Field(default="concierge")
     db_schema: str | None = Field(default="nostr")
     db_table: str = Field(default="sellers")
-    listings_table: str | None = Field(default="classified_listings", alias="DB_LISTINGS_TABLE")
+    listings_table: str | None = Field(
+        default="classified_listings", alias="DB_LISTINGS_TABLE"
+    )
     db_pool_size: int = Field(default=5)
     db_max_overflow: int = Field(default=10)
 
@@ -46,12 +48,9 @@ class Settings(BaseSettings):
     frontend_base_url: str = Field(default="http://localhost:5173")
 
     # Nostr relay configuration for NIP-89 handler discovery
-    nostr_relays: list[str] = Field(
-        default=[
-            "wss://relay.damus.io",
-            "wss://nos.lol",
-            "wss://relay.nostr.band",
-        ],
+    # Note: Type is str | list[str] to prevent pydantic from trying to JSON-decode before validation
+    nostr_relays: str | list[str] = Field(
+        default="wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band",
         description="Comma-separated or list of Nostr relay URLs for NIP-89 discovery",
     )
     nip89_cache_ttl: int = Field(
@@ -64,10 +63,14 @@ class Settings(BaseSettings):
         default=3, description="Relay query timeout in seconds"
     )
 
-    @field_validator("nostr_relays", mode="before")
+    @field_validator("nostr_relays", mode="after")
     @classmethod
-    def parse_nostr_relays(cls, v: str | list[str] | None) -> list[str]:
-        """Parse comma-separated string or list of relay URLs."""
+    def parse_nostr_relays(cls, v: str | list[str]) -> list[str]:
+        """Parse comma-separated string or list of relay URLs.
+        
+        Using mode='after' to run after pydantic's type coercion,
+        so we handle the string before pydantic tries to JSON-decode it.
+        """
         if v is None or v == "":
             # Return default relays if not set
             return [
@@ -78,11 +81,16 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             relays = [url.strip() for url in v.split(",") if url.strip()]
             # If string was empty or only whitespace, return defaults
-            return relays if relays else [
-                "wss://relay.damus.io",
-                "wss://nos.lol",
-                "wss://relay.nostr.band",
-            ]
+            return (
+                relays
+                if relays
+                else [
+                    "wss://relay.damus.io",
+                    "wss://nos.lol",
+                    "wss://relay.nostr.band",
+                ]
+            )
+        # Already a list
         return v
 
     @property
