@@ -222,10 +222,11 @@ class TestNostrRelayPool:
             assert events == mock_events
             # Verify filter was built correctly (Kind wrapper is now used)
             mock_filter.kinds.assert_called_once()
-            # Check that it was called with a list containing Kind(31989)
+            # Check that it was called with a list containing a Kind instance
             call_args = mock_filter.kinds.call_args[0][0]
             assert len(call_args) == 1
-            assert str(call_args[0]).startswith("Kind")
+            # Kind objects have a repr like "Kind { inner: Custom(31989) }"
+            assert "Kind" in repr(call_args[0]) or "31989" in str(call_args[0])
             mock_filter.authors.assert_called_once_with(hex_pubkeys)
             mock_filter.custom_tag.assert_called_once_with("d", ["32101"])
 
