@@ -110,7 +110,7 @@ const initialMessages: ChatMessage[] = [
 export const ChatPanel = () => {
   const { visitorId, sessionId, resetSession } = useClientIds()
   const nostrIdentity = useNostrIdentity()
-  const { addOutgoingMessage, reservationThreads } = useReservations()
+  const { addOutgoingMessage, threads: reservationThreads } = useReservations()
   const toast = useToast()
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
@@ -143,6 +143,9 @@ export const ChatPanel = () => {
 
   // Watch for new reservation responses and notify user
   useEffect(() => {
+    // Guard against undefined reservationThreads
+    if (!reservationThreads) return
+    
     reservationThreads.forEach((thread) => {
       // Get the latest response message
       const responseMessages = thread.messages.filter((m) => m.type === 'response')
