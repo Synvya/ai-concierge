@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Avatar,
+  Badge,
   Box,
   Button,
   Card,
@@ -225,7 +226,7 @@ export const ChatPanel = () => {
         id: giftWrap.id, // Use gift wrap ID as rumor ID
         pubkey: nostrIdentity.publicKeyHex,
       };
-      
+
       const reservationMessage: ReservationMessage = {
         rumor: rumorWithId,
         type: 'request',
@@ -291,6 +292,17 @@ export const ChatPanel = () => {
           const assistantMessage: ChatMessage = {
             role: 'assistant',
             content: "I couldn't find that restaurant in the current search results. Could you search for the restaurant first, then request a reservation?",
+          }
+          setMessages((prev) => [...prev, assistantMessage])
+          setPendingIntent(null)
+          return
+        }
+
+        // Check if restaurant supports reservations
+        if (restaurant.supports_reservations !== true) {
+          const assistantMessage: ChatMessage = {
+            role: 'assistant',
+            content: "This restaurant doesn't support online reservations yet. Try calling them directly or visiting their website.",
           }
           setMessages((prev) => [...prev, assistantMessage])
           setPendingIntent(null)
@@ -584,7 +596,38 @@ export const ChatPanel = () => {
                     gap={2}
                   >
                     <Box>
-                      <Heading size="sm">{displayName}</Heading>
+                      <Flex align="center" gap={2} flexWrap="wrap">
+                        <Heading size="sm">{displayName}</Heading>
+                        {seller.supports_reservations === true && (
+                          <Tooltip
+                            label="This restaurant accepts reservations via Nostr messaging"
+                            fontSize="xs"
+                            hasArrow
+                          >
+                            <Badge
+                              bgGradient="linear(to-r, purple.400, purple.600)"
+                              color="white"
+                              fontSize="xs"
+                              px={3}
+                              py={1}
+                              borderRadius="full"
+                              display="inline-flex"
+                              alignItems="center"
+                              gap={1}
+                              cursor="help"
+                              tabIndex={0}
+                              aria-label="This restaurant accepts reservations via Nostr messaging"
+                              _hover={{ transform: 'scale(1.05)' }}
+                              transition="transform 0.2s"
+                            >
+                              <Text as="span" role="img" aria-label="magic wand">
+                                🪄
+                              </Text>
+                              <Text>Book via Concierge</Text>
+                            </Badge>
+                          </Tooltip>
+                        )}
+                      </Flex>
                       {location ? (
                         <Text fontSize="sm" color="gray.600">
                           {location}

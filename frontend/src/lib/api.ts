@@ -39,6 +39,7 @@ export interface SellerResult {
   id: string
   name?: string
   npub?: string
+  supports_reservations?: boolean | null
   meta_data?: Record<string, unknown>
   filters?: Record<string, unknown>
   content?: string
