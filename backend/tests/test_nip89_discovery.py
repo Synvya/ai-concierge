@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from app.schemas import SellerResult
 from app.services.nostr_relay import CacheEntry, NostrRelayPool
 
@@ -119,9 +120,10 @@ class TestNostrRelayPool:
         hex2 = "ef567890" * 8
 
         # Mock the entire flow
-        with patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex, patch.object(
-            relay_pool, "_query_relays"
-        ) as mock_query:
+        with (
+            patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
+            patch.object(relay_pool, "_query_relays") as mock_query,
+        ):
 
             mock_npub_to_hex.side_effect = lambda npub: hex1 if npub == npub1 else hex2
 
@@ -162,9 +164,10 @@ class TestNostrRelayPool:
         """Test that check_handlers handles query errors gracefully."""
         npub = "npub1test123"
 
-        with patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex, patch.object(
-            relay_pool, "_query_relays"
-        ) as mock_query:
+        with (
+            patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
+            patch.object(relay_pool, "_query_relays") as mock_query,
+        ):
 
             mock_npub_to_hex.return_value = "abcd1234" * 8
             mock_query.side_effect = Exception("Connection failed")
@@ -177,9 +180,10 @@ class TestNostrRelayPool:
     @pytest.mark.asyncio
     async def test_query_relays_timeout(self, relay_pool):
         """Test that _query_relays handles timeout."""
-        with patch.object(relay_pool, "_ensure_client") as mock_ensure, patch(
-            "app.services.nostr_relay.asyncio.wait_for"
-        ) as mock_wait_for:
+        with (
+            patch.object(relay_pool, "_ensure_client") as mock_ensure,
+            patch("app.services.nostr_relay.asyncio.wait_for") as mock_wait_for,
+        ):
 
             mock_client = AsyncMock()
             mock_ensure.return_value = mock_client
@@ -194,11 +198,11 @@ class TestNostrRelayPool:
         """Test that _query_relays builds correct filter."""
         hex_pubkeys = ["abcd1234" * 8, "ef567890" * 8]
 
-        with patch.object(relay_pool, "_ensure_client") as mock_ensure, patch(
-            "app.services.nostr_relay.Filter"
-        ) as mock_filter_class, patch(
-            "app.services.nostr_relay.asyncio.wait_for"
-        ) as mock_wait_for:
+        with (
+            patch.object(relay_pool, "_ensure_client") as mock_ensure,
+            patch("app.services.nostr_relay.Filter") as mock_filter_class,
+            patch("app.services.nostr_relay.asyncio.wait_for") as mock_wait_for,
+        ):
 
             mock_client = AsyncMock()
             mock_ensure.return_value = mock_client
@@ -371,8 +375,8 @@ class TestGlobalRelayPoolManagement:
     async def test_shutdown_relay_pool(self):
         """Test shutting down the global relay pool."""
         import app.services.nostr_relay as nostr_module
-        from app.services.nostr_relay import (get_relay_pool,
-                                              shutdown_relay_pool)
+
+        from app.services.nostr_relay import get_relay_pool, shutdown_relay_pool
 
         nostr_module._relay_pool = None
 
@@ -406,7 +410,9 @@ class TestCacheHitRate:
         )
 
         # Mock the relay query
-        with patch.object(relay_pool, "_query_relays", new_callable=AsyncMock) as mock_query:
+        with patch.object(
+            relay_pool, "_query_relays", new_callable=AsyncMock
+        ) as mock_query:
             mock_query.return_value = []
 
             # First query - cache hit
@@ -521,7 +527,9 @@ class TestRelayMetrics:
     async def test_relay_metrics_tracking(self, relay_pool):
         """Test that relay metrics track query latency."""
         # Mock successful query
-        with patch.object(relay_pool, "_ensure_client", new_callable=AsyncMock) as mock_client:
+        with patch.object(
+            relay_pool, "_ensure_client", new_callable=AsyncMock
+        ) as mock_client:
             mock_client_instance = MagicMock()
             mock_event = MagicMock()
             mock_event.author.return_value.to_hex.return_value = "test_hex"
@@ -544,7 +552,7 @@ class TestRelayMetrics:
 
         assert "relays" in stats
         assert len(stats["relays"]) == 2
-        
+
         for relay_url in relay_pool.relays:
             assert relay_url in stats["relays"]
             relay_stats = stats["relays"][relay_url]
@@ -572,7 +580,9 @@ class TestBatchQueries:
 
         with (
             patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
-            patch.object(relay_pool, "_query_relays", new_callable=AsyncMock) as mock_query,
+            patch.object(
+                relay_pool, "_query_relays", new_callable=AsyncMock
+            ) as mock_query,
         ):
             mock_npub_to_hex.side_effect = lambda x: f"hex_{x}"
             mock_query.return_value = []
@@ -597,7 +607,9 @@ class TestBatchQueries:
 
         with (
             patch.object(relay_pool, "_npub_to_hex") as mock_npub_to_hex,
-            patch.object(relay_pool, "_query_relays", new_callable=AsyncMock) as mock_query,
+            patch.object(
+                relay_pool, "_query_relays", new_callable=AsyncMock
+            ) as mock_query,
         ):
             mock_npub_to_hex.side_effect = lambda x: f"hex_{x}"
             mock_query.return_value = []
