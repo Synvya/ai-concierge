@@ -203,6 +203,7 @@ class TestNostrRelayPool:
             patch.object(relay_pool, "_ensure_client") as mock_ensure,
             patch("app.services.nostr_relay.Filter") as mock_filter_class,
             patch("app.services.nostr_relay.PublicKey") as mock_pk_class,
+            patch("app.services.nostr_relay.SingleLetterTag") as mock_tag_class,
             patch("app.services.nostr_relay.asyncio.wait_for") as mock_wait_for,
         ):
 
@@ -213,10 +214,14 @@ class TestNostrRelayPool:
             mock_pks = [MagicMock(), MagicMock()]
             mock_pk_class.parse.side_effect = mock_pks
 
+            # Mock SingleLetterTag for 'd' tag
+            mock_d_tag = MagicMock()
+            mock_tag_class.lowercase.return_value = mock_d_tag
+
             mock_filter = MagicMock()
             mock_filter.kinds.return_value = mock_filter
             mock_filter.authors.return_value = mock_filter
-            mock_filter.custom_tag.return_value = mock_filter
+            mock_filter.custom_tags.return_value = mock_filter
             mock_filter_class.return_value = mock_filter
 
             mock_events = [MagicMock(), MagicMock()]
@@ -225,7 +230,7 @@ class TestNostrRelayPool:
             events = await relay_pool._query_relays(hex_pubkeys)
 
             assert events == mock_events
-            # Verify filter was built correctly (Kind and PublicKey wrappers are now used)
+            # Verify filter was built correctly (Kind, PublicKey, and SingleLetterTag wrappers are used)
             mock_filter.kinds.assert_called_once()
             # Check that it was called with a list containing a Kind instance
             call_args = mock_filter.kinds.call_args[0][0]
@@ -234,7 +239,8 @@ class TestNostrRelayPool:
             assert "Kind" in repr(call_args[0]) or "31989" in str(call_args[0])
             # Authors should be called with PublicKey instances
             mock_filter.authors.assert_called_once_with(mock_pks)
-            mock_filter.custom_tag.assert_called_once_with("d", ["32101"])
+            # custom_tags should be called with SingleLetterTag and list of values
+            mock_filter.custom_tags.assert_called_once_with(mock_d_tag, ["32101"])
 
     def test_clear_cache(self, relay_pool):
         """Test cache clearing."""
@@ -544,6 +550,7 @@ class TestRelayMetrics:
             ) as mock_client,
             patch("app.services.nostr_relay.Filter") as mock_filter,
             patch("app.services.nostr_relay.PublicKey") as mock_pk_class,
+            patch("app.services.nostr_relay.SingleLetterTag") as mock_tag_class,
             patch(
                 "app.services.nostr_relay.asyncio.wait_for", new_callable=AsyncMock
             ) as mock_wait_for,
@@ -556,12 +563,16 @@ class TestRelayMetrics:
             mock_pk = MagicMock()
             mock_pk_class.parse.return_value = mock_pk
 
+            # Mock SingleLetterTag
+            mock_d_tag = MagicMock()
+            mock_tag_class.lowercase.return_value = mock_d_tag
+
             # Mock Filter chain
             mock_filter_instance = MagicMock()
             mock_filter.return_value = mock_filter_instance
             mock_filter_instance.kinds.return_value = mock_filter_instance
             mock_filter_instance.authors.return_value = mock_filter_instance
-            mock_filter_instance.custom_tag.return_value = mock_filter_instance
+            mock_filter_instance.custom_tags.return_value = mock_filter_instance
 
             mock_client_instance.get_events.return_value = [mock_event]
             mock_client.return_value = mock_client_instance

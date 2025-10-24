@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from nostr_sdk import Client, Event, Filter, Kind, PublicKey, RelayUrl
+from nostr_sdk import Alphabet, Client, Event, Filter, Kind, PublicKey, RelayUrl, SingleLetterTag
 
 
 logger = logging.getLogger(__name__)
@@ -257,11 +257,14 @@ class NostrRelayPool:
             # Convert hex pubkeys to PublicKey instances
             author_pks = [PublicKey.parse(hex_pk) for hex_pk in hex_pubkeys]
             
+            # Create SingleLetterTag for 'd' tag
+            d_tag = SingleLetterTag.lowercase(Alphabet.D)
+            
             filter_obj = (
                 Filter()
                 .kinds([Kind(31989)])  # Handler recommendations
                 .authors(author_pks)  # From these restaurants
-                .custom_tag("d", ["32101"])  # For reservation.request
+                .custom_tags(d_tag, ["32101"])  # For reservation.request (use custom_tags for list)
             )
 
             logger.debug(
