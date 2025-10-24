@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter
 
 from ..core.config import get_settings
@@ -10,7 +12,7 @@ router = APIRouter(tags=["health"])
 @router.get("/health", response_model=HealthResponse)
 async def healthcheck() -> HealthResponse:
     settings = get_settings()
-    response_data = {"status": "ok", "environment": settings.environment}
+    response_data: dict[str, Any] = {"status": "ok", "environment": settings.environment}
     
     # Try to get relay pool stats (may not exist yet if no queries have been made)
     try:
