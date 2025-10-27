@@ -20,13 +20,15 @@ def test_extract_npub_from_list():
 
 
 def test_extract_npub_returns_none_when_missing():
-    """Test that extract_npub returns None when no npub present."""
+    """Test that extract_npub converts hex to npub when no npub present."""
     keys = [
-        "1234567890abcdef" * 4,  # only hex key
+        "1234567890abcdef" * 4,  # only hex key - should be converted to npub
         "someinvalidkey",
     ]
     npub = _extract_npub(keys)
-    assert npub is None
+    # Should convert the hex key to npub format
+    assert npub is not None
+    assert npub.startswith("npub1")
 
 
 def test_extract_npub_from_empty_list():
