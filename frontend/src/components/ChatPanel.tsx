@@ -46,6 +46,7 @@ import { publishToRelays } from '../lib/nostr/relayPool'
 import { npubToHex } from '../lib/nostr/keys'
 import type { ReservationMessage } from '../services/reservationMessenger'
 import type { Rumor } from '../lib/nostr/nip59'
+import type { ReservationRequest } from '../types/reservation'
 
 const ASSISTANT_NAME = 'Synvya Concierge'
 const ASSISTANT_AVATAR_URL = '/assets/doorman.png'
@@ -259,7 +260,7 @@ export const ChatPanel = () => {
       }
 
       // Build reservation request
-      const request: Record<string, any> = {
+      const request: ReservationRequest = {
         party_size: intent.partySize!,
         iso_time: intent.time!,
       }

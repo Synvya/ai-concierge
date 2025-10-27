@@ -1,7 +1,7 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { ReservationProvider, useReservations } from './ReservationContext'
-import type { ReservationMessage } from '../types/reservation'
+import type { ReservationMessage } from '../services/reservationMessenger'
 
 // Mock the Nostr identity hook
 vi.mock('../hooks/useNostrIdentity', () => ({
@@ -30,7 +30,7 @@ describe('ReservationContext', () => {
       wrapper: ReservationProvider,
     })
 
-    expect(result.current.reservationThreads).toEqual([])
+    expect(result.current.threads).toEqual([])
   })
 
   test('adds outgoing message and creates new thread', async () => {
@@ -74,10 +74,10 @@ describe('ReservationContext', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.reservationThreads).toHaveLength(1)
+      expect(result.current.threads).toHaveLength(1)
     })
 
-    const thread = result.current.reservationThreads[0]
+    const thread = result.current.threads[0]
     expect(thread.restaurantName).toBe('Test Restaurant')
     expect(thread.restaurantNpub).toBe('npub1restaurant')
     expect(thread.status).toBe('sent')
@@ -127,7 +127,7 @@ describe('ReservationContext', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.reservationThreads).toHaveLength(1)
+      expect(result.current.threads).toHaveLength(1)
     })
 
     // Now simulate receiving a confirmed response
@@ -164,7 +164,7 @@ describe('ReservationContext', () => {
     act(() => {
       // Access the internal update function (would normally be called by subscription)
       // For testing, we'll verify the logic exists
-      const thread = result.current.reservationThreads[0]
+      const thread = result.current.threads[0]
       expect(thread.status).toBe('sent')
     })
 
@@ -236,10 +236,10 @@ describe('ReservationContext', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.reservationThreads).toHaveLength(2)
+      expect(result.current.threads).toHaveLength(2)
     })
 
-    const threads = result.current.reservationThreads
+    const threads = result.current.threads
     expect(threads[0].restaurantName).toBe('Restaurant Two') // Most recent first
     expect(threads[1].restaurantName).toBe('Restaurant One')
   })
