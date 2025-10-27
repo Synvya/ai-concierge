@@ -74,15 +74,41 @@ describe("reservationMessenger", () => {
 
             expect(mockPool.subscribeMany).toHaveBeenCalledWith(
                 ["wss://relay1.com", "wss://relay2.com"],
-                {
+                expect.objectContaining({
                     kinds: [1059],
                     "#p": [user.publicKeyHex],
-                },
+                    since: expect.any(Number), // Should include since for historical messages
+                }),
                 expect.objectContaining({
                     onevent: expect.any(Function),
                     oneose: expect.any(Function),
                 })
             );
+        });
+
+        it("uses custom historySince parameter", () => {
+            const user = generateKeypair();
+            const customHistorySeconds = 7 * 24 * 60 * 60; // 7 days
+
+            const subscription = new ReservationSubscription({
+                relays: ["wss://relay1.com"],
+                privateKey: user.privateKeyHex,
+                publicKey: user.publicKeyHex,
+                onMessage: vi.fn(),
+                historySince: customHistorySeconds,
+            });
+
+            subscription.start();
+
+            // Calculate expected timestamp
+            const expectedSince = Math.floor(Date.now() / 1000) - customHistorySeconds;
+
+            const callArgs = (mockPool.subscribeMany as any).mock.calls[0];
+            const filter = callArgs[1];
+            
+            // Should be within 1 second of expected (accounting for test execution time)
+            expect(filter.since).toBeGreaterThanOrEqual(expectedSince - 1);
+            expect(filter.since).toBeLessThanOrEqual(expectedSince + 1);
         });
 
         it("doesn't start twice if already active", () => {

@@ -57,6 +57,8 @@ export interface ReservationSubscriptionConfig {
     onError?: ReservationErrorCallback;
     /** Optional callback when subscription is active */
     onReady?: () => void;
+    /** Optional: Number of seconds to look back for historical messages (default: 30 days) */
+    historySince?: number;
 }
 
 /**
@@ -82,7 +84,13 @@ export class ReservationSubscription {
         }
 
         const pool = getPool();
-        const { relays, publicKey, privateKey, onMessage, onError, onReady } = this.config;
+        const { relays, publicKey, privateKey, onMessage, onError, onReady, historySince } = this.config;
+
+        // Calculate the 'since' timestamp for historical messages
+        // Default to 30 days ago if not specified
+        const defaultHistorySeconds = 30 * 24 * 60 * 60; // 30 days in seconds
+        const historyWindow = historySince ?? defaultHistorySeconds;
+        const sinceTimestamp = Math.floor(Date.now() / 1000) - historyWindow;
 
         // Subscribe to gift wrap events addressed to this user
         this.subscription = pool.subscribeMany(
@@ -90,6 +98,7 @@ export class ReservationSubscription {
             {
                 kinds: [1059], // Gift wrap
                 "#p": [publicKey], // Addressed to user
+                since: sinceTimestamp, // Fetch historical messages
             },
             {
                 onevent: (event: Event) => {
