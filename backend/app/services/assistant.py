@@ -296,9 +296,9 @@ async def generate_response(
 
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
+            messages=messages,  # type: ignore[arg-type]
             model=settings.openai_assistant_model,
             temperature=0.4,
-            messages=messages,  # type: ignore[arg-type]
             tools=tools,  # type: ignore[arg-type]
             tool_choice="auto",
         )

@@ -52,7 +52,7 @@ class Settings(BaseSettings):
 
     # Nostr relay configuration for NIP-89 handler discovery
     # Note: Type is str | list[str] to prevent pydantic from trying to JSON-decode before validation
-    nostr_relays: str | list[str] = Field(
+    nostr_relays: list[str] = Field(
         default="wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band",
         description="Comma-separated or list of Nostr relay URLs for NIP-89 discovery",
     )
