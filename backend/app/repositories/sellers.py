@@ -57,11 +57,11 @@ def _should_exclude_seller(seller: dict[str, Any]) -> bool:
     meta = seller.get("meta_data")
     if isinstance(meta, dict) and meta.get("type") == "classified_listing":
         return True
-    
+
     filters = seller.get("filters")
     if isinstance(filters, dict) and filters.get("type") == "classified_listing":
         return True
-    
+
     return has_demo_flag(meta) or has_demo_flag(filters)
 
 
