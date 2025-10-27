@@ -1,8 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ChakraProvider, ColorModeScript, extendTheme } from '@chakra-ui/react'
+import { Buffer } from 'buffer'
 
 import App from './App'
+
+// Polyfill Buffer for browser environment
+window.Buffer = Buffer
 
 const theme = extendTheme({
   fonts: {

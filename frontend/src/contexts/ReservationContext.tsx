@@ -16,6 +16,39 @@ import { getThreadContext, type ThreadContext } from '../lib/nostr/nip10';
 import type { ReservationRequest, ReservationResponse } from '../types/reservation';
 
 /**
+ * Determine whether we should start the live reservation subscription.
+ * Vitest runs consume limited heap, so we avoid opening websocket pools
+ * unless explicitly re-enabled via VITE_ENABLE_RESERVATION_SUBSCRIPTION.
+ */
+const SHOULD_START_RESERVATION_SUBSCRIPTION = (() => {
+  try {
+    if (typeof import.meta !== 'undefined') {
+      const metaAny = import.meta as unknown as {
+        vitest?: boolean;
+        env?: { MODE?: string; VITE_ENABLE_RESERVATION_SUBSCRIPTION?: string };
+      };
+
+      // Allow explicit opt-in via env even when running tests
+      if (metaAny.env?.VITE_ENABLE_RESERVATION_SUBSCRIPTION === 'true') {
+        return true;
+      }
+
+      if (metaAny.vitest || metaAny.env?.MODE === 'test') {
+        return false;
+      }
+    }
+  } catch {
+    // If env detection fails, fall through to process.env check
+  }
+
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+    return false;
+  }
+
+  return true;
+})();
+
+/**
  * Represents a complete reservation conversation thread
  */
 export interface ReservationThread {
@@ -64,7 +97,7 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
 
   // Start subscription when identity is available
   useEffect(() => {
-    if (!nostrIdentity) {
+    if (!nostrIdentity || !SHOULD_START_RESERVATION_SUBSCRIPTION) {
       return;
     }
 
@@ -83,7 +116,9 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
         console.error('Reservation messenger error:', error);
       },
       onReady: () => {
-        console.log('Reservation messenger ready');
+        if (SHOULD_START_RESERVATION_SUBSCRIPTION) {
+          console.log('Reservation messenger ready');
+        }
       },
     });
 
@@ -91,8 +126,9 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
 
     return () => {
       sub.stop();
+      setSubscription((current) => (current === sub ? null : current));
     };
-  }, [nostrIdentity, handleIncomingMessage]);
+  }, [handleIncomingMessage, nostrIdentity]);
 
   const addOutgoingMessage = useCallback(
     (message: ReservationMessage, restaurantName: string, restaurantNpub: string) => {
@@ -137,9 +173,11 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
     []
   );
 
+  const isActive = SHOULD_START_RESERVATION_SUBSCRIPTION ? subscription?.active ?? false : false;
+
   const value: ReservationContextValue = {
     threads,
-    isActive: subscription?.active ?? false,
+    isActive,
     addOutgoingMessage,
   };
 
@@ -217,7 +255,12 @@ function updateThreadWithMessage(
 
     // Response without a matching thread - log warning and ignore
     console.warn('Received response for unknown thread:', threadId);
+    console.warn('Available threads:', threads.map(t => t.threadId));
+    console.warn('Response details:', {
+      giftWrapId: message.giftWrap.id,
+      rumorTags: message.rumor.tags,
+      extractedThreadId: threadId,
+    });
     return threads;
   }
 }
-

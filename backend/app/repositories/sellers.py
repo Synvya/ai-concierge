@@ -87,14 +87,28 @@ def _select_canonical_key(keys: list[str]) -> str | None:
 
 
 def _extract_npub(keys: list[str]) -> str | None:
-    """Extract the first valid npub from a list of public keys.
+    """Extract or convert the first valid npub from a list of public keys.
 
-    Returns the first key that starts with 'npub1' and appears to be
-    a valid bech32 encoded public key.
+    Returns the first key that starts with 'npub1', or converts the first
+    hex public key to npub format.
     """
+    from nostr_sdk import PublicKey
+
+    # First, check if any key is already an npub
     for key in keys:
         if isinstance(key, str) and key.startswith("npub1") and len(key) > 10:
             return key
+
+    # If no npub found, try to convert first hex key to npub
+    for key in keys:
+        if isinstance(key, str) and len(key) == 64:
+            try:
+                # Parse hex as PublicKey and convert to bech32 (npub)
+                pubkey = PublicKey.parse(key)
+                return pubkey.to_bech32()
+            except Exception:
+                continue
+
     return None
 
 
@@ -382,12 +396,22 @@ async def search_sellers(
         ranked_sellers.append(seller)
 
     def _sort_key(item: dict[str, Any]) -> tuple:
+        # Detect if this is a classified listing vs a business profile
+        item_id = item.get("id", "")
+        is_classified_listing = isinstance(item_id, str) and item_id.startswith(
+            "classified_listing:"
+        )
+
+        # Business profiles should rank higher than classified listings
+        # by placing them in priority group 0, classified listings in group 1
+        priority_group = 1 if is_classified_listing else 0
+
         vector_distance = item.get("vector_distance")
         score = float(item.get("score", 0.0) or 0.0)
         if vector_distance is not None:
             adjusted_distance = float(vector_distance) - min(score, 1.0) * 0.1
-            return (0, adjusted_distance)
-        return (1, -score)
+            return (priority_group, 0, adjusted_distance)
+        return (priority_group, 1, -score)
 
     ranked_sellers.sort(key=_sort_key)
 
@@ -407,9 +431,7 @@ async def search_sellers(
             }
 
     # Check NIP-89 handler support for restaurants with npubs
-    npubs_to_check = [
-        seller["npub"] for seller in ranked_sellers if seller.get("npub")
-    ]
+    npubs_to_check = [seller["npub"] for seller in ranked_sellers if seller.get("npub")]
 
     if npubs_to_check:
         try:

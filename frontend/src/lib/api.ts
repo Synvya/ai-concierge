@@ -60,6 +60,16 @@ export interface ChatMessage {
   attachments?: SellerResult[]
 }
 
+export interface ReservationAction {
+  action: string
+  restaurant_id: string
+  restaurant_name: string
+  npub: string
+  party_size: number
+  iso_time: string
+  notes?: string
+}
+
 export interface ChatRequestPayload {
   message: string
   session_id?: string
@@ -80,6 +90,7 @@ export interface ChatResponse {
   debug_payload?: Record<string, unknown>
   user_location?: string
   user_coordinates?: GeoPoint
+  reservation_action?: ReservationAction | null
 }
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'

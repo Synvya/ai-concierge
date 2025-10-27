@@ -98,6 +98,22 @@ class SellerResult(BaseModel):
         return
 
 
+class ReservationAction(BaseModel):
+    """Structured reservation data returned by OpenAI function calling."""
+
+    action: str = Field(
+        description="Action type: 'send_reservation_request' or 'needs_confirmation'"
+    )
+    restaurant_id: str = Field(description="Database ID of the restaurant")
+    restaurant_name: str = Field(description="Name of the restaurant")
+    npub: str = Field(description="Nostr public key (npub) of the restaurant")
+    party_size: int = Field(description="Number of guests", ge=1, le=20)
+    iso_time: str = Field(
+        description="ISO 8601 datetime string with timezone (e.g. 2025-10-25T15:00:00-07:00)"
+    )
+    notes: str | None = Field(default=None, description="Special requests or dietary restrictions")
+
+
 class ChatResponse(BaseModel):
     session_id: str
     answer: str
@@ -107,6 +123,10 @@ class ChatResponse(BaseModel):
     debug_payload: dict[str, Any] | None = None
     user_location: str | None = None
     user_coordinates: GeoPoint | None = None
+    reservation_action: ReservationAction | None = Field(
+        default=None,
+        description="Structured reservation data when OpenAI determines a booking is ready",
+    )
 
 
 class SearchResponse(BaseModel):

@@ -20,5 +20,21 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: true,
     },
+    define: {
+      // Polyfill Buffer for browser
+      'global': 'globalThis',
+    },
+    resolve: {
+      alias: {
+        buffer: 'buffer/',
+      },
+    },
+    optimizeDeps: {
+      esbuildOptions: {
+        define: {
+          global: 'globalThis',
+        },
+      },
+    },
   }
 })

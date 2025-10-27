@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Avatar,
   Badge,
@@ -39,18 +39,14 @@ import type {
   SellerResult,
 } from '../lib/api'
 import { chat } from '../lib/api'
-import {
-  parseReservationIntent,
-  isReservationComplete,
-  getMissingDetailPrompt,
-  type ReservationIntent,
-} from '../lib/parseReservationIntent'
+import type { ReservationIntent } from '../lib/parseReservationIntent'
 import { buildReservationRequest } from '../lib/nostr/reservationEvents'
 import { wrapEvent } from '../lib/nostr/nip59'
 import { publishToRelays } from '../lib/nostr/relayPool'
 import { npubToHex } from '../lib/nostr/keys'
 import type { ReservationMessage } from '../services/reservationMessenger'
 import type { Rumor } from '../lib/nostr/nip59'
+import type { ReservationRequest } from '../types/reservation'
 
 const ASSISTANT_NAME = 'Synvya Concierge'
 const ASSISTANT_AVATAR_URL = '/assets/doorman.png'
@@ -115,18 +111,17 @@ const initialMessages: ChatMessage[] = [
 export const ChatPanel = () => {
   const { visitorId, sessionId, resetSession } = useClientIds()
   const nostrIdentity = useNostrIdentity()
-  const { addOutgoingMessage } = useReservations()
+  const { addOutgoingMessage, threads: reservationThreads } = useReservations()
   const toast = useToast()
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
-  const [currentSearchResults, setCurrentSearchResults] = useState<SellerResult[]>([])
-  const [pendingIntent, setPendingIntent] = useState<ReservationIntent | null>(null)
   const [sharedLocation, setSharedLocation] = useState<{
     label?: string
     coords?: GeoPoint
     status: 'idle' | 'pending' | 'granted' | 'denied'
   }>({ status: 'idle' })
+  const processedResponsesRef = useRef<Set<string>>(new Set())
 
   // Read cached location from session storage if present
   useEffect(() => {
@@ -147,23 +142,92 @@ export const ChatPanel = () => {
     }
   }, [])
 
-  const handleChatResponse = useCallback((payload: ChatResponse) => {
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      content: payload.answer,
-      attachments: payload.results,
-    }
-    setMessages((prev) => [...prev, assistantMessage])
-    // Track search results for reservation intent matching
-    if (payload.results && payload.results.length > 0) {
-      setCurrentSearchResults(payload.results)
-    }
-  }, [])
+  // Watch for new reservation responses and notify user
+  useEffect(() => {
+    // Guard against undefined reservationThreads
+    if (!reservationThreads) return
+    
+    reservationThreads.forEach((thread) => {
+      // Get the latest response message
+      const responseMessages = thread.messages.filter((m) => m.type === 'response')
+      if (responseMessages.length === 0) return
 
-  const canSend = useMemo(
-    () => Boolean(inputValue.trim()) && Boolean(sessionId) && Boolean(visitorId) && !isLoading,
-    [inputValue, sessionId, visitorId, isLoading],
-  )
+      const latestResponse = responseMessages[responseMessages.length - 1]
+      const responseId = latestResponse.giftWrap.id
+
+      // Check if we've already processed this response
+      if (processedResponsesRef.current.has(responseId)) return
+
+      // Mark as processed immediately to prevent duplicate processing
+      processedResponsesRef.current.add(responseId)
+
+      // Get response details
+      const response = latestResponse.payload as any
+      const status = response.status
+      const restaurantName = thread.restaurantName
+
+      // Format the notification message
+      let notificationTitle = ''
+      let notificationDescription = ''
+      let toastStatus: 'success' | 'info' | 'warning' | 'error' = 'info'
+
+      switch (status) {
+        case 'confirmed':
+          notificationTitle = '✅ Reservation Confirmed!'
+          notificationDescription = `Your reservation at ${restaurantName} has been confirmed${
+            response.iso_time ? ` for ${new Date(response.iso_time).toLocaleString()}` : ''
+          }.${response.table ? ` Table: ${response.table}` : ''}`
+          toastStatus = 'success'
+          break
+        case 'suggested':
+          notificationTitle = '💡 Alternative Time Suggested'
+          notificationDescription = `${restaurantName} suggested ${
+            response.iso_time ? new Date(response.iso_time).toLocaleString() : 'an alternative time'
+          } instead.`
+          toastStatus = 'info'
+          break
+        case 'declined':
+          notificationTitle = '❌ Reservation Declined'
+          notificationDescription = `${restaurantName} could not accommodate your request.${
+            response.message ? ` ${response.message}` : ''
+          }`
+          toastStatus = 'warning'
+          break
+        case 'expired':
+          notificationTitle = '⏰ Reservation Expired'
+          notificationDescription = `Your hold at ${restaurantName} has expired.`
+          toastStatus = 'warning'
+          break
+        case 'cancelled':
+          notificationTitle = '🚫 Reservation Cancelled'
+          notificationDescription = `Your reservation at ${restaurantName} was cancelled.`
+          toastStatus = 'error'
+          break
+        default:
+          notificationTitle = '📬 Reservation Update'
+          notificationDescription = `${restaurantName} sent a response about your reservation.`
+      }
+
+      // Show toast notification
+      toast({
+        title: notificationTitle,
+        description: notificationDescription,
+        status: toastStatus,
+        duration: 8000,
+        isClosable: true,
+        position: 'top',
+      })
+
+      // Add message to chat
+      const chatMessage: ChatMessage = {
+        role: 'assistant',
+        content: `${notificationTitle}\n\n${notificationDescription}${
+          response.message ? `\n\nMessage: "${response.message}"` : ''
+        }`,
+      }
+      setMessages((prev) => [...prev, chatMessage])
+    })
+  }, [reservationThreads, toast])
 
   const sendReservationRequest = useCallback(async (
     restaurant: SellerResult,
@@ -196,10 +260,14 @@ export const ChatPanel = () => {
       }
 
       // Build reservation request
-      const request = {
+      const request: ReservationRequest = {
         party_size: intent.partySize!,
         iso_time: intent.time!,
-        notes: intent.notes,
+      }
+      
+      // Only include notes if it's a non-empty string
+      if (intent.notes && intent.notes.trim()) {
+        request.notes = intent.notes
       }
 
       const rumor = buildReservationRequest(
@@ -209,6 +277,8 @@ export const ChatPanel = () => {
       )
 
       const giftWrap = wrapEvent(rumor, nostrIdentity.privateKeyHex, restaurantPubkeyHex)
+      
+      console.log('📤 Sent reservation request - Thread ID:', giftWrap.id)
 
       // Publish to default relays
       const relays = [
@@ -242,7 +312,6 @@ export const ChatPanel = () => {
         content: `Great! I've sent your reservation request to ${restaurant.name} for ${intent.partySize} people at ${new Date(intent.time!).toLocaleString()}.${intent.notes ? ` Note: "${intent.notes}"` : ''}\n\nYou'll receive a response from the restaurant shortly.`,
       }
       setMessages((prev) => [...prev, confirmationMessage])
-      setPendingIntent(null)
 
       toast({
         title: 'Reservation request sent',
@@ -261,6 +330,43 @@ export const ChatPanel = () => {
     }
   }, [nostrIdentity, toast, addOutgoingMessage])
 
+  const handleChatResponse = useCallback(async (payload: ChatResponse) => {
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: payload.answer,
+      attachments: payload.results,
+    }
+    setMessages((prev) => [...prev, assistantMessage])
+
+    // Handle reservation action from backend
+    if (payload.reservation_action) {
+      const action = payload.reservation_action
+      // Find the restaurant in the results
+      const restaurant = payload.results.find(r => r.id === action.restaurant_id)
+      
+      if (restaurant && restaurant.npub) {
+        // Automatically send the reservation request
+        await sendReservationRequest(restaurant, {
+          restaurantName: action.restaurant_name,
+          partySize: action.party_size,
+          time: action.iso_time,
+          notes: action.notes,
+        })
+      } else {
+        toast({
+          title: 'Restaurant not found',
+          description: 'Could not find the restaurant to complete the reservation.',
+          status: 'error',
+        })
+      }
+    }
+  }, [sendReservationRequest, toast])
+
+  const canSend = useMemo(
+    () => Boolean(inputValue.trim()) && Boolean(sessionId) && Boolean(visitorId) && !isLoading,
+    [inputValue, sessionId, visitorId, isLoading],
+  )
+
   const handleSubmit = useCallback(async () => {
     if (!sessionId || !visitorId || !inputValue.trim()) {
       return
@@ -271,107 +377,7 @@ export const ChatPanel = () => {
     setMessages(nextHistory)
     setInputValue('')
 
-    // Check for reservation intent
-    const intent = parseReservationIntent(inputValue, currentSearchResults)
-
-    if (intent) {
-      // Merge with pending intent if exists
-      const mergedIntent: ReservationIntent = {
-        ...pendingIntent,
-        ...intent,
-      }
-
-      // Check if complete
-      if (isReservationComplete(mergedIntent)) {
-        // Find restaurant with npub
-        let restaurant = currentSearchResults.find(
-          (r) => r.name === mergedIntent.restaurantName && r.npub
-        )
-
-        // If restaurant not in current results, search for it
-        if (!restaurant && mergedIntent.restaurantName) {
-          setIsLoading(true)
-          
-          try {
-            const payload = await chat({
-              message: mergedIntent.restaurantName,
-              session_id: sessionId,
-              visitor_id: visitorId,
-              history: nextHistory,
-              user_location: sharedLocation.status === 'granted' ? sharedLocation.label : undefined,
-              user_coordinates: sharedLocation.status === 'granted' ? sharedLocation.coords : undefined,
-            })
-            
-            // Update search results
-            if (payload.results && payload.results.length > 0) {
-              setCurrentSearchResults(payload.results)
-              
-              // Try to find the restaurant again (fuzzy match)
-              restaurant = payload.results.find(
-                (r) => r.name?.toLowerCase().includes(mergedIntent.restaurantName!.toLowerCase()) && r.npub
-              )
-              
-              const searchMessage: ChatMessage = {
-                role: 'assistant',
-                content: payload.answer,
-                attachments: payload.results,
-              }
-              setMessages((prev) => [...prev, searchMessage])
-            }
-            
-            setIsLoading(false)
-          } catch (error) {
-            setIsLoading(false)
-            toast({
-              title: 'Failed to search for restaurant',
-              description: 'Please try again.',
-              status: 'error',
-            })
-            setPendingIntent(null)
-            return
-          }
-        }
-
-        if (!restaurant) {
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: "I couldn't find that restaurant. Could you provide more details or try searching for it first?",
-          }
-          setMessages((prev) => [...prev, assistantMessage])
-          setPendingIntent(null)
-          return
-        }
-
-        // Check if restaurant supports reservations
-        if (restaurant.supports_reservations !== true) {
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: "This restaurant doesn't support online reservations yet. Try calling them directly or visiting their website.",
-          }
-          setMessages((prev) => [...prev, assistantMessage])
-          setPendingIntent(null)
-          return
-        }
-
-        // Send reservation request
-        await sendReservationRequest(restaurant, mergedIntent)
-        return
-      } else {
-        // Prompt for missing details
-        const prompt = getMissingDetailPrompt(mergedIntent)
-        if (prompt) {
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: prompt,
-          }
-          setMessages((prev) => [...prev, assistantMessage])
-          setPendingIntent(mergedIntent)
-          return
-        }
-      }
-    }
-
-    // Normal chat flow
+    // Always send to backend - let OpenAI handle the intelligence
     setIsLoading(true)
     try {
       const payload = await chat({
@@ -382,7 +388,7 @@ export const ChatPanel = () => {
         user_location: sharedLocation.status === 'granted' ? sharedLocation.label : undefined,
         user_coordinates: sharedLocation.status === 'granted' ? sharedLocation.coords : undefined,
       })
-      handleChatResponse(payload)
+      await handleChatResponse(payload)
     } catch (error) {
       toast({
         title: 'Something went wrong',
@@ -393,7 +399,7 @@ export const ChatPanel = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [sessionId, visitorId, inputValue, messages, currentSearchResults, pendingIntent, toast, handleChatResponse, sendReservationRequest, sharedLocation])
+  }, [sessionId, visitorId, inputValue, messages, toast, handleChatResponse, sharedLocation])
 
   const handleSuggestedQuery = (query: string) => {
     setInputValue(query)
@@ -402,8 +408,6 @@ export const ChatPanel = () => {
   const startNewSession = () => {
     resetSession()
     setMessages(initialMessages)
-    setCurrentSearchResults([])
-    setPendingIntent(null)
   }
 
   const onKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (event) => {
@@ -641,7 +645,7 @@ export const ChatPanel = () => {
                   >
                     <Box>
                       <Flex align="center" gap={2} flexWrap="wrap">
-                        <Heading size="sm">{displayName}</Heading>
+                      <Heading size="sm">{displayName}</Heading>
                         {seller.supports_reservations === true && (
                           <Tooltip
                             label="This restaurant accepts reservations via Nostr messaging"

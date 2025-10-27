@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -8,7 +9,9 @@ class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=str(Path(__file__).parent.parent.parent / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     app_name: str = Field(default="AI Concierge")
@@ -48,9 +51,8 @@ class Settings(BaseSettings):
     frontend_base_url: str = Field(default="http://localhost:5173")
 
     # Nostr relay configuration for NIP-89 handler discovery
-    # Note: Type is str | list[str] to prevent pydantic from trying to JSON-decode before validation
-    nostr_relays: str | list[str] = Field(
-        default="wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band",
+    nostr_relays: list[str] = Field(
+        default=["wss://relay.damus.io", "wss://nos.lol", "wss://relay.nostr.band"],
         description="Comma-separated or list of Nostr relay URLs for NIP-89 discovery",
     )
     nip89_cache_ttl: int = Field(

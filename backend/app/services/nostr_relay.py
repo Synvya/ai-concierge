@@ -15,16 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from nostr_sdk import (
-    Alphabet,
-    Client,
-    Event,
-    Filter,
-    Kind,
-    PublicKey,
-    RelayUrl,
-    SingleLetterTag,
-)
+from nostr_sdk import Alphabet, Client, Event, Filter, Kind, PublicKey, RelayUrl, SingleLetterTag
 
 
 logger = logging.getLogger(__name__)
