@@ -83,17 +83,50 @@ interface ReservationContextValue {
 
 const ReservationContext = createContext<ReservationContextValue | null>(null);
 
+const STORAGE_KEY = 'reservation_threads';
+
+/**
+ * Load reservation threads from localStorage
+ */
+function loadThreadsFromStorage(): ReservationThread[] {
+  try {
+    const cached = localStorage.getItem(STORAGE_KEY);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    console.error('Failed to load cached reservations:', error);
+  }
+  return [];
+}
+
+/**
+ * Save reservation threads to localStorage
+ */
+function saveThreadsToStorage(threads: ReservationThread[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(threads));
+  } catch (error) {
+    console.error('Failed to cache reservations:', error);
+  }
+}
+
 /**
  * Provider component for reservation state management
  */
 export function ReservationProvider({ children }: { children: React.ReactNode }) {
-  const [threads, setThreads] = useState<ReservationThread[]>([]);
+  const [threads, setThreads] = useState<ReservationThread[]>(loadThreadsFromStorage);
   const [subscription, setSubscription] = useState<ReservationSubscription | null>(null);
   const nostrIdentity = useNostrIdentity();
 
   const handleIncomingMessage = useCallback((message: ReservationMessage) => {
     setThreads((prev) => updateThreadWithMessage(prev, message));
   }, []);
+
+  // Save threads to localStorage whenever they change
+  useEffect(() => {
+    saveThreadsToStorage(threads);
+  }, [threads]);
 
   // Start subscription when identity is available
   useEffect(() => {

@@ -23,10 +23,14 @@ vi.mock('../services/reservationMessenger', () => ({
 describe('ReservationContext', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Clear localStorage before each test to prevent data leakage
+    localStorage.clear()
   })
 
   afterEach(() => {
     cleanup()
+    // Clear localStorage after each test as well
+    localStorage.clear()
   })
 
   test('initializes with empty threads', () => {
@@ -267,6 +271,94 @@ describe('ReservationContext', () => {
         mockResponse.status
       )
     })
+  })
+
+  test('persists threads to localStorage', async () => {
+    const { result, unmount } = renderHook(() => useReservations(), {
+      wrapper: ReservationProvider,
+    })
+
+    const mockMessage: ReservationMessage = {
+      rumor: {
+        kind: 32101,
+        content: '{"party_size":3,"iso_time":"2025-10-28T18:00:00Z"}',
+        created_at: Math.floor(Date.now() / 1000),
+        pubkey: 'test-pubkey-hex',
+        tags: [['p', 'restaurant-pubkey']],
+        id: 'request-id-persist',
+        sig: 'sig',
+      } as any,
+      type: 'request',
+      payload: {
+        party_size: 3,
+        iso_time: '2025-10-28T18:00:00Z',
+      },
+      senderPubkey: 'test-pubkey-hex',
+      giftWrap: {
+        kind: 1059,
+        content: 'encrypted',
+        created_at: Math.floor(Date.now() / 1000),
+        pubkey: 'random-pubkey',
+        tags: [['p', 'restaurant-pubkey']],
+        id: 'giftwrap-id-persist',
+        sig: 'sig',
+      } as any,
+    }
+
+    act(() => {
+      result.current.addOutgoingMessage(
+        mockMessage,
+        'Test Restaurant',
+        'npub1restaurant'
+      )
+    })
+
+    await waitFor(() => {
+      expect(result.current.threads).toHaveLength(1)
+    })
+
+    // Verify localStorage was updated
+    const stored = localStorage.getItem('reservation_threads')
+    expect(stored).not.toBeNull()
+    
+    const parsed = JSON.parse(stored!)
+    expect(parsed).toHaveLength(1)
+    expect(parsed[0].restaurantName).toBe('Test Restaurant')
+    expect(parsed[0].request.partySize).toBe(3)
+    
+    unmount()
+  })
+
+  test('loads threads from localStorage on mount', () => {
+    // Pre-populate localStorage
+    const mockThreads = [
+      {
+        threadId: 'existing-thread-id',
+        restaurantName: 'Pre-existing Restaurant',
+        restaurantNpub: 'npub1existing',
+        messages: [],
+        request: {
+          partySize: 4,
+          isoTime: '2025-10-29T19:00:00Z',
+        },
+        status: 'sent',
+        lastUpdated: Math.floor(Date.now() / 1000),
+      },
+    ]
+    
+    localStorage.setItem('reservation_threads', JSON.stringify(mockThreads))
+
+    // Mount the provider
+    const { result, unmount } = renderHook(() => useReservations(), {
+      wrapper: ReservationProvider,
+    })
+
+    // Should load the pre-existing thread
+    expect(result.current.threads).toHaveLength(1)
+    expect(result.current.threads[0].restaurantName).toBe('Pre-existing Restaurant')
+    expect(result.current.threads[0].request.partySize).toBe(4)
+    
+    unmount()
   })
 })
 
