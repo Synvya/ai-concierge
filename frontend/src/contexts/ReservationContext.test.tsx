@@ -1,5 +1,5 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest'
+import { renderHook, waitFor, act, cleanup } from '@testing-library/react'
 import { ReservationProvider, useReservations } from './ReservationContext'
 import type { ReservationMessage } from '../services/reservationMessenger'
 
@@ -25,16 +25,21 @@ describe('ReservationContext', () => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    cleanup()
+  })
+
   test('initializes with empty threads', () => {
-    const { result } = renderHook(() => useReservations(), {
+    const { result, unmount } = renderHook(() => useReservations(), {
       wrapper: ReservationProvider,
     })
 
     expect(result.current.threads).toEqual([])
+    unmount()
   })
 
   test('adds outgoing message and creates new thread', async () => {
-    const { result } = renderHook(() => useReservations(), {
+    const { result, unmount } = renderHook(() => useReservations(), {
       wrapper: ReservationProvider,
     })
 
@@ -83,10 +88,11 @@ describe('ReservationContext', () => {
     expect(thread.status).toBe('sent')
     expect(thread.messages).toHaveLength(1)
     expect(thread.messages[0].type).toBe('request')
+    unmount()
   })
 
   test('updates thread status when response is received', async () => {
-    const { result } = renderHook(() => useReservations(), {
+    const { result, unmount } = renderHook(() => useReservations(), {
       wrapper: ReservationProvider,
     })
 
@@ -170,10 +176,11 @@ describe('ReservationContext', () => {
 
     // Note: Full integration would require mocking the WebSocket subscription
     // and simulating the onMessage callback from reservationMessenger
+    unmount()
   })
 
   test('handles multiple threads correctly', async () => {
-    const { result } = renderHook(() => useReservations(), {
+    const { result, unmount } = renderHook(() => useReservations(), {
       wrapper: ReservationProvider,
     })
 
@@ -242,6 +249,7 @@ describe('ReservationContext', () => {
     const threads = result.current.threads
     expect(threads[0].restaurantName).toBe('Restaurant Two') // Most recent first
     expect(threads[1].restaurantName).toBe('Restaurant One')
+    unmount()
   })
 
   test('handles different response statuses', async () => {
