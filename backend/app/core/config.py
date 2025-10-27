@@ -51,9 +51,8 @@ class Settings(BaseSettings):
     frontend_base_url: str = Field(default="http://localhost:5173")
 
     # Nostr relay configuration for NIP-89 handler discovery
-    # Note: Type is str | list[str] to prevent pydantic from trying to JSON-decode before validation
     nostr_relays: list[str] = Field(
-        default="wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band",
+        default=["wss://relay.damus.io", "wss://nos.lol", "wss://relay.nostr.band"],
         description="Comma-separated or list of Nostr relay URLs for NIP-89 discovery",
     )
     nip89_cache_ttl: int = Field(
