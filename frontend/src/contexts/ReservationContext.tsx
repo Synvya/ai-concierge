@@ -239,6 +239,16 @@ function updateThreadWithMessage(
   threads: ReservationThread[],
   message: ReservationMessage
 ): ReservationThread[] {
+  // Deduplication: Check if this message already exists in any thread
+  const messageAlreadyExists = threads.some((t) =>
+    t.messages.some((m) => m.giftWrap.id === message.giftWrap.id)
+  );
+
+  if (messageAlreadyExists) {
+    // Message already exists (likely from localStorage), skip it
+    return threads;
+  }
+
   // Extract thread context using NIP-10
   const threadContext = getThreadContext(message.rumor as any);
   const threadId = threadContext.rootId || message.giftWrap.id;
