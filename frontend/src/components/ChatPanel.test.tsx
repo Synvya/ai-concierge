@@ -244,7 +244,7 @@ describe('ChatPanel - Reservation Notifications', () => {
 
         // Wait for component to mount
         await waitFor(() => {
-            expect(screen.getByPlaceholderText(/what are you looking for/i)).toBeInTheDocument()
+            expect(screen.getByPlaceholderText(/ask for what you need/i)).toBeInTheDocument()
         })
 
         // Verify component mounts successfully with reservation notification logic
