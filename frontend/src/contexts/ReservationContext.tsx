@@ -92,7 +92,7 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
     return () => {
       sub.stop();
     };
-  }, [nostrIdentity, handleIncomingMessage]);
+  }, [nostrIdentity]);
 
   const addOutgoingMessage = useCallback(
     (message: ReservationMessage, restaurantName: string, restaurantNpub: string) => {
