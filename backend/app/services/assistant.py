@@ -295,11 +295,12 @@ async def generate_response(
         messages.append({"role": "user", "content": user_prompt})
 
         client = OpenAI(api_key=api_key)
+        from typing import Any, cast
         response = client.chat.completions.create(
-            messages=messages,  # type: ignore[arg-type]
+            messages=cast(Any, messages),
             model=settings.openai_assistant_model,
             temperature=0.4,
-            tools=tools,  # type: ignore[arg-type]
+            tools=cast(Any, tools),
             tool_choice="auto",
         )
         choice = response.choices[0].message
@@ -308,7 +309,8 @@ async def generate_response(
         function_call_data = None
         if choice.tool_calls:
             tool_call = choice.tool_calls[0]
-            if tool_call.function.name == "send_reservation_request":
+            # Only process function tool calls, not custom tool calls
+            if hasattr(tool_call, 'function') and tool_call.function.name == "send_reservation_request":
                 import json
 
                 function_call_data = {
