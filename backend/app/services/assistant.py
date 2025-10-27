@@ -167,6 +167,8 @@ async def generate_response(
 
     def _call() -> tuple[str, dict[str, Any] | None]:
         # Lazy import to avoid dependency requirements when only using _build_context in tests
+        from datetime import datetime, timezone
+
         from ..core.config import get_settings
 
         try:
@@ -182,6 +184,10 @@ async def generate_response(
         )
         if not api_key:
             raise AssistantError("OPENAI_API_KEY is not configured")
+
+        # Get current date/time for OpenAI to use as reference
+        now = datetime.now(timezone.utc)
+        current_datetime = now.isoformat()
 
         system_prompt = (
             "You are a friendly AI concierge helping people discover and book local businesses. "
@@ -200,12 +206,13 @@ async def generate_response(
             "- IMPORTANT: Check the conversation history for previous business recommendations.\n"
             "  If the user confirms a reservation from a previous message, use the details from history.\n"
             "- Ask clarifying questions if any details are missing or ambiguous.\n"
+            f"- CURRENT DATE/TIME: {current_datetime}\n"
             "- IMPORTANT: Parse natural language times into ISO 8601 format with timezone.\n"
-            "  * Use the CURRENT date and time as your reference point\n"
+            "  * Use the CURRENT DATE/TIME above as your reference point\n"
             "  * 'tomorrow' = current date + 1 day\n"
             "  * 'tonight' = current date at evening time\n"
             "  * Include timezone (default to US Pacific: -07:00 or -08:00 depending on DST)\n"
-            "  * Example: 'tomorrow at 3pm' → '2025-10-25T15:00:00-07:00'\n"
+            "  * Always calculate dates relative to the CURRENT DATE/TIME provided above\n"
             "- If 'supports_reservations' is false or missing, suggest they contact the business directly.\n"
             "\n"
             "Respond concisely with at most three recommendations, include the city and a verbatim highlight drawn from the context, "
@@ -270,7 +277,7 @@ async def generate_response(
         context_block = (
             _build_context(results) if results else "No relevant businesses found."
         )
-        
+
         # Add instruction based on whether we have results
         result_instruction = ""
         if results:
@@ -279,9 +286,9 @@ async def generate_response(
                 "Even if the match isn't perfect, present what's available to the user. "
                 "Don't say you couldn't find anything when results are provided."
             )
-        
+
         user_prompt = (
-            f"User question: {query}\n\n" 
+            f"User question: {query}\n\n"
             f"Business context:\n{context_block}"
             f"{result_instruction}"
         )
