@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,7 +52,8 @@ class Settings(BaseSettings):
     frontend_base_url: str = Field(default="http://localhost:5173")
 
     # Nostr relay configuration for NIP-89 handler discovery
-    nostr_relays: list[str] = Field(
+    # Type is Any for input, but validator ensures it's list[str] at runtime
+    nostr_relays: Any = Field(
         default=["wss://relay.damus.io", "wss://nos.lol", "wss://relay.nostr.band"],
         description="Comma-separated or list of Nostr relay URLs for NIP-89 discovery",
     )
@@ -65,7 +67,7 @@ class Settings(BaseSettings):
         default=3, description="Relay query timeout in seconds"
     )
 
-    @field_validator("nostr_relays", mode="after")
+    @field_validator("nostr_relays", mode="before")
     @classmethod
     def parse_nostr_relays(cls, v: str | list[str]) -> list[str]:
         """Parse comma-separated string or list of relay URLs.

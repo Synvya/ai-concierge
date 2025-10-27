@@ -107,4 +107,3 @@ def test_seller_result_with_real_npub_format():
     )
     assert seller.npub == realistic_npub
     assert len(seller.npub) == 63
-
