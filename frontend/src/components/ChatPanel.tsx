@@ -359,12 +359,16 @@ export const ChatPanel = () => {
   }, [nostrIdentity, toast, addOutgoingMessage])
 
   const handleChatResponse = useCallback(async (payload: ChatResponse) => {
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      content: payload.answer,
-      attachments: payload.results,
+    // Only add assistant message if there's actual content or no reservation action
+    // (avoids showing empty/negative message when making a reservation)
+    if (payload.answer && payload.answer.trim()) {
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: payload.answer,
+        attachments: payload.results,
+      }
+      setMessages((prev) => [...prev, assistantMessage])
     }
-    setMessages((prev) => [...prev, assistantMessage])
 
     // Handle reservation action from backend
     if (payload.reservation_action) {
