@@ -270,15 +270,38 @@ export const ChatPanel = () => {
         request.notes = intent.notes
       }
 
-      const rumor = buildReservationRequest(
+      // IMPORTANT: Implement "Self CC" per NIP-17 pattern
+      // Create TWO separate request templates with DIFFERENT encryption:
+      // 1. Request TO merchant (encrypted for merchant to read)
+      // 2. Request TO self (encrypted for self to read - Self CC)
+      
+      const rumorToMerchant = buildReservationRequest(
         request,
         nostrIdentity.privateKeyHex,
-        restaurantPubkeyHex
+        restaurantPubkeyHex  // Encrypted TO merchant
       )
 
-      const giftWrap = wrapEvent(rumor, nostrIdentity.privateKeyHex, restaurantPubkeyHex)
+      const rumorToSelf = buildReservationRequest(
+        request,
+        nostrIdentity.privateKeyHex,
+        nostrIdentity.publicKeyHex  // Encrypted TO self (Self CC)
+      )
+
+      // Create TWO gift wraps
+      const giftWrapToMerchant = wrapEvent(
+        rumorToMerchant, 
+        nostrIdentity.privateKeyHex, 
+        restaurantPubkeyHex  // Addressed to merchant
+      )
+
+      const giftWrapToSelf = wrapEvent(
+        rumorToSelf, 
+        nostrIdentity.privateKeyHex, 
+        nostrIdentity.publicKeyHex  // Addressed to self
+      )
       
-      console.log('📤 Sent reservation request - Thread ID:', giftWrap.id)
+      console.log('📤 Sent reservation request - Thread ID:', giftWrapToMerchant.id)
+      console.log('📤 Self CC - Thread ID:', giftWrapToSelf.id)
 
       // Publish to default relays
       const relays = [
@@ -287,13 +310,18 @@ export const ChatPanel = () => {
         'wss://relay.nostr.band',
       ]
 
-      await publishToRelays(giftWrap, relays)
+      // Publish BOTH gift wraps to relays (Self CC ensures persistence across devices)
+      await Promise.all([
+        publishToRelays(giftWrapToMerchant, relays),
+        publishToRelays(giftWrapToSelf, relays),
+      ])
 
       // Add to reservation context for tracking
       // Convert EventTemplate to Rumor by adding required id field
+      // Use the Self CC rumor since that's the one we can decrypt
       const rumorWithId: Rumor = {
-        ...rumor,
-        id: giftWrap.id, // Use gift wrap ID as rumor ID
+        ...rumorToSelf,
+        id: giftWrapToMerchant.id, // Use merchant gift wrap ID as thread ID
         pubkey: nostrIdentity.publicKeyHex,
       };
 
@@ -302,7 +330,7 @@ export const ChatPanel = () => {
         type: 'request',
         payload: request,
         senderPubkey: nostrIdentity.publicKeyHex,
-        giftWrap,
+        giftWrap: giftWrapToMerchant,
       }
       addOutgoingMessage(reservationMessage, restaurant.name || 'Unknown Restaurant', restaurant.npub)
 
