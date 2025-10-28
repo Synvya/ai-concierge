@@ -166,10 +166,9 @@ export const ChatPanel = () => {
       const status = response.status
       const restaurantName = thread.restaurantName
 
-      // Format the notification message
+      // Format the chat notification message
       let notificationTitle = ''
       let notificationDescription = ''
-      let toastStatus: 'success' | 'info' | 'warning' | 'error' = 'info'
 
       switch (status) {
         case 'confirmed':
@@ -177,46 +176,31 @@ export const ChatPanel = () => {
           notificationDescription = `Your reservation at ${restaurantName} has been confirmed${
             response.iso_time ? ` for ${new Date(response.iso_time).toLocaleString()}` : ''
           }.${response.table ? ` Table: ${response.table}` : ''}`
-          toastStatus = 'success'
           break
         case 'suggested':
           notificationTitle = '💡 Alternative Time Suggested'
           notificationDescription = `${restaurantName} suggested ${
             response.iso_time ? new Date(response.iso_time).toLocaleString() : 'an alternative time'
           } instead.`
-          toastStatus = 'info'
           break
         case 'declined':
           notificationTitle = '❌ Reservation Declined'
           notificationDescription = `${restaurantName} could not accommodate your request.${
             response.message ? ` ${response.message}` : ''
           }`
-          toastStatus = 'warning'
           break
         case 'expired':
           notificationTitle = '⏰ Reservation Expired'
           notificationDescription = `Your hold at ${restaurantName} has expired.`
-          toastStatus = 'warning'
           break
         case 'cancelled':
           notificationTitle = '🚫 Reservation Cancelled'
           notificationDescription = `Your reservation at ${restaurantName} was cancelled.`
-          toastStatus = 'error'
           break
         default:
           notificationTitle = '📬 Reservation Update'
           notificationDescription = `${restaurantName} sent a response about your reservation.`
       }
-
-      // Show toast notification
-      toast({
-        title: notificationTitle,
-        description: notificationDescription,
-        status: toastStatus,
-        duration: 8000,
-        isClosable: true,
-        position: 'top',
-      })
 
       // Add message to chat
       const chatMessage: ChatMessage = {
@@ -227,7 +211,7 @@ export const ChatPanel = () => {
       }
       setMessages((prev) => [...prev, chatMessage])
     })
-  }, [reservationThreads, toast])
+  }, [reservationThreads])
 
   const sendReservationRequest = useCallback(async (
     restaurant: SellerResult,
