@@ -664,7 +664,7 @@ export const ChatPanel = () => {
                       <Heading size="sm">{displayName}</Heading>
                         {seller.supports_reservations === true && (
                           <Tooltip
-                            label="This restaurant accepts reservations via Nostr messaging"
+                            label="Tell me when you'd like to dine, and I'll make the reservation"
                             fontSize="xs"
                             hasArrow
                           >
@@ -680,7 +680,7 @@ export const ChatPanel = () => {
                               gap={1}
                               cursor="help"
                               tabIndex={0}
-                              aria-label="This restaurant accepts reservations via Nostr messaging"
+                              aria-label="Tell me when you'd like to dine, and I'll make the reservation"
                               _hover={{ transform: 'scale(1.05)' }}
                               transition="transform 0.2s"
                             >
