@@ -322,9 +322,17 @@ async def generate_response(
                     **json.loads(tool_call.function.arguments),
                 }
 
-        response_text = (
-            choice.content or "I couldn't find anything right now, please try again."
-        )
+        # Determine response text based on whether we have a function call
+        if function_call_data:
+            # When making a reservation, provide a minimal message since the frontend
+            # will add the full confirmation message
+            response_text = choice.content or ""
+        else:
+            # For regular responses, use the content or fallback message
+            response_text = (
+                choice.content
+                or "I couldn't find anything right now, please try again."
+            )
         return response_text, function_call_data
 
     return await asyncio.to_thread(_call)
