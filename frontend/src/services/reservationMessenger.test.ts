@@ -287,11 +287,12 @@ describe("reservationMessenger", () => {
             expect(message.rumor.kind).toBe(32102);
         });
 
-        it("handles decryption errors gracefully", () => {
+        it("silently ignores invalid MAC errors (Self CC pattern)", () => {
             const user = generateKeypair();
             const wrongUser = generateKeypair(); // Different user
             const onMessage = vi.fn();
             const onError = vi.fn();
+            const consoleDebugSpy = vi.spyOn(console, "debug").mockImplementation(() => { });
 
             const subscription = new ReservationSubscription({
                 relays: ["wss://relay.example.com"],
@@ -322,15 +323,19 @@ describe("reservationMessenger", () => {
                 user.publicKeyHex
             );
 
-            // Try to decrypt with wrong key
+            // Try to decrypt with wrong key (produces "invalid MAC" error)
             const options = mockPool.subscribeMany.mock.calls[0][2];
             options.onevent(giftWrap);
 
-            // Should call onError, not onMessage
+            // With Self CC, "invalid MAC" errors are silently ignored (expected behavior)
+            // This happens when we receive Self CC copies encrypted for others
             expect(onMessage).not.toHaveBeenCalled();
-            expect(onError).toHaveBeenCalled();
-            expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
-            expect(onError.mock.calls[0][1]).toBe(giftWrap);
+            expect(onError).not.toHaveBeenCalled(); // Error should NOT be reported
+            expect(consoleDebugSpy).toHaveBeenCalledWith(
+                'Skipping gift wrap not encrypted for us (expected with Self CC)'
+            );
+
+            consoleDebugSpy.mockRestore();
         });
 
         it("ignores events with unexpected kinds", () => {

@@ -184,6 +184,18 @@ export class ReservationSubscription {
         } catch (error) {
             // Handle decryption or parsing errors
             const errorMessage = error instanceof Error ? error : new Error(String(error));
+            
+            // With Self CC (NIP-17), we publish TWO gift wraps:
+            // 1. One encrypted for the recipient (merchant/customer)
+            // 2. One encrypted for ourselves (Self CC)
+            // When subscribing, we receive BOTH, but can only decrypt the one encrypted for us.
+            // "invalid MAC" errors are expected and should be silently ignored.
+            if (errorMessage.message.includes('invalid MAC')) {
+                console.debug('Skipping gift wrap not encrypted for us (expected with Self CC)');
+                return; // Silently ignore
+            }
+            
+            // Report other errors
             onError?.(errorMessage, event);
         }
     }
