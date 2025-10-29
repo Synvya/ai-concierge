@@ -175,39 +175,45 @@ export const ChatPanel = () => {
           notificationTitle = '✅ Reservation Confirmed!'
           notificationDescription = `Your reservation at ${restaurantName} has been confirmed${
             response.iso_time ? ` for ${new Date(response.iso_time).toLocaleString()}` : ''
-          }.${response.table ? ` Table: ${response.table}` : ''}`
+          }.${response.table ? ` Table: ${response.table}` : ''}${
+            response.message ? `\n\n${response.message}` : ''
+          }`
           break
         case 'suggested':
           notificationTitle = '💡 Alternative Time Suggested'
           notificationDescription = `${restaurantName} suggested ${
             response.iso_time ? new Date(response.iso_time).toLocaleString() : 'an alternative time'
-          } instead.`
+          } instead.${response.message ? `\n\n${response.message}` : ''}`
           break
         case 'declined':
           notificationTitle = '❌ Reservation Declined'
           notificationDescription = `${restaurantName} could not accommodate your request.${
-            response.message ? ` ${response.message}` : ''
+            response.message ? `\n\n${response.message}` : ''
           }`
           break
         case 'expired':
           notificationTitle = '⏰ Reservation Expired'
-          notificationDescription = `Your hold at ${restaurantName} has expired.`
+          notificationDescription = `Your hold at ${restaurantName} has expired.${
+            response.message ? `\n\n${response.message}` : ''
+          }`
           break
         case 'cancelled':
           notificationTitle = '🚫 Reservation Cancelled'
-          notificationDescription = `Your reservation at ${restaurantName} was cancelled.`
+          notificationDescription = `Your reservation at ${restaurantName} was cancelled.${
+            response.message ? `\n\n${response.message}` : ''
+          }`
           break
         default:
           notificationTitle = '📬 Reservation Update'
-          notificationDescription = `${restaurantName} sent a response about your reservation.`
+          notificationDescription = `${restaurantName} sent a response about your reservation.${
+            response.message ? `\n\n${response.message}` : ''
+          }`
       }
 
       // Add message to chat
       const chatMessage: ChatMessage = {
         role: 'assistant',
-        content: `${notificationTitle}\n\n${notificationDescription}${
-          response.message ? `\n\nMessage: "${response.message}"` : ''
-        }`,
+        content: `${notificationTitle}\n\n${notificationDescription}`,
       }
       setMessages((prev) => [...prev, chatMessage])
     })
