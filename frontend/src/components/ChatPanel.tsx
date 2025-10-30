@@ -1016,7 +1016,10 @@ export const ChatPanel = () => {
         </Box>
 
         {/* Powered by Synvya branding */}
-        <Flex justify="center" pt={2}>
+        <Flex justify="center" align="center" pt={2} gap={2}>
+          <Text fontSize="sm" color="gray.600" fontWeight="medium">
+            Powered by
+          </Text>
           <Link
             href="https://www.synvya.com"
             target="_blank"
@@ -1026,8 +1029,8 @@ export const ChatPanel = () => {
           >
             <Image
               src="/assets/powered-by-synvya.png"
-              alt="Powered by Synvya"
-              height="40px"
+              alt="Synvya"
+              height="28px"
               objectFit="contain"
             />
           </Link>
