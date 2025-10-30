@@ -241,34 +241,6 @@ export const ChatPanel = () => {
     })
   }, [reservationThreads])
 
-  // Handler for saving contact info and proceeding with reservation
-  const handleContactInfoSubmit = useCallback(() => {
-    if (!tempName.trim() || !tempPhone.trim()) {
-      toast({
-        title: 'Required fields',
-        description: 'Please enter both your name and phone number.',
-        status: 'warning',
-      })
-      return
-    }
-
-    // Save contact info
-    setContactInfo({ name: tempName.trim(), phone: tempPhone.trim() })
-    
-    // Close modal
-    onContactModalClose()
-    
-    // Clear temp values
-    setTempName('')
-    setTempPhone('')
-    
-    // Proceed with pending reservation if any
-    if (pendingReservation) {
-      sendReservationRequest(pendingReservation.restaurant, pendingReservation.intent)
-      setPendingReservation(null)
-    }
-  }, [tempName, tempPhone, setContactInfo, onContactModalClose, pendingReservation, toast])
-
   const sendReservationRequest = useCallback(async (
     restaurant: SellerResult,
     intent: ReservationIntent
@@ -409,6 +381,34 @@ export const ChatPanel = () => {
       setIsLoading(false)
     }
   }, [nostrIdentity, toast, addOutgoingMessage, hasContactInfo, contactInfo, onContactModalOpen])
+
+  // Handler for saving contact info and proceeding with reservation
+  const handleContactInfoSubmit = useCallback(() => {
+    if (!tempName.trim() || !tempPhone.trim()) {
+      toast({
+        title: 'Required fields',
+        description: 'Please enter both your name and phone number.',
+        status: 'warning',
+      })
+      return
+    }
+
+    // Save contact info
+    setContactInfo({ name: tempName.trim(), phone: tempPhone.trim() })
+    
+    // Close modal
+    onContactModalClose()
+    
+    // Clear temp values
+    setTempName('')
+    setTempPhone('')
+    
+    // Proceed with pending reservation if any
+    if (pendingReservation) {
+      sendReservationRequest(pendingReservation.restaurant, pendingReservation.intent)
+      setPendingReservation(null)
+    }
+  }, [tempName, tempPhone, setContactInfo, onContactModalClose, pendingReservation, toast, sendReservationRequest])
 
   const handleChatResponse = useCallback(async (payload: ChatResponse) => {
     // Only add assistant message if there's actual content or no reservation action
