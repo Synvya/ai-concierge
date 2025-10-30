@@ -1,6 +1,6 @@
-# Reservation Request Format (kind:32101)
+# Reservation Request Format (kind:9901)
 
-This document describes the format of reservation request messages sent via Nostr using kind:32101 (wrapped in NIP-59 gift wrap).
+This document describes the format of reservation request messages sent via Nostr using kind:9901 (wrapped in NIP-59 gift wrap).
 
 ## Overview
 
@@ -40,13 +40,13 @@ After decrypting the gift wrap content, you get a seal:
 }
 ```
 
-### Inner Layer (Rumor - kind:32101)
+### Inner Layer (Rumor - kind:9901)
 
 After decrypting the seal content, you get the actual reservation request (an unsigned event called a "rumor"):
 
 ```json
 {
-  "kind": 32101,
+  "kind": 9901,
   "pubkey": "<sender_pubkey_hex>",
   "created_at": <unix timestamp>,
   "tags": [],
@@ -105,7 +105,7 @@ The `content` field of the rumor is encrypted using NIP-44 and contains:
 1. **Decryption Process**:
    - Receive gift wrap (kind:1059) addressed to your restaurant's pubkey
    - Decrypt the gift wrap to get the seal (kind:13)
-   - Decrypt the seal to get the rumor (kind:32101)
+   - Decrypt the seal to get the rumor (kind:9901)
    - Decrypt the rumor's content to get the reservation payload
 
 2. **Contact Information**:
@@ -119,7 +119,7 @@ The `content` field of the rumor is encrypted using NIP-44 and contains:
    - Parse using your preferred datetime library
 
 4. **Response Format**:
-   - Respond using kind:32102 (see [RESTAURANT_RESPONSE_FORMAT.md](./RESTAURANT_RESPONSE_FORMAT.md))
+   - Respond using kind:9902 (see [RESTAURANT_RESPONSE_FORMAT.md](./RESTAURANT_RESPONSE_FORMAT.md))
    - Include the original gift wrap `id` in your response's `e` tag for threading
 
 ### Example Implementation (JavaScript/TypeScript)
@@ -132,7 +132,7 @@ function handleGiftWrap(giftWrapEvent, restaurantPrivateKey) {
   // Unwrap using NIP-59
   const rumor = nip59.unwrap(giftWrapEvent, restaurantPrivateKey);
   
-  if (rumor.kind !== 32101) {
+  if (rumor.kind !== 9901) {
     console.error('Unexpected rumor kind:', rumor.kind);
     return null;
   }

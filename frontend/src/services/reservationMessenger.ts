@@ -157,7 +157,7 @@ export class ReservationSubscription {
             const rumor = unwrapEvent(event, privateKey);
 
             // Determine type and parse
-            if (rumor.kind === 32101) {
+            if (rumor.kind === 9901) {
                 // Reservation request
                 const payload = parseReservationRequest(rumor, privateKey);
                 onMessage({
@@ -167,7 +167,7 @@ export class ReservationSubscription {
                     senderPubkey: rumor.pubkey,
                     giftWrap: event,
                 });
-            } else if (rumor.kind === 32102) {
+            } else if (rumor.kind === 9902) {
                 // Reservation response
                 const payload = parseReservationResponse(rumor, privateKey);
                 onMessage({

@@ -161,7 +161,7 @@ class NostrRelayPool:
         """
         Check NIP-89 handler support for multiple npubs.
 
-        Queries relays for kind 31989 events with d:32101 to determine if
+        Queries relays for kind 31989 events with d:9901 to determine if
         restaurants have published reservation.request handlers.
 
         Args:
@@ -245,14 +245,14 @@ class NostrRelayPool:
             hex_pubkeys: List of hex public keys
 
         Returns:
-            List of kind 31989 events with d:32101
+            List of kind 31989 events with d:9901
         """
         start_time = time.time()
 
         try:
             client = await self._ensure_client()
 
-            # Build filter for kind 31989 events with d:32101
+            # Build filter for kind 31989 events with d:9901
             # These are recommendations for reservation.request handlers
             # Convert hex pubkeys to PublicKey instances
             author_pks = [PublicKey.parse(hex_pk) for hex_pk in hex_pubkeys]
@@ -265,12 +265,12 @@ class NostrRelayPool:
                 .kinds([Kind(31989)])  # Handler recommendations
                 .authors(author_pks)  # From these restaurants
                 .custom_tags(
-                    d_tag, ["32101"]
+                    d_tag, ["9901"]
                 )  # For reservation.request (use custom_tags for list)
             )
 
             logger.debug(
-                f"Querying relays for {len(hex_pubkeys)} authors, kind 31989, d:32101"
+                f"Querying relays for {len(hex_pubkeys)} authors, kind 31989, d:9901"
             )
 
             # Query with timeout using fetch_events which expects a Duration (timedelta)

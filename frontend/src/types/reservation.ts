@@ -1,5 +1,5 @@
 /**
- * Types for Synvya Reservation Messages (NIP-32101/32102)
+ * Types for Synvya Reservation Messages (NIP-9901/9902)
  * 
  * These types match the JSON schemas defined in docs/schemas/
  */
@@ -24,7 +24,7 @@ export interface ReservationConstraints {
 }
 
 /**
- * Reservation request payload (kind 32101)
+ * Reservation request payload (kind 9901)
  */
 export interface ReservationRequest {
     /** Number of guests (1-20) */
@@ -50,7 +50,7 @@ export type ReservationStatus =
     | "cancelled";
 
 /**
- * Reservation response payload (kind 32102)
+ * Reservation response payload (kind 9902)
  */
 export interface ReservationResponse {
     /** Status of the reservation */
