@@ -3,9 +3,8 @@
   "iso_time": "2025-10-17T19:00:00-07:00",
   "notes": "Window seat if possible",
   "contact": {
-    "name": "Alejandro",
-    "phone": "+1-555-0100",
-    "email": "alejandro@example.com"
+    "name": "Alejandro Martinez",
+    "phone": "+1-555-0100"
   },
   "constraints": {
     "earliest_iso_time": "2025-10-17T18:30:00-07:00",
