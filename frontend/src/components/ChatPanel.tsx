@@ -44,6 +44,7 @@ import { buildReservationRequest } from '../lib/nostr/reservationEvents'
 import { wrapEvent } from '../lib/nostr/nip59'
 import { publishToRelays } from '../lib/nostr/relayPool'
 import { npubToHex } from '../lib/nostr/keys'
+import { getRestaurantDisplayName } from '../lib/restaurantName'
 import type { ReservationMessage } from '../services/reservationMessenger'
 import type { Rumor } from '../lib/nostr/nip59'
 import type { ReservationRequest } from '../types/reservation'
@@ -322,18 +323,19 @@ export const ChatPanel = () => {
         senderPubkey: nostrIdentity.publicKeyHex,
         giftWrap: giftWrapToMerchant,
       }
-      addOutgoingMessage(reservationMessage, restaurant.name || 'Unknown Restaurant', restaurant.npub)
+      const restaurantDisplayName = getRestaurantDisplayName(restaurant);
+      addOutgoingMessage(reservationMessage, restaurantDisplayName, restaurant.npub)
 
       // Show success message
       const confirmationMessage: ChatMessage = {
         role: 'assistant',
-        content: `Great! I've sent your reservation request to ${restaurant.name} for ${intent.partySize} people at ${new Date(intent.time!).toLocaleString()}.${intent.notes ? ` Note: "${intent.notes}"` : ''}\n\nYou'll receive a response from the restaurant shortly.`,
+        content: `Great! I've sent your reservation request to ${restaurantDisplayName} for ${intent.partySize} people at ${new Date(intent.time!).toLocaleString()}.${intent.notes ? ` Note: "${intent.notes}"` : ''}\n\nYou'll receive a response from the restaurant shortly.`,
       }
       setMessages((prev) => [...prev, confirmationMessage])
 
       toast({
         title: 'Reservation request sent',
-        description: `Sent to ${restaurant.name}`,
+        description: `Sent to ${restaurantDisplayName}`,
         status: 'success',
       })
     } catch (error) {
