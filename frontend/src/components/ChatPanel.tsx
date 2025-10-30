@@ -1014,6 +1014,24 @@ export const ChatPanel = () => {
             </InputRightElement>
           </InputGroup>
         </Box>
+
+        {/* Powered by Synvya branding */}
+        <Flex justify="center" pt={2}>
+          <Link
+            href="https://www.synvya.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            _hover={{ opacity: 0.7 }}
+            transition="opacity 0.2s"
+          >
+            <Image
+              src="/assets/powered-by-synvya.png"
+              alt="Powered by Synvya"
+              height="40px"
+              objectFit="contain"
+            />
+          </Link>
+        </Flex>
       </Flex>
 
     </Flex>
