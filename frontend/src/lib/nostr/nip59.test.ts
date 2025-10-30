@@ -27,7 +27,7 @@ describe("nip59", () => {
 
             const rumor = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "encrypted-content",
                     tags: [["p", keypair.publicKeyHex]],
                     created_at: Math.floor(Date.now() / 1000),
@@ -37,7 +37,7 @@ describe("nip59", () => {
 
             expect(rumor).toHaveProperty("id");
             expect(rumor).toHaveProperty("pubkey");
-            expect(rumor).toHaveProperty("kind", 32101);
+            expect(rumor).toHaveProperty("kind", 9901);
             expect(rumor).toHaveProperty("content", "encrypted-content");
             expect(rumor).not.toHaveProperty("sig"); // Rumors are unsigned
         });
@@ -47,7 +47,7 @@ describe("nip59", () => {
 
             const rumor1 = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "content-1",
                     tags: [],
                     created_at: 1000,
@@ -57,7 +57,7 @@ describe("nip59", () => {
 
             const rumor2 = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "content-2",
                     tags: [],
                     created_at: 1000,
@@ -76,7 +76,7 @@ describe("nip59", () => {
 
             const rumor = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "test",
                     tags: [],
                     created_at: Math.floor(Date.now() / 1000),
@@ -101,7 +101,7 @@ describe("nip59", () => {
 
             const rumor = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "test",
                     tags: [],
                     created_at: Math.floor(Date.now() / 1000),
@@ -129,7 +129,7 @@ describe("nip59", () => {
 
             const rumor = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "test",
                     tags: [],
                     created_at: Math.floor(Date.now() / 1000),
@@ -152,7 +152,7 @@ describe("nip59", () => {
 
             const wrap = wrapEvent(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "test-content",
                     tags: [["p", recipient.publicKeyHex]],
                     created_at: Math.floor(Date.now() / 1000),
@@ -176,7 +176,7 @@ describe("nip59", () => {
 
             const wrap = wrapEvent(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: originalContent,
                     tags: [["t", "test"]],
                     created_at: 1000,
@@ -224,7 +224,7 @@ describe("nip59", () => {
 
             const wrap = wrapEvent(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "for-bob-only",
                     tags: [],
                     created_at: Math.floor(Date.now() / 1000),
