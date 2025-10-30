@@ -1,4 +1,5 @@
 import type { SellerResult } from './api';
+import { getRestaurantDisplayName } from './restaurantName';
 
 /**
  * Represents a parsed reservation intent from natural language.
@@ -50,10 +51,19 @@ export function parseReservationIntent(
   }
 
   // Match restaurant from search context
+  // Try matching against display_name first, then fall back to name
   for (const result of searchContext) {
+    const displayName = getRestaurantDisplayName(result, '');
     const name = result.name || '';
-    if (name && message.toLowerCase().includes(name.toLowerCase())) {
-      intent.restaurantName = name;
+    
+    // Check if message includes the display name
+    if (displayName && message.toLowerCase().includes(displayName.toLowerCase())) {
+      intent.restaurantName = displayName;
+      break;
+    }
+    // Fall back to checking the raw name if display name didn't match
+    if (name && name !== displayName && message.toLowerCase().includes(name.toLowerCase())) {
+      intent.restaurantName = displayName; // Still use display name for consistency
       break;
     }
   }
