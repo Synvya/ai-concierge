@@ -168,7 +168,8 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
       setThreads((prev) => {
         // Find thread by extracting thread context
         const threadContext = getThreadContext(message.rumor as any); // Rumor extends UnsignedEvent but getThreadContext expects Event
-        const threadId = threadContext.rootId || message.giftWrap.id;
+        // Use rumor.id as threadId since that's what NIP-10 e-tags will reference
+        const threadId = threadContext.rootId || message.rumor.id;
 
         const existingThread = prev.find((t) => t.threadId === threadId);
 
@@ -251,7 +252,8 @@ function updateThreadWithMessage(
 
   // Extract thread context using NIP-10
   const threadContext = getThreadContext(message.rumor as any);
-  const threadId = threadContext.rootId || message.giftWrap.id;
+  // Use rumor.id as threadId since that's what NIP-10 e-tags will reference
+  const threadId = threadContext.rootId || message.rumor.id;
 
   console.log('[ReservationContext] Processing message:', {
     type: message.type,
@@ -261,36 +263,8 @@ function updateThreadWithMessage(
     availableThreads: threads.map(t => ({ id: t.threadId, name: t.restaurantName })),
   });
 
-  // Try to find existing thread by multiple methods:
-  // 1. Direct threadId match
-  // 2. Check if this rumor already exists in any thread (dedup across gift wraps)
-  // 3. For responses: check if replying to any message in a thread
-  let existingThread = threads.find((t) => t.threadId === threadId);
-  
-  if (!existingThread && message.type === 'request') {
-    // For Self CC requests: try to match by sender (us) and request details
-    const request = message.payload as ReservationRequest;
-    existingThread = threads.find((t) => 
-      t.request.partySize === request.party_size &&
-      t.request.isoTime === request.iso_time &&
-      Math.abs(t.lastUpdated - message.rumor.created_at) < 5 // Within 5 seconds
-    );
-    
-    if (existingThread) {
-      console.log('[ReservationContext] ✅ Matched Self CC request to existing thread:', existingThread.threadId);
-    }
-  }
-  
-  if (!existingThread && message.type === 'response' && threadContext.replyId) {
-    // For responses: check if replying to any message's rumor in a thread
-    existingThread = threads.find((t) =>
-      t.messages.some((m) => m.rumor.id === threadContext.replyId)
-    );
-    
-    if (existingThread) {
-      console.log('[ReservationContext] ✅ Matched response via reply-to tag:', existingThread.threadId);
-    }
-  }
+  // Find existing thread by threadId (rumor.id or rootId from e-tags)
+  const existingThread = threads.find((t) => t.threadId === threadId);
 
   if (existingThread) {
     // Update existing thread
