@@ -150,6 +150,43 @@ def _extract_seller_pubkeys(seller: dict[str, Any]) -> list[str]:
     return _normalize_pubkeys(candidates)
 
 
+def _enrich_meta_data_from_content(seller: dict[str, Any]) -> None:
+    """
+    Parse the content field (kind:0 Nostr profile) and merge it into meta_data.
+    This ensures display_name and other profile fields are available in meta_data.
+    
+    Modifies seller dict in place.
+    """
+    content_raw = seller.get("content")
+    if not content_raw:
+        return
+    
+    # Parse content if it's a JSON string
+    content: dict[str, Any] | None = None
+    if isinstance(content_raw, dict):
+        content = content_raw
+    elif isinstance(content_raw, str):
+        try:
+            parsed = json.loads(content_raw)
+            if isinstance(parsed, dict):
+                content = parsed
+        except json.JSONDecodeError:
+            return
+    
+    if not content:
+        return
+    
+    # Get existing meta_data or create new dict
+    meta_data = seller.get("meta_data")
+    if not isinstance(meta_data, dict):
+        meta_data = {}
+    
+    # Merge content into meta_data (content takes precedence for conflicts)
+    # This ensures display_name, name, and other profile fields are available
+    merged = {**meta_data, **content}
+    seller["meta_data"] = merged
+
+
 async def _fetch_sellers_by_public_keys(
     session: AsyncSession,
     public_keys: Sequence[str],
@@ -185,6 +222,8 @@ async def _fetch_sellers_by_public_keys(
         if not pubkeys:
             continue
         seller["normalized_pubkeys"] = pubkeys
+        # Enrich meta_data with content (kind:0 profile data)
+        _enrich_meta_data_from_content(seller)
         for key in pubkeys:
             seller_map[key] = seller
     return seller_map
@@ -228,6 +267,8 @@ async def search_sellers(
             continue
         pubkeys = _extract_seller_pubkeys(seller)
         seller["normalized_pubkeys"] = pubkeys
+        # Enrich meta_data with content (kind:0 profile data)
+        _enrich_meta_data_from_content(seller)
         sellers.append(seller)
         for pubkey in pubkeys:
             seller_pubkey_map[pubkey] = seller
@@ -490,6 +531,9 @@ async def get_seller_by_id(
     pubkeys = _extract_seller_pubkeys(seller)
     seller["normalized_pubkeys"] = pubkeys
     seller["npub"] = _extract_npub(pubkeys)
+    
+    # Enrich meta_data with content (kind:0 profile data)
+    _enrich_meta_data_from_content(seller)
 
     # Get listings
     if pubkeys:
