@@ -253,7 +253,44 @@ function updateThreadWithMessage(
   const threadContext = getThreadContext(message.rumor as any);
   const threadId = threadContext.rootId || message.giftWrap.id;
 
-  const existingThread = threads.find((t) => t.threadId === threadId);
+  console.log('[ReservationContext] Processing message:', {
+    type: message.type,
+    giftWrapId: message.giftWrap.id,
+    extractedThreadId: threadId,
+    rumorTags: message.rumor.tags,
+    availableThreads: threads.map(t => ({ id: t.threadId, name: t.restaurantName })),
+  });
+
+  // Try to find existing thread by multiple methods:
+  // 1. Direct threadId match
+  // 2. Check if this rumor already exists in any thread (dedup across gift wraps)
+  // 3. For responses: check if replying to any message in a thread
+  let existingThread = threads.find((t) => t.threadId === threadId);
+  
+  if (!existingThread && message.type === 'request') {
+    // For Self CC requests: try to match by sender (us) and request details
+    const request = message.payload as ReservationRequest;
+    existingThread = threads.find((t) => 
+      t.request.partySize === request.party_size &&
+      t.request.isoTime === request.iso_time &&
+      Math.abs(t.lastUpdated - message.rumor.created_at) < 5 // Within 5 seconds
+    );
+    
+    if (existingThread) {
+      console.log('[ReservationContext] ✅ Matched Self CC request to existing thread:', existingThread.threadId);
+    }
+  }
+  
+  if (!existingThread && message.type === 'response' && threadContext.replyId) {
+    // For responses: check if replying to any message's rumor in a thread
+    existingThread = threads.find((t) =>
+      t.messages.some((m) => m.rumor.id === threadContext.replyId)
+    );
+    
+    if (existingThread) {
+      console.log('[ReservationContext] ✅ Matched response via reply-to tag:', existingThread.threadId);
+    }
+  }
 
   if (existingThread) {
     // Update existing thread
@@ -297,13 +334,11 @@ function updateThreadWithMessage(
     }
 
     // Response without a matching thread - log warning and ignore
-    console.warn('Received response for unknown thread:', threadId);
-    console.warn('Available threads:', threads.map(t => t.threadId));
-    console.warn('Response details:', {
-      giftWrapId: message.giftWrap.id,
-      rumorTags: message.rumor.tags,
-      extractedThreadId: threadId,
-    });
+    console.warn('[ReservationContext] ⚠️ Received response for unknown thread');
+    console.warn('[ReservationContext] Response threadId:', threadId);
+    console.warn('[ReservationContext] Available threadIds:', threads.map(t => t.threadId));
+    console.warn('[ReservationContext] Response e-tags:', message.rumor.tags.filter(t => t[0] === 'e'));
+    console.warn('[ReservationContext] Full message:', message);
     return threads;
   }
 }
