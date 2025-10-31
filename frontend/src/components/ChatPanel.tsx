@@ -9,6 +9,7 @@ import {
   Image,
   Flex,
   FormControl,
+  FormHelperText,
   FormLabel,
   Heading,
   IconButton,
@@ -243,10 +244,14 @@ export const ChatPanel = () => {
 
   const sendReservationRequest = useCallback(async (
     restaurant: SellerResult,
-    intent: ReservationIntent
+    intent: ReservationIntent,
+    overrideContactInfo?: { name: string; phone: string }
   ) => {
+    // Use override contact info if provided (from modal submission), otherwise check stored contact info
+    const effectiveContactInfo = overrideContactInfo || contactInfo
+    
     // Check if we have contact info - if not, show modal
-    if (!hasContactInfo) {
+    if (!effectiveContactInfo) {
       setPendingReservation({ restaurant, intent })
       onContactModalOpen()
       return
@@ -283,8 +288,8 @@ export const ChatPanel = () => {
         party_size: intent.partySize!,
         iso_time: intent.time!,
         contact: {
-          name: contactInfo!.name,
-          phone: contactInfo!.phone,
+          name: effectiveContactInfo.name,
+          phone: effectiveContactInfo.phone,
         },
       }
       
@@ -380,7 +385,7 @@ export const ChatPanel = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [nostrIdentity, toast, addOutgoingMessage, hasContactInfo, contactInfo, onContactModalOpen])
+  }, [nostrIdentity, toast, addOutgoingMessage, contactInfo, onContactModalOpen, setPendingReservation])
 
   // Handler for saving contact info and proceeding with reservation
   const handleContactInfoSubmit = useCallback(() => {
@@ -393,8 +398,17 @@ export const ChatPanel = () => {
       return
     }
 
-    // Save contact info
-    setContactInfo({ name: tempName.trim(), phone: tempPhone.trim() })
+    // Normalize phone number (remove all non-digit characters except leading +)
+    const normalizedPhone = tempPhone.trim().replace(/^(\+)?(\d+)[\s\-\(\)]+/, '$1$2').replace(/[\s\-\(\)]/g, '')
+    
+    // Create contact info object
+    const newContactInfo = {
+      name: tempName.trim(),
+      phone: normalizedPhone
+    }
+    
+    // Save contact info to localStorage
+    setContactInfo(newContactInfo)
     
     // Close modal
     onContactModalClose()
@@ -403,9 +417,10 @@ export const ChatPanel = () => {
     setTempName('')
     setTempPhone('')
     
-    // Proceed with pending reservation if any
+    // Proceed with pending reservation if any, passing the new contact info directly
     if (pendingReservation) {
-      sendReservationRequest(pendingReservation.restaurant, pendingReservation.intent)
+      // Pass the contact info directly to avoid race condition with state updates
+      sendReservationRequest(pendingReservation.restaurant, pendingReservation.intent, newContactInfo)
       setPendingReservation(null)
     }
   }, [tempName, tempPhone, setContactInfo, onContactModalClose, pendingReservation, toast, sendReservationRequest])
@@ -1124,6 +1139,7 @@ export const ChatPanel = () => {
               <FormControl isRequired>
                 <FormLabel>Phone Number</FormLabel>
                 <Input
+                  type="tel"
                   placeholder="+1-555-1234"
                   value={tempPhone}
                   onChange={(e) => setTempPhone(e.target.value)}
@@ -1133,6 +1149,9 @@ export const ChatPanel = () => {
                     }
                   }}
                 />
+                <FormHelperText color="gray.500" fontSize="sm">
+                  Any format accepted: +14253942379, 425-394-2379, (425) 394-2379
+                </FormHelperText>
               </FormControl>
             </Stack>
           </ModalBody>
