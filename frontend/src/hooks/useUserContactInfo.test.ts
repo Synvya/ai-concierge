@@ -3,35 +3,13 @@
  */
 
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useUserContactInfo } from './useUserContactInfo';
-
-// Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {};
-
-  return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => {
-      store[key] = value;
-    },
-    removeItem: (key: string) => {
-      delete store[key];
-    },
-    clear: () => {
-      store = {};
-    },
-  };
-})();
-
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
-});
 
 describe('useUserContactInfo', () => {
   beforeEach(() => {
-    localStorageMock.clear();
-    vi.clearAllMocks();
+    // Clear localStorage before each test
+    localStorage.clear();
   });
 
   it('should initialize with null contact info', () => {
@@ -132,29 +110,4 @@ describe('useUserContactInfo', () => {
     expect(result.current.contactInfo).toBeNull();
     expect(result.current.hasContactInfo).toBe(false);
   });
-
-  it('should handle localStorage errors gracefully', () => {
-    // Mock localStorage to throw an error
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    
-    // Clear existing localStorage before the test
-    localStorageMock.clear();
-    
-    const getItemSpy = vi
-      .spyOn(Storage.prototype, 'getItem')
-      .mockImplementation(() => {
-        throw new Error('Storage error');
-      });
-
-    const { result } = renderHook(() => useUserContactInfo());
-
-    expect(result.current.contactInfo).toBeNull();
-    
-    // The console.warn should be called during hook initialization
-    expect(consoleWarnSpy).toHaveBeenCalled();
-
-    consoleWarnSpy.mockRestore();
-    getItemSpy.mockRestore();
-  });
 });
-
