@@ -332,7 +332,7 @@ describe("reservationMessenger", () => {
             expect(onMessage).not.toHaveBeenCalled();
             expect(onError).not.toHaveBeenCalled(); // Error should NOT be reported
             expect(consoleDebugSpy).toHaveBeenCalledWith(
-                'Skipping gift wrap not encrypted for us (expected with Self CC)'
+                '[ReservationMessenger] Skipping gift wrap not encrypted for us (expected with Self CC)'
             );
 
             consoleDebugSpy.mockRestore();
