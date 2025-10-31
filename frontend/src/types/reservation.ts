@@ -59,10 +59,8 @@ export interface ReservationResponse {
     iso_time?: string | null;
     /** Optional message to the requester */
     message?: string;
-    /** Optional table identifier */
+    /** Optional table identifier (only for confirmed status) */
     table?: string | null;
-    /** When a soft hold expires (if applicable) */
-    hold_expires_at?: string | null;
 }
 
 /**

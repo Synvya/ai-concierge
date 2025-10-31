@@ -35,15 +35,7 @@
         "string",
         "null"
       ],
-      "description": "Optional table identifier"
-    },
-    "hold_expires_at": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "format": "date-time",
-      "description": "If a soft hold is placed, when it expires"
+      "description": "Optional table identifier (only for confirmed status)"
     }
   },
   "allOf": [
