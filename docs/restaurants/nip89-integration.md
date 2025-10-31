@@ -18,36 +18,36 @@ Declares support for reservation event kinds:
   "pubkey": "<restaurant_pubkey>",
   "tags": [
     ["d", "synvya-restaurants-v1.0"],
-    ["k", "32101"],  // reservation.request
-    ["k", "32102"],  // reservation.response
+    ["k", "9901"],  // reservation.request
+    ["k", "9902"],  // reservation.response
     ["alt", "Synvya Restaurants Handler v1.0"]
   ],
   "content": ""
 }
 ```
 
-#### 2. Handler Recommendation for 32101 (kind 31989)
+#### 2. Handler Recommendation for 9901 (kind 31989)
 Recommends the handler for processing reservation requests:
 ```json
 {
   "kind": 31989,
   "pubkey": "<restaurant_pubkey>",
   "tags": [
-    ["d", "32101"],
+    ["d", "9901"],
     ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]
   ],
   "content": ""
 }
 ```
 
-#### 3. Handler Recommendation for 32102 (kind 31989)
+#### 3. Handler Recommendation for 9902 (kind 31989)
 Recommends the handler for processing reservation responses:
 ```json
 {
   "kind": 31989,
   "pubkey": "<restaurant_pubkey>",
   "tags": [
-    ["d", "32102"],
+    ["d", "9902"],
     ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]
   ],
   "content": ""
@@ -59,7 +59,7 @@ Recommends the handler for processing reservation responses:
 When searching for restaurants, the backend:
 
 1. **Queries Nostr relays** for kind 31989 events
-2. **Filters by author** (restaurant npub) and `d:32101`
+2. **Filters by author** (restaurant npub) and `d:9901`
 3. **Sets flag** `supports_reservations: true` if handler found
 4. **Returns results** to frontend with capability flag
 
@@ -72,7 +72,7 @@ Frontend displays the **"🪄 Book via Concierge"** badge for restaurants with `
 filters = {
     "kinds": [31989],
     "authors": [restaurant_hex_pubkey],
-    "#d": ["32101"]  # Looking for reservation.request handlers
+    "#d": ["9901"]  # Looking for reservation.request handlers
 }
 
 # If any events returned, restaurant supports reservations
@@ -90,8 +90,8 @@ filters = {
 ┌──────────────────────────────────────┐
 │  Auto-publish NIP-89 Handler Events  │
 │  • kind 31990 (handler info)         │
-│  • kind 31989 (d:32101 recommendation)│
-│  • kind 31989 (d:32102 recommendation)│
+│  • kind 31989 (d:9901 recommendation)│
+│  • kind 31989 (d:9902 recommendation)│
 └──────────────┬───────────────────────┘
                │
                ↓
@@ -106,7 +106,7 @@ filters = {
        │   Backend    │
        └──────┬───────┘
               │
-              │ Query: kind 31989, #d:32101
+              │ Query: kind 31989, #d:9901
               ↓
        ┌──────────────┐
        │  Check Cache │
@@ -183,7 +183,7 @@ Multiple restaurants checked in a single relay request:
 filters = {
     "kinds": [31989],
     "authors": [npub1_hex, npub2_hex, npub3_hex, ...],  # Multiple authors
-    "#d": ["32101"]
+    "#d": ["9901"]
 }
 ```
 
@@ -385,8 +385,8 @@ npm run dev -- --host 127.0.0.1 --port 3000
    ```
    ✅ Published kind 0 profile
    ✅ Published kind 31990 handler info
-   ✅ Published kind 31989 recommendation (d:32101)
-   ✅ Published kind 31989 recommendation (d:32102)
+   ✅ Published kind 31989 recommendation (d:9901)
+   ✅ Published kind 31989 recommendation (d:9902)
    ```
 
 #### Step 3: Verify Events on Relay
@@ -397,12 +397,12 @@ Use a Nostr client (e.g., [Snort.social](https://snort.social)) or CLI:
 nostr-cli fetch --relay wss://relay.damus.io \
   --kind 31989 \
   --author <restaurant_pubkey> \
-  --tag d 32101
+  --tag d 9901
 
 # Expected output:
 # Found 1 event(s)
 # Event ID: abc123...
-# Tags: [["d", "32101"], ["a", "31990:..."], ...]
+# Tags: [["d", "9901"], ["a", "31990:..."], ...]
 ```
 
 #### Step 4: Test AI Concierge Discovery
@@ -431,7 +431,7 @@ async def test_check_handlers_with_valid_npub():
     with mock_relay_events([{
         "kind": 31989,
         "pubkey": "abc123...",
-        "tags": [["d", "32101"]]
+        "tags": [["d", "9901"]]
     }]):
         result = await pool.check_handlers(["npub1test"])
         assert result["npub1test"] is True
@@ -498,7 +498,7 @@ def test_supports_reservations_true_for_restaurants_with_handlers():
     """Restaurant with NIP-89 handler flagged correctly"""
     # Mock relay to return handler events
     with mock_relay_events([
-        {"kind": 31989, "pubkey": "...", "tags": [["d", "32101"]]}
+        {"kind": 31989, "pubkey": "...", "tags": [["d", "9901"]]}
     ]):
         results = search_sellers(query="Mario's Pizza")
         mario = next(r for r in results if "Mario" in r["name"])
@@ -526,7 +526,7 @@ async def check_restaurant_handlers(npub: str):
     hex_pubkey = pubkey.to_hex()
     
     # Query for handler recommendations
-    filter_31989 = Filter().kind(31989).author(hex_pubkey).custom_tag("d", ["32101"])
+    filter_31989 = Filter().kind(31989).author(hex_pubkey).custom_tag("d", ["9901"])
     events = await client.get_events([filter_31989], timeout=5.0)
     
     print(f"Found {len(events)} handler events for {npub}")
@@ -618,7 +618,7 @@ websocat wss://relay.damus.io
 #### Verify Handler Events Exist
 ```bash
 # Using nak (Nostr Army Knife)
-nak req -k 31989 -a <restaurant_hex_pubkey> --tag d=32101 wss://relay.damus.io
+nak req -k 31989 -a <restaurant_hex_pubkey> --tag d=9901 wss://relay.damus.io
 
 # Expected: Returns at least one event with matching tags
 ```

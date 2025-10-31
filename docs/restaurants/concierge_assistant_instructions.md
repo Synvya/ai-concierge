@@ -14,8 +14,8 @@ You are helping build the **Synvya AI Concierge**, the agent that:
 
 | Action | Event Kind | Description |
 |--------|-------------|--------------|
-| Send reservation request | `32101` | Request to restaurant |
-| Receive reservation response | `32102` | Restaurant reply |
+| Send reservation request | `9901` | Request to restaurant |
+| Receive reservation response | `9902` | Restaurant reply |
 | Receive confirmed calendar | `31923` | NIP-52 event from restaurant |
 | Send RSVP | `31925` | Confirmation of booking |
 | Store confirmed events | `31924` | User calendar |
@@ -68,7 +68,7 @@ const restaurantPubkeys = restaurants.map(e => e.pubkey);
 const recommendations = await pool.querySync(relays, {
   kinds: [31989],
   authors: restaurantPubkeys,
-  "#d": ["32101"]  // Looking for reservation.request handlers
+  "#d": ["9901"]  // Looking for reservation.request handlers
 });
 
 // Build a Set of restaurants that support reservations
@@ -115,7 +115,7 @@ for (const rec of recommendations) {
         .map(t => t[1]);
       
       console.log(`Restaurant ${pubkey} supports: ${supportedKinds.join(", ")}`);
-      // Expected: ["32101", "32102"]
+      // Expected: ["9901", "9902"]
     }
   }
 }
@@ -132,33 +132,33 @@ Restaurants that support reservations publish three events:
      "pubkey": "<restaurant_pubkey>",
      "tags": [
        ["d", "synvya-restaurants-v1.0"],
-       ["k", "32101"],
-       ["k", "32102"]
+       ["k", "9901"],
+       ["k", "9902"]
      ],
      "content": ""
    }
    ```
 
-2. **Handler Recommendation for 32101 (kind 31989)**
+2. **Handler Recommendation for 9901 (kind 31989)**
    ```json
    {
      "kind": 31989,
      "pubkey": "<restaurant_pubkey>",
      "tags": [
-       ["d", "32101"],
+       ["d", "9901"],
        ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "wss://relay.damus.io", "all"]
      ],
      "content": ""
    }
    ```
 
-3. **Handler Recommendation for 32102 (kind 31989)**
+3. **Handler Recommendation for 9902 (kind 31989)**
    ```json
    {
      "kind": 31989,
      "pubkey": "<restaurant_pubkey>",
      "tags": [
-       ["d", "32102"],
+       ["d", "9902"],
        ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "wss://relay.damus.io", "all"]
      ],
      "content": ""
@@ -184,7 +184,7 @@ Restaurants that support reservations publish three events:
 ## Sending a Reservation Request
 
 1. **Create Rumor**
-   - Unsigned event `kind:32101` containing encrypted payload (NIP-44):
+   - Unsigned event `kind:9901` containing encrypted payload (NIP-44):
      ```json
      {
        "party_size": 2,
@@ -209,7 +209,7 @@ Restaurants that support reservations publish three events:
 
 1. **Receive Gift Wrap (`kind:1059`)**
    - Addressed to Concierge’s pubkey.
-   - Unwrap → decrypt → extract rumor (`kind:32102`).
+   - Unwrap → decrypt → extract rumor (`kind:9902`).
 
 2. **Parse Payload**
    ```json
@@ -265,11 +265,11 @@ User → Concierge → Restaurant
 
 1. Concierge sends Gift Wrap(1059)
    └─ Seal(13)
-       └─ Rumor(32101)
+       └─ Rumor(9901)
 
 2. Restaurant replies Gift Wrap(1059)
    └─ Seal(13)
-       └─ Rumor(32102)
+       └─ Rumor(9902)
 
 3. Repeat until agreement.
 

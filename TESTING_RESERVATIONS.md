@@ -42,7 +42,7 @@ You should see:
 ## Test Scenario 2: Receive a Reservation Response (Simulated)
 
 ### Background:
-When a restaurant responds to your reservation via Nostr (kind 32102 event), the frontend subscription automatically detects it and shows notifications.
+When a restaurant responds to your reservation via Nostr (kind 9902 event), the frontend subscription automatically detects it and shows notifications.
 
 ### Notification Types You Should See:
 
@@ -75,7 +75,7 @@ When a restaurant responds to your reservation via Nostr (kind 32102 event), the
 - **Description**: "Your reservation at [Restaurant] was cancelled"
 
 ### How to Test with Real Restaurant:
-1. The restaurant needs to publish a kind 32102 Nostr event (reservation response)
+1. The restaurant needs to publish a kind 9902 Nostr event (reservation response)
 2. The event must be a NIP-59 gift wrap addressed to your public key
 3. The frontend subscription will automatically detect and display it
 

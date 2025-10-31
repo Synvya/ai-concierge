@@ -1,10 +1,10 @@
 {
-  "kind": 32102,
+  "kind": 9901,
   "created_at": 1760724793,
   "tags": [
     [
       "a",
-      "32102:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:"
+      "9901:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:"
     ],
     [
       "p",
@@ -14,8 +14,9 @@
       "e",
       "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "wss://relay.example.com",
-      "reply"
+      "root"
     ]
   ],
-  "content": "NIP44:ciphertext-placeholder-for-reservation-response"
+  "content": "NIP44:ciphertext-placeholder-for-reservation-request"
 }
+

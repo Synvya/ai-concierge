@@ -2,8 +2,8 @@
 
 ## Summary
 
-Reservation requests now use **kind 9901** (changed from 32101).  
-Reservation responses now use **kind 9902** (changed from 32102).
+Reservation requests now use **kind 9901** (changed from 9901).  
+Reservation responses now use **kind 9902** (changed from 9902).
 
 This document describes the complete format for restaurants to receive and process reservation requests.
 
@@ -209,9 +209,9 @@ function sendReservationResponse(
 ## Key Changes from Previous Version
 
 1. **Kind numbers changed**:
-   - Reservation requests: 32101 → **9901**
-   - Reservation responses: 32102 → **9902**
-   - NIP-89 discovery: d:32101 → **d:9901**
+   - Reservation requests: 9901 → **9901**
+   - Reservation responses: 9902 → **9902**
+   - NIP-89 discovery: d:9901 → **d:9901**
 
 2. **New contact fields** (Issue #61):
    - `contact.name`: Guest's full name

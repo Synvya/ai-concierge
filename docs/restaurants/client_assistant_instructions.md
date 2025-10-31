@@ -13,8 +13,8 @@ You are helping build the **Synvya Client** — the application used by restaura
 
 | Action | Event Kind | Description |
 |--------|-------------|--------------|
-| Receive reservation request | `32101` | Reservation inquiry from AI Concierge |
-| Send reservation response | `32102` | Confirmation or counter-offer |
+| Receive reservation request | `9901` | Reservation inquiry from AI Concierge |
+| Send reservation response | `9902` | Confirmation or counter-offer |
 | Send calendar event | `31923` | Time-based event (NIP-52) |
 | Store confirmed reservation | `31924` | Business calendar (NIP-52) |
 | Receive RSVP | `31925` | Confirmation from user (NIP-52) |
@@ -27,7 +27,7 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 
 1. **Receive Gift Wrap (`kind:1059`)**
    - Addressed to the business pubkey.
-   - Decrypt per NIP-59 → extract the `kind:13` seal → extract the rumor (`kind:32101`).
+   - Decrypt per NIP-59 → extract the `kind:13` seal → extract the rumor (`kind:9901`).
 
 2. **Decrypt Rumor Payload (NIP-44)**
    ```json
@@ -47,7 +47,7 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 ## How to Send a Reservation Response
 
 1. **Create Rumor**
-   - Unsigned event `kind:32102` with encrypted payload:
+   - Unsigned event `kind:9902` with encrypted payload:
      ```json
      {
        "status": "suggested",
@@ -94,13 +94,13 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 ## Example Flow
 
 ```
-Gift Wrap (1059) → Seal (13) → Rumor (32101)
+Gift Wrap (1059) → Seal (13) → Rumor (9901)
                                   ↓
                               Decrypt (NIP-44)
                                   ↓
                       Display message + reply
                                   ↓
-Gift Wrap (1059) → Seal (13) → Rumor (32102)
+Gift Wrap (1059) → Seal (13) → Rumor (9902)
 ```
 
 ---
@@ -164,7 +164,7 @@ npm run build         # Build for production
 
 ### Calendar Events (NIP-52)
 - Calendar events (kinds 31923, 31924, 31925) **not yet implemented**
-- Phase 1 focuses on message-based negotiation only (32101/32102)
+- Phase 1 focuses on message-based negotiation only (9901/9902)
 - Confirmed reservations stored in local React state only
 - **Phase 2 will add calendar integration for finalized bookings**
 
@@ -186,7 +186,7 @@ client/src/
 │   ├── nip59.ts              # NIP-59 gift wrap utilities
 │   ├── nip10.ts              # NIP-10 threading
 │   ├── nip13.ts              # NIP-13 proof of work (library only)
-│   ├── reservationEvents.ts  # Build/parse 32101/32102
+│   ├── reservationEvents.ts  # Build/parse 9901/9902
 │   └── relayPool.ts          # Relay connection management
 ├── services/
 │   └── reservationService.ts # Subscription and message handling
@@ -200,12 +200,12 @@ client/src/
 ```
 
 ### Key Functions
-- `buildReservationRequest()`: Create encrypted 32101 rumor
-- `buildReservationResponse()`: Create encrypted 32102 rumor
+- `buildReservationRequest()`: Create encrypted 9901 rumor
+- `buildReservationResponse()`: Create encrypted 9902 rumor
 - `wrapEvent()`: Wrap rumor in NIP-59 gift wrap
 - `unwrapEvent()`: Unwrap and decrypt gift wrap
-- `parseReservationRequest()`: Parse and validate 32101
-- `parseReservationResponse()`: Parse and validate 32102
+- `parseReservationRequest()`: Parse and validate 9901
+- `parseReservationResponse()`: Parse and validate 9902
 
 ---
 

@@ -114,10 +114,10 @@ User: "Book a table for 2 at Smoothies & Muffins tomorrow at 3pm"
 6. Adds message to `reservationThreads`
 
 ### **Step 5: Restaurant Responds** (via Nostr)
-Restaurant publishes kind 32102 event (reservation response):
+Restaurant publishes kind 9902 event (reservation response):
 ```json
 {
-  "kind": 32102,
+  "kind": 9902,
   "content": "{\"status\":\"confirmed\",\"iso_time\":\"2025-10-25T15:00:00-07:00\",\"table\":\"5\"}",
   ...
 }
@@ -125,7 +125,7 @@ Restaurant publishes kind 32102 event (reservation response):
 
 ### **Step 6: Frontend Receives & Notifies** ⭐ NEW
 1. `ReservationSubscription` receives gift wrap event
-2. Unwraps and decrypts rumor (kind 32102)
+2. Unwraps and decrypts rumor (kind 9902)
 3. Validates and parses response payload
 4. Updates thread status to "confirmed"
 5. `ChatPanel` useEffect detects new response

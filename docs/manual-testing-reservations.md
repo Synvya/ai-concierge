@@ -65,13 +65,13 @@ npm run dev
 9. Switch to Business Client test harness
 10. Verify: New gift wrap event received (kind 1059)
 11. Unwrap and decrypt the message
-12. Confirm: Decrypted payload shows kind 32101 (reservation request) with:
+12. Confirm: Decrypted payload shows kind 9901 (reservation request) with:
     - `party_size`: 4
     - `iso_time`: (appropriate datetime)
     - Correct NIP-10 threading tags
 
 **Response Flow**:
-13. In Business Client, send a confirmation response (kind 32102)
+13. In Business Client, send a confirmation response (kind 9902)
 14. Back in AI Concierge, check Reservations tab
 15. Verify:
     - Thread status updates to "Confirmed" (may take a few seconds for relay propagation)

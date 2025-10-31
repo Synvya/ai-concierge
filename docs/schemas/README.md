@@ -18,8 +18,8 @@ schemas/
 │   ├── calendar.31923.example.json
 │   ├── calendar.31924.example.json
 │   ├── calendar.31925.rsvp.example.json
-│   ├── nostr.rumor.32101.example.json
-│   ├── nostr.rumor.32102.example.json
+│   ├── nostr.rumor.9901.example.json
+│   ├── nostr.rumor.9902.example.json
 │   ├── nostr.seal.kind13.example.json
 │   └── nostr.giftwrap.kind1059.example.json
 ├── reservation.request.schema.json

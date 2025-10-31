@@ -13,7 +13,7 @@
   "properties": {
     "kind": {
       "type": "integer",
-      "description": "e.g., 32101, 32102, 31923, 31924, 31925"
+      "description": "e.g., 9901, 9902, 31923, 31924, 31925"
     },
     "created_at": {
       "type": "integer",

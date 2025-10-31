@@ -22,8 +22,8 @@ This design avoids fragmented API integrations and builds a **universal agent-to
 
 3. **Event Kind Definitions**
    - App-specific kinds (in the **30000–30999** range) are assigned as:
-     - `kind:32101` — `reservation.request`
-     - `kind:32102` — `reservation.response`
+     - `kind:9901` — `reservation.request`
+     - `kind:9902` — `reservation.response`
    - Calendar messages (NIP-52) are also exchanged via NIP-59 wrapping.
 
 4. **NIP References**
@@ -48,18 +48,18 @@ Before AI agents can send reservation requests, they must **discover which resta
 When a restaurant with `businessType === "restaurant"` publishes their profile, three additional events are automatically published:
 
 1. **Handler Information (kind 31990)**
-   - Declares support for `kind:32101` (reservation.request) and `kind:32102` (reservation.response)
+   - Declares support for `kind:9901` (reservation.request) and `kind:9902` (reservation.response)
    - Tagged with `["d", "synvya-restaurants-v1.0"]` for identification
    - Content is empty (refer to kind 0 profile for restaurant metadata)
 
-2. **Handler Recommendation for 32101 (kind 31989)**
+2. **Handler Recommendation for 9901 (kind 31989)**
    - Recommends the restaurant's 31990 handler for processing reservation requests
-   - Tagged with `["d", "32101"]`
+   - Tagged with `["d", "9901"]`
    - Includes `["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]`
 
-3. **Handler Recommendation for 32102 (kind 31989)**
+3. **Handler Recommendation for 9902 (kind 31989)**
    - Recommends the restaurant's 31990 handler for processing reservation responses
-   - Tagged with `["d", "32102"]`
+   - Tagged with `["d", "9902"]`
    - Includes same `a` tag format as above
 
 ### Publishing Lifecycle
@@ -83,7 +83,7 @@ const restaurantPubkeys = restaurants.map(e => e.pubkey);
 const recommendations = await pool.querySync(relays, {
   kinds: [31989],
   authors: restaurantPubkeys,
-  "#d": ["32101"]  // Looking for reservation.request handlers
+  "#d": ["9901"]  // Looking for reservation.request handlers
 });
 
 // Step 3: (Optional) Fetch detailed handler information
@@ -116,7 +116,7 @@ for (const rec of recommendations) {
 ### Reservation Request
 
 1. **Create a rumor**
-   - Unsigned event of `kind:32101` containing the reservation request payload.
+   - Unsigned event of `kind:9901` containing the reservation request payload.
    - Payload encrypted with **NIP-44**.
 
 2. **Seal the rumor**
@@ -128,7 +128,7 @@ for (const rec of recommendations) {
 ### Reservation Response
 
 1. **Create a rumor**
-   - Unsigned event of `kind:32102` containing the reservation response payload.
+   - Unsigned event of `kind:9902` containing the reservation response payload.
 
 2. **Seal the rumor**
    - Create a `kind:13` seal event containing the rumor.
@@ -162,10 +162,10 @@ Do **not** use the deprecated `d` tag for addressable identification.
 ## End-to-End Flow Summary
 
 1. **AI Concierge → Restaurant**
-   - Sends `reservation.request` (`kind:32101`) wrapped via NIP-59.
+   - Sends `reservation.request` (`kind:9901`) wrapped via NIP-59.
 
 2. **Restaurant ↔ Concierge**
-   - Exchanges `reservation.response` (`kind:32102`) via NIP-59, threaded with NIP-10.
+   - Exchanges `reservation.response` (`kind:9902`) via NIP-59, threaded with NIP-10.
 
 3. **Restaurant → Concierge**
    - Sends confirmed **NIP-52 calendar event** (`kind:31923`), wrapped via NIP-59.

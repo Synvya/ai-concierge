@@ -414,7 +414,7 @@ describe("reservationEvents", () => {
 
         it("throws on wrong event kind", () => {
             const mockRumor = {
-                kind: 9901, // Wrong kind (should be 32102)
+                kind: 9901, // Wrong kind (should be 9902)
                 content: "encrypted",
                 pubkey: "pubkey",
             };
