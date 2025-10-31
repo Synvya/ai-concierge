@@ -49,7 +49,7 @@ describe('ReservationContext', () => {
 
     const mockMessage: ReservationMessage = {
       rumor: {
-        kind: 32101,
+        kind: 9901,
         content: '{"party_size":2,"iso_time":"2025-10-25T15:00:00Z"}',
         created_at: Math.floor(Date.now() / 1000),
         pubkey: 'test-pubkey-hex',
@@ -103,7 +103,7 @@ describe('ReservationContext', () => {
     // First add a request
     const requestMessage: ReservationMessage = {
       rumor: {
-        kind: 32101,
+        kind: 9901,
         content: '{"party_size":2,"iso_time":"2025-10-25T15:00:00Z"}',
         created_at: Math.floor(Date.now() / 1000),
         pubkey: 'test-pubkey-hex',
@@ -143,7 +143,7 @@ describe('ReservationContext', () => {
     // Now simulate receiving a confirmed response
     const responseMessage: ReservationMessage = {
       rumor: {
-        kind: 32102,
+        kind: 9902,
         content: '{"status":"confirmed","iso_time":"2025-10-25T15:00:00Z","table":"5"}',
         created_at: Math.floor(Date.now() / 1000) + 60,
         pubkey: 'restaurant-pubkey',
@@ -191,7 +191,7 @@ describe('ReservationContext', () => {
     // Add first reservation
     const message1: ReservationMessage = {
       rumor: {
-        kind: 32101,
+        kind: 9901,
         content: '{"party_size":2,"iso_time":"2025-10-25T15:00:00Z"}',
         created_at: Math.floor(Date.now() / 1000),
         pubkey: 'test-pubkey-hex',
@@ -216,7 +216,7 @@ describe('ReservationContext', () => {
     // Add second reservation
     const message2: ReservationMessage = {
       rumor: {
-        kind: 32101,
+        kind: 9901,
         content: '{"party_size":4,"iso_time":"2025-10-26T19:00:00Z"}',
         created_at: Math.floor(Date.now() / 1000) + 100,
         pubkey: 'test-pubkey-hex',
@@ -280,7 +280,7 @@ describe('ReservationContext', () => {
 
     const mockMessage: ReservationMessage = {
       rumor: {
-        kind: 32101,
+        kind: 9901,
         content: '{"party_size":3,"iso_time":"2025-10-28T18:00:00Z"}',
         created_at: Math.floor(Date.now() / 1000),
         pubkey: 'test-pubkey-hex',
@@ -375,7 +375,7 @@ describe('ReservationContext', () => {
         messages: [
           {
             rumor: {
-              kind: 32101,
+              kind: 9901,
               content: '{"party_size":2,"iso_time":"2025-10-30T20:00:00Z"}',
               created_at: Math.floor(Date.now() / 1000) - 1000,
               pubkey: 'test-pubkey',

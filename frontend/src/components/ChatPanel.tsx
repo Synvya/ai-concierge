@@ -8,12 +8,21 @@ import {
   CardBody,
   Image,
   Flex,
+  FormControl,
+  FormLabel,
   Heading,
   IconButton,
   Input,
   InputGroup,
   InputRightElement,
   Link,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
   Spinner,
   Stack,
   Tag,
@@ -23,12 +32,14 @@ import {
   Wrap,
   WrapItem,
   useToast,
+  useDisclosure,
   Icon,
 } from '@chakra-ui/react'
 import { ArrowForwardIcon } from '@chakra-ui/icons'
 
 import { useClientIds } from '../hooks/useClientIds'
 import { useNostrIdentity } from '../hooks/useNostrIdentity'
+import { useUserContactInfo } from '../hooks/useUserContactInfo'
 import { useReservations } from '../contexts/ReservationContext'
 import type {
   ChatMessage,
@@ -112,6 +123,7 @@ const initialMessages: ChatMessage[] = [
 export const ChatPanel = () => {
   const { visitorId, sessionId, resetSession } = useClientIds()
   const nostrIdentity = useNostrIdentity()
+  const { contactInfo, setContactInfo, hasContactInfo } = useUserContactInfo()
   const { addOutgoingMessage, threads: reservationThreads } = useReservations()
   const toast = useToast()
   const [inputValue, setInputValue] = useState('')
@@ -123,6 +135,15 @@ export const ChatPanel = () => {
     status: 'idle' | 'pending' | 'granted' | 'denied'
   }>({ status: 'idle' })
   const processedResponsesRef = useRef<Set<string>>(new Set())
+  
+  // Contact info modal state
+  const { isOpen: isContactModalOpen, onOpen: onContactModalOpen, onClose: onContactModalClose } = useDisclosure()
+  const [tempName, setTempName] = useState('')
+  const [tempPhone, setTempPhone] = useState('')
+  const [pendingReservation, setPendingReservation] = useState<{
+    restaurant: SellerResult;
+    intent: ReservationIntent;
+  } | null>(null)
 
   // Read cached location from session storage if present
   useEffect(() => {
@@ -224,6 +245,13 @@ export const ChatPanel = () => {
     restaurant: SellerResult,
     intent: ReservationIntent
   ) => {
+    // Check if we have contact info - if not, show modal
+    if (!hasContactInfo) {
+      setPendingReservation({ restaurant, intent })
+      onContactModalOpen()
+      return
+    }
+
     if (!nostrIdentity) {
       toast({
         title: 'Nostr keys not available',
@@ -250,10 +278,14 @@ export const ChatPanel = () => {
         throw new Error('Invalid restaurant public key')
       }
 
-      // Build reservation request
+      // Build reservation request with contact info
       const request: ReservationRequest = {
         party_size: intent.partySize!,
         iso_time: intent.time!,
+        contact: {
+          name: contactInfo!.name,
+          phone: contactInfo!.phone,
+        },
       }
       
       // Only include notes if it's a non-empty string
@@ -348,7 +380,35 @@ export const ChatPanel = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [nostrIdentity, toast, addOutgoingMessage])
+  }, [nostrIdentity, toast, addOutgoingMessage, hasContactInfo, contactInfo, onContactModalOpen])
+
+  // Handler for saving contact info and proceeding with reservation
+  const handleContactInfoSubmit = useCallback(() => {
+    if (!tempName.trim() || !tempPhone.trim()) {
+      toast({
+        title: 'Required fields',
+        description: 'Please enter both your name and phone number.',
+        status: 'warning',
+      })
+      return
+    }
+
+    // Save contact info
+    setContactInfo({ name: tempName.trim(), phone: tempPhone.trim() })
+    
+    // Close modal
+    onContactModalClose()
+    
+    // Clear temp values
+    setTempName('')
+    setTempPhone('')
+    
+    // Proceed with pending reservation if any
+    if (pendingReservation) {
+      sendReservationRequest(pendingReservation.restaurant, pendingReservation.intent)
+      setPendingReservation(null)
+    }
+  }, [tempName, tempPhone, setContactInfo, onContactModalClose, pendingReservation, toast, sendReservationRequest])
 
   const handleChatResponse = useCallback(async (payload: ChatResponse) => {
     // Only add assistant message if there's actual content or no reservation action
@@ -1037,6 +1097,59 @@ export const ChatPanel = () => {
         </Flex>
       </Flex>
 
+      {/* Contact Info Modal */}
+      <Modal isOpen={isContactModalOpen} onClose={onContactModalClose} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Contact Information</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Stack spacing={4}>
+              <Text color="gray.600">
+                Please provide your contact information for the reservation. This will be securely stored and included in future reservation requests.
+              </Text>
+              <FormControl isRequired>
+                <FormLabel>Name</FormLabel>
+                <Input
+                  placeholder="Your full name"
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && tempName.trim() && tempPhone.trim()) {
+                      handleContactInfoSubmit()
+                    }
+                  }}
+                />
+              </FormControl>
+              <FormControl isRequired>
+                <FormLabel>Phone Number</FormLabel>
+                <Input
+                  placeholder="+1-555-1234"
+                  value={tempPhone}
+                  onChange={(e) => setTempPhone(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && tempName.trim() && tempPhone.trim()) {
+                      handleContactInfoSubmit()
+                    }
+                  }}
+                />
+              </FormControl>
+            </Stack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onContactModalClose}>
+              Cancel
+            </Button>
+            <Button 
+              colorScheme="purple" 
+              onClick={handleContactInfoSubmit}
+              isDisabled={!tempName.trim() || !tempPhone.trim()}
+            >
+              Continue
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Flex>
   )
 }

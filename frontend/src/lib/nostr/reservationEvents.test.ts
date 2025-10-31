@@ -210,7 +210,7 @@ describe("reservationEvents", () => {
                 recipient.publicKeyHex
             );
 
-            expect(template.kind).toBe(32101);
+            expect(template.kind).toBe(9901);
             expect(template.content).toBeTruthy();
             expect(template.content).not.toContain("party_size"); // Encrypted
             expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
@@ -271,7 +271,7 @@ describe("reservationEvents", () => {
                 recipient.publicKeyHex
             );
 
-            expect(template.kind).toBe(32102);
+            expect(template.kind).toBe(9902);
             expect(template.content).toBeTruthy();
             expect(template.content).not.toContain("confirmed"); // Encrypted
             expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
@@ -335,7 +335,7 @@ describe("reservationEvents", () => {
 
             // Parse (in real world this would be a rumor from unwrapEvent)
             const mockRumor = {
-                kind: 32101,
+                kind: 9901,
                 content: rumor.content,
                 pubkey: sender.publicKeyHex,
             };
@@ -355,7 +355,7 @@ describe("reservationEvents", () => {
             };
 
             expect(() => parseReservationRequest(mockRumor, "privatekey")).toThrow(
-                "Expected kind 32101"
+                "Expected kind 9901"
             );
         });
 
@@ -367,7 +367,7 @@ describe("reservationEvents", () => {
             const encrypted = JSON.stringify({ party_size: 0 }); // Invalid
 
             const mockRumor = {
-                kind: 32101,
+                kind: 9901,
                 content: encrypted, // Not encrypted for test
                 pubkey: sender.publicKeyHex,
             };
@@ -399,7 +399,7 @@ describe("reservationEvents", () => {
 
             // Parse
             const mockRumor = {
-                kind: 32102,
+                kind: 9902,
                 content: rumor.content,
                 pubkey: sender.publicKeyHex,
             };
@@ -414,13 +414,13 @@ describe("reservationEvents", () => {
 
         it("throws on wrong event kind", () => {
             const mockRumor = {
-                kind: 32101, // Wrong kind (should be 32102)
+                kind: 9901, // Wrong kind (should be 32102)
                 content: "encrypted",
                 pubkey: "pubkey",
             };
 
             expect(() => parseReservationResponse(mockRumor, "privatekey")).toThrow(
-                "Expected kind 32102"
+                "Expected kind 9902"
             );
         });
     });

@@ -242,7 +242,7 @@ class TestNostrRelayPool:
             # Authors should be called with PublicKey instances
             mock_filter.authors.assert_called_once_with(mock_pks)
             # custom_tags should be called with SingleLetterTag and list of values
-            mock_filter.custom_tags.assert_called_once_with(mock_d_tag, ["32101"])
+            mock_filter.custom_tags.assert_called_once_with(mock_d_tag, ["9901"])
 
     def test_clear_cache(self, relay_pool):
         """Test cache clearing."""

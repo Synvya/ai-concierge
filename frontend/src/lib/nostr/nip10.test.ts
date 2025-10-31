@@ -74,7 +74,7 @@ describe("nip10", () => {
     describe("getThreadContext", () => {
         it("extracts root and reply markers from event", () => {
             const event: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "test",
                 tags: [
                     ["e", "root-event-id", "wss://relay1.com", "root"],
@@ -97,7 +97,7 @@ describe("nip10", () => {
 
         it("handles events with only root marker", () => {
             const event: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "test",
                 tags: [["e", "root-event-id", "", "root"]],
                 created_at: 1000,
@@ -155,7 +155,7 @@ describe("nip10", () => {
     describe("isThreadRoot", () => {
         it("identifies event with no thread markers as root", () => {
             const event: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "test",
                 tags: [["p", "pubkey123"]],
                 created_at: 1000,
@@ -169,7 +169,7 @@ describe("nip10", () => {
 
         it("identifies event with root marker as non-root", () => {
             const event: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "test",
                 tags: [["e", "root-id", "", "root"]],
                 created_at: 1000,
@@ -183,7 +183,7 @@ describe("nip10", () => {
 
         it("identifies event with reply marker as non-root", () => {
             const event: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "test",
                 tags: [["e", "reply-id", "", "reply"]],
                 created_at: 1000,
@@ -258,7 +258,7 @@ describe("nip10", () => {
     describe("buildReplyTags", () => {
         it("builds tags for first reply (creates root)", () => {
             const originalEvent: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "original",
                 tags: [["p", "recipient-pubkey"]],
                 created_at: 1000,
@@ -277,7 +277,7 @@ describe("nip10", () => {
 
         it("builds tags for reply in existing thread", () => {
             const threadReply: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "reply",
                 tags: [
                     ["e", "thread-root-id", "wss://relay.com", "root"],
@@ -299,7 +299,7 @@ describe("nip10", () => {
 
         it("includes additional pubkeys without duplicates", () => {
             const event: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "test",
                 tags: [],
                 created_at: 1000,
@@ -323,7 +323,7 @@ describe("nip10", () => {
 
         it("works without relay URL", () => {
             const event: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "test",
                 tags: [],
                 created_at: 1000,
@@ -343,7 +343,7 @@ describe("nip10", () => {
     describe("groupEventsByThread", () => {
         it("groups events by thread root", () => {
             const rootEvent: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "root",
                 tags: [],
                 created_at: 1000,
@@ -353,7 +353,7 @@ describe("nip10", () => {
             };
 
             const reply1: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "reply-1",
                 tags: [["e", "root-id", "", "root"]],
                 created_at: 2000,
@@ -363,7 +363,7 @@ describe("nip10", () => {
             };
 
             const reply2: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "reply-2",
                 tags: [
                     ["e", "root-id", "", "root"],
@@ -504,7 +504,7 @@ describe("nip10", () => {
 
             // Step 1: Initial reservation request (thread root)
             const requestEvent: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "encrypted-request",
                 tags: [["p", restaurant.publicKeyHex]],
                 created_at: 1000,
@@ -518,7 +518,7 @@ describe("nip10", () => {
             // Step 2: Restaurant suggests different time (first reply)
             const suggestionTags = buildReplyTags(requestEvent, [], "wss://relay.damus.io");
             const suggestionEvent: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "encrypted-suggestion",
                 tags: suggestionTags,
                 created_at: 2000,
@@ -535,7 +535,7 @@ describe("nip10", () => {
             // Step 3: Concierge accepts (reply to suggestion)
             const acceptTags = buildReplyTags(suggestionEvent, [], "wss://relay.damus.io");
             const acceptEvent: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "encrypted-accept",
                 tags: acceptTags,
                 created_at: 3000,
@@ -551,7 +551,7 @@ describe("nip10", () => {
             // Step 4: Restaurant confirms (final reply)
             const confirmTags = buildReplyTags(acceptEvent, [], "wss://relay.damus.io");
             const confirmEvent: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "encrypted-confirm",
                 tags: confirmTags,
                 created_at: 4000,
@@ -585,7 +585,7 @@ describe("nip10", () => {
 
             // Two different reservation requests
             const request1: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "request-friday",
                 tags: [["p", restaurant.publicKeyHex]],
                 created_at: 1000,
@@ -595,7 +595,7 @@ describe("nip10", () => {
             };
 
             const request2: Event = {
-                kind: 32101,
+                kind: 9901,
                 content: "request-saturday",
                 tags: [["p", restaurant.publicKeyHex]],
                 created_at: 1100,
@@ -606,7 +606,7 @@ describe("nip10", () => {
 
             // Replies to each
             const reply1: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "reply-to-friday",
                 tags: buildReplyTags(request1),
                 created_at: 2000,
@@ -616,7 +616,7 @@ describe("nip10", () => {
             };
 
             const reply2: Event = {
-                kind: 32102,
+                kind: 9902,
                 content: "reply-to-saturday",
                 tags: buildReplyTags(request2),
                 created_at: 2100,

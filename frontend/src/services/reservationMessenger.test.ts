@@ -229,7 +229,7 @@ describe("reservationMessenger", () => {
                 iso_time: "2025-10-20T19:00:00-07:00",
                 notes: "Window seat",
             });
-            expect(message.rumor.kind).toBe(32101);
+            expect(message.rumor.kind).toBe(9901);
             expect(message.giftWrap).toBe(giftWrap);
         });
 
@@ -284,7 +284,7 @@ describe("reservationMessenger", () => {
                 message: "Confirmed!",
                 table: "A4",
             });
-            expect(message.rumor.kind).toBe(32102);
+            expect(message.rumor.kind).toBe(9902);
         });
 
         it("silently ignores invalid MAC errors (Self CC pattern)", () => {

@@ -192,7 +192,7 @@ export function getReferencedEventIds(event: Event): string[] {
  * );
  * 
  * const replyEvent = {
- *   kind: 32102,
+ *   kind: 9902,
  *   content: encryptedResponse,
  *   tags,
  *   created_at: Math.floor(Date.now() / 1000)

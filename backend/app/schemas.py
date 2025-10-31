@@ -112,6 +112,8 @@ class ReservationAction(BaseModel):
         description="ISO 8601 datetime string with timezone (e.g. 2025-10-25T15:00:00-07:00)"
     )
     notes: str | None = Field(default=None, description="Special requests or dietary restrictions")
+    contact_name: str | None = Field(default=None, description="Guest name for the reservation")
+    contact_phone: str | None = Field(default=None, description="Guest phone number for the reservation")
 
 
 class ChatResponse(BaseModel):

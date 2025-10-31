@@ -27,7 +27,7 @@ describe("nip59", () => {
 
             const rumor = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "encrypted-content",
                     tags: [["p", keypair.publicKeyHex]],
                     created_at: Math.floor(Date.now() / 1000),
@@ -37,7 +37,7 @@ describe("nip59", () => {
 
             expect(rumor).toHaveProperty("id");
             expect(rumor).toHaveProperty("pubkey");
-            expect(rumor).toHaveProperty("kind", 32101);
+            expect(rumor).toHaveProperty("kind", 9901);
             expect(rumor).toHaveProperty("content", "encrypted-content");
             expect(rumor).not.toHaveProperty("sig"); // Rumors are unsigned
         });
@@ -47,7 +47,7 @@ describe("nip59", () => {
 
             const rumor1 = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "content-1",
                     tags: [],
                     created_at: 1000,
@@ -57,7 +57,7 @@ describe("nip59", () => {
 
             const rumor2 = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "content-2",
                     tags: [],
                     created_at: 1000,
@@ -76,7 +76,7 @@ describe("nip59", () => {
 
             const rumor = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "test",
                     tags: [],
                     created_at: Math.floor(Date.now() / 1000),
@@ -101,7 +101,7 @@ describe("nip59", () => {
 
             const rumor = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "test",
                     tags: [],
                     created_at: Math.floor(Date.now() / 1000),
@@ -129,7 +129,7 @@ describe("nip59", () => {
 
             const rumor = createRumor(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "test",
                     tags: [],
                     created_at: Math.floor(Date.now() / 1000),
@@ -152,7 +152,7 @@ describe("nip59", () => {
 
             const wrap = wrapEvent(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "test-content",
                     tags: [["p", recipient.publicKeyHex]],
                     created_at: Math.floor(Date.now() / 1000),
@@ -176,7 +176,7 @@ describe("nip59", () => {
 
             const wrap = wrapEvent(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: originalContent,
                     tags: [["t", "test"]],
                     created_at: 1000,
@@ -187,7 +187,7 @@ describe("nip59", () => {
 
             const rumor = unwrapEvent(wrap, recipient.privateKeyHex);
 
-            expect(rumor.kind).toBe(32101);
+            expect(rumor.kind).toBe(9901);
             expect(rumor.content).toBe(originalContent);
             expect(rumor.created_at).toBe(1000);
             expect(rumor.tags).toContainEqual(["t", "test"]);
@@ -198,7 +198,7 @@ describe("nip59", () => {
             const recipient = generateKeypair();
 
             const originalEvent = {
-                kind: 32102,
+                kind: 9902,
                 content: "response-content",
                 tags: [
                     ["e", "parent-event-id", "", "root"],
@@ -224,7 +224,7 @@ describe("nip59", () => {
 
             const wrap = wrapEvent(
                 {
-                    kind: 32101,
+                    kind: 9901,
                     content: "for-bob-only",
                     tags: [],
                     created_at: Math.floor(Date.now() / 1000),
@@ -245,17 +245,17 @@ describe("nip59", () => {
 
             const wraps = [
                 wrapEvent(
-                    { kind: 32101, content: "msg-1", tags: [], created_at: 1000 },
+                    { kind: 9901, content: "msg-1", tags: [], created_at: 1000 },
                     sender.privateKeyHex,
                     recipient.publicKeyHex
                 ),
                 wrapEvent(
-                    { kind: 32101, content: "msg-2", tags: [], created_at: 2000 },
+                    { kind: 9901, content: "msg-2", tags: [], created_at: 2000 },
                     sender.privateKeyHex,
                     recipient.publicKeyHex
                 ),
                 wrapEvent(
-                    { kind: 32102, content: "msg-3", tags: [], created_at: 3000 },
+                    { kind: 9902, content: "msg-3", tags: [], created_at: 3000 },
                     sender.privateKeyHex,
                     recipient.publicKeyHex
                 ),
@@ -276,12 +276,12 @@ describe("nip59", () => {
 
             const wraps = [
                 wrapEvent(
-                    { kind: 32101, content: "for-bob-1", tags: [], created_at: 1000 },
+                    { kind: 9901, content: "for-bob-1", tags: [], created_at: 1000 },
                     sender.privateKeyHex,
                     bob.publicKeyHex
                 ),
                 wrapEvent(
-                    { kind: 32101, content: "for-bob-2", tags: [], created_at: 2000 },
+                    { kind: 9901, content: "for-bob-2", tags: [], created_at: 2000 },
                     sender.privateKeyHex,
                     bob.publicKeyHex
                 ),
@@ -301,12 +301,12 @@ describe("nip59", () => {
 
             const wraps = [
                 wrapEvent(
-                    { kind: 32101, content: "for-bob", tags: [], created_at: 1000 },
+                    { kind: 9901, content: "for-bob", tags: [], created_at: 1000 },
                     sender.privateKeyHex,
                     bob.publicKeyHex
                 ),
                 wrapEvent(
-                    { kind: 32101, content: "for-charlie", tags: [], created_at: 2000 },
+                    { kind: 9901, content: "for-charlie", tags: [], created_at: 2000 },
                     sender.privateKeyHex,
                     charlie.publicKeyHex
                 ),
@@ -336,7 +336,7 @@ describe("nip59", () => {
             };
 
             const wrap = createGiftWrappedMessage(
-                32101,
+                9901,
                 payload,
                 sender.privateKeyHex,
                 recipient.publicKeyHex
@@ -358,7 +358,7 @@ describe("nip59", () => {
             const payload = { test: "data" };
 
             const wrap = createGiftWrappedMessage(
-                32101,
+                9901,
                 payload,
                 sender.privateKeyHex,
                 recipient.publicKeyHex,
@@ -382,7 +382,7 @@ describe("nip59", () => {
             const payload = { secret: "password123" };
 
             const wrap = createGiftWrappedMessage(
-                32101,
+                9901,
                 payload,
                 sender.privateKeyHex,
                 recipient.publicKeyHex
@@ -417,7 +417,7 @@ describe("nip59", () => {
             };
 
             const wrap = createGiftWrappedMessage(
-                32101,
+                9901,
                 payload,
                 sender.privateKeyHex,
                 recipient.publicKeyHex
@@ -428,7 +428,7 @@ describe("nip59", () => {
                 recipient.privateKeyHex
             );
 
-            expect(rumor.kind).toBe(32101);
+            expect(rumor.kind).toBe(9901);
             expect(rumor.pubkey).toBe(sender.publicKeyHex);
             expect(decryptedPayload).toEqual(payload);
         });
@@ -454,7 +454,7 @@ describe("nip59", () => {
             };
 
             const wrap = createGiftWrappedMessage(
-                32101,
+                9901,
                 payload,
                 sender.privateKeyHex,
                 recipient.publicKeyHex
@@ -476,7 +476,7 @@ describe("nip59", () => {
             };
 
             const wrap = createGiftWrappedMessage(
-                32101,
+                9901,
                 payload,
                 sender.privateKeyHex,
                 recipient.publicKeyHex
@@ -494,7 +494,7 @@ describe("nip59", () => {
             const recipient = generateKeypair();
 
             const wrap = wrapEvent(
-                { kind: 32101, content: "test", tags: [], created_at: 1000 },
+                { kind: 9901, content: "test", tags: [], created_at: 1000 },
                 sender.privateKeyHex,
                 recipient.publicKeyHex
             );
@@ -510,7 +510,7 @@ describe("nip59", () => {
             const recipient = generateKeypair();
 
             const rumor = createRumor(
-                { kind: 32101, content: "test", tags: [], created_at: 1000 },
+                { kind: 9901, content: "test", tags: [], created_at: 1000 },
                 sender.privateKeyHex
             );
 
@@ -537,7 +537,7 @@ describe("nip59", () => {
             };
 
             const requestWrap = createGiftWrappedMessage(
-                32101, // kind: reservation.request
+                9901, // kind: reservation.request
                 reservationRequest,
                 alice.privateKeyHex,
                 bob.publicKeyHex
@@ -562,7 +562,7 @@ describe("nip59", () => {
             };
 
             const responseWrap = createGiftWrappedMessage(
-                32102, // kind: reservation.response
+                9902, // kind: reservation.response
                 reservationResponse,
                 bob.privateKeyHex,
                 alice.publicKeyHex,
