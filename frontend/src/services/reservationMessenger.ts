@@ -102,6 +102,7 @@ export class ReservationSubscription {
             },
             {
                 onevent: (event: Event) => {
+                    console.log('[ReservationMessenger] Received gift wrap event:', event.id, 'kind:', event.kind, 'from:', event.pubkey);
                     this.handleEvent(event, privateKey, onMessage, onError);
                 },
                 oneose: () => {
@@ -153,8 +154,10 @@ export class ReservationSubscription {
         onError?: ReservationErrorCallback
     ): void {
         try {
+            console.log('[ReservationMessenger] Unwrapping gift wrap:', event.id);
             // Unwrap the gift wrap
             const rumor = unwrapEvent(event, privateKey);
+            console.log('[ReservationMessenger] Unwrapped rumor kind:', rumor.kind);
 
             // Determine type and parse
             if (rumor.kind === 9901) {
@@ -169,7 +172,9 @@ export class ReservationSubscription {
                 });
             } else if (rumor.kind === 9902) {
                 // Reservation response
+                console.log('[ReservationMessenger] Parsing kind:9902 response');
                 const payload = parseReservationResponse(rumor, privateKey);
+                console.log('[ReservationMessenger] Response parsed successfully, status:', payload.status);
                 onMessage({
                     rumor,
                     type: "response",
@@ -177,6 +182,7 @@ export class ReservationSubscription {
                     senderPubkey: rumor.pubkey,
                     giftWrap: event,
                 });
+                console.log('[ReservationMessenger] Response message delivered to callback');
             } else {
                 // Unknown kind - ignore or log
                 console.debug(`Received gift wrap with unexpected kind: ${rumor.kind}`);
@@ -191,11 +197,12 @@ export class ReservationSubscription {
             // When subscribing, we receive BOTH, but can only decrypt the one encrypted for us.
             // "invalid MAC" errors are expected and should be silently ignored.
             if (errorMessage.message.includes('invalid MAC')) {
-                console.debug('Skipping gift wrap not encrypted for us (expected with Self CC)');
+                console.debug('[ReservationMessenger] Skipping gift wrap not encrypted for us (expected with Self CC)');
                 return; // Silently ignore
             }
             
             // Report other errors
+            console.error('[ReservationMessenger] Error handling event:', errorMessage);
             onError?.(errorMessage, event);
         }
     }
