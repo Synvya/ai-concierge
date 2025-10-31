@@ -3,7 +3,7 @@
   "$id": "https://synvya.com/schemas/reservation.response.schema.json",
   "title": "Synvya Reservation Response Payload",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
     "status"
   ],

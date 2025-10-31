@@ -3,7 +3,7 @@
   "$id": "https://synvya.com/schemas/reservation.request.schema.json",
   "title": "Synvya Reservation Request Payload",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
     "party_size",
     "iso_time"
