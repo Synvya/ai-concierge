@@ -5,11 +5,11 @@ When responding to a reservation request, the restaurant MUST include proper thr
 
 ## Required Response Format
 
-### 1. Response Structure (kind 32102)
+### 1. Response Structure (kind 9902)
 
 ```typescript
 {
-  kind: 32102,  // Reservation response
+  kind: 9902,  // Reservation response
   content: "{encrypted_payload}",  // NIP-44 encrypted JSON
   tags: [
     ["p", "<customer_pubkey_hex>"],           // Required: Customer's public key
@@ -27,7 +27,7 @@ When the customer sends a reservation:
 ```
 Customer Request (Gift Wrap):
   - ID: "abc123..." ← USE THIS ID
-  - Contains: Encrypted Rumor (kind 32101)
+  - Contains: Encrypted Rumor (kind 9901)
 ```
 
 Your response MUST tag this gift wrap ID:
@@ -46,9 +46,8 @@ The `content` field contains a NIP-44 encrypted JSON payload:
 {
   status: "confirmed" | "suggested" | "declined" | "expired" | "cancelled",
   iso_time?: string,      // ISO 8601 datetime (required for confirmed/suggested)
-  table?: string,         // Optional table number
-  message?: string,       // Optional message to customer
-  hold_expires_at?: string  // Optional expiry for soft holds
+  table?: string,         // Optional table number (only for confirmed)
+  message?: string        // Optional message to customer
 }
 ```
 
@@ -76,7 +75,7 @@ const responsePayload = {
 
 // Step 3: Create response rumor
 const responseRumor = {
-  kind: 32102,
+  kind: 9902,
   content: encryptNip44(
     JSON.stringify(responsePayload),
     restaurantPrivateKey,
@@ -115,13 +114,13 @@ Restaurant accepts the reservation at the requested time.
 ```
 
 ### suggested
-Restaurant suggests an alternative time.
+Restaurant suggests an alternative time. User must make a new request if they want the suggested time.
 
 ```json
 {
   "status": "suggested",
   "iso_time": "2025-10-26T18:00:00-07:00",
-  "message": "We're fully booked at 5pm, but 6pm is available."
+  "message": "We're fully booked at 5pm, but 6pm is available. Please make a new request if that works for you."
 }
 ```
 
@@ -136,12 +135,13 @@ Restaurant cannot accommodate the request.
 ```
 
 ### expired
-A previously-held reservation has expired.
+The reservation date/time has passed without being used.
 
 ```json
 {
   "status": "expired",
-  "message": "Your soft hold has expired. Please request again."
+  "iso_time": "2025-10-26T17:00:00-07:00",
+  "message": "This reservation time has passed."
 }
 ```
 

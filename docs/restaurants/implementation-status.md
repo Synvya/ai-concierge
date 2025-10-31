@@ -29,16 +29,16 @@ This document tracks the implementation status of the Synvya reservation messagi
   - Located: `client/src/lib/nip10.ts`
 
 ### Message Types
-- **Kind 32101 (reservation.request)**
+- **Kind 9901 (reservation.request)**
   - JSON schema validation
   - Encryption and wrapping
   - Parsing and unwrapping
   - Support for: party_size, iso_time, notes, contact, constraints
 
-- **Kind 32102 (reservation.response)**
+- **Kind 9902 (reservation.response)**
   - JSON schema validation
   - Support for: confirmed, declined, suggested, expired, cancelled
-  - Optional fields: iso_time, message, table, hold_expires_at
+  - Optional fields: iso_time, message, table
 
 ### Business Client Features
 - **Relay Subscription**
@@ -87,9 +87,9 @@ This document tracks the implementation status of the Synvya reservation messagi
 - ✅ Auto-publish on restaurant profile creation
 - ✅ Auto-delete on business type change
 - ✅ Three-event pattern:
-  - One kind 31990 (handler info declaring support for 32101 & 32102)
-  - One kind 31989 with `d:"32101"` (recommendation for reservation.request)
-  - One kind 31989 with `d:"32102"` (recommendation for reservation.response)
+  - One kind 31990 (handler info declaring support for 9901 & 9902)
+  - One kind 31989 with `d:"9901"` (recommendation for reservation.request)
+  - One kind 31989 with `d:"9902"` (recommendation for reservation.response)
 
 
 ---
@@ -130,11 +130,12 @@ This document tracks the implementation status of the Synvya reservation messagi
   - Completes the reservation loop
 
 ### Complete Reservation Flow
-1. AI Concierge → Restaurant: Request (32101)
-2. Restaurant ↔ Concierge: Negotiation (32102)
-3. Restaurant → Concierge: Calendar event (31923)
-4. Concierge → Restaurant: RSVP (31925)
-5. Both parties: Store in calendar (31924)
+1. AI Concierge → Restaurant: Request (9901)
+2. Restaurant → Concierge: Response (9902) - confirmed, declined, or suggested
+3. If suggested: AI Concierge → Restaurant: New request with suggested time
+4. Restaurant → Concierge: Calendar event (31923) - after confirmation
+5. Concierge → Restaurant: RSVP (31925)
+6. Both parties: Store in calendar (31924)
 
 ---
 
