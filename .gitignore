@@ -33,3 +33,4 @@ frontend/.env
 internal/*
 third_party_readonly/*
 sample.csv
+scratchpad.md 

@@ -248,31 +248,83 @@ npm run dev
 
 ### Scenario 9: Time Parsing Edge Cases
 
-**Objective**: Test various natural language time formats.
+**Objective**: Test various natural language time formats, especially AM/PM parsing.
 
 **Test Inputs**:
-| Input | Expected Interpretation |
-|-------|------------------------|
-| "tonight at 7pm" | Today at 19:00 local time |
-| "tomorrow at 7:30pm" | Tomorrow at 19:30 |
-| "at 19:00" | Today at 19:00 (24-hour) |
-| "at 7pm" | If currently past 7pm, should assume tomorrow |
-| "today at 2pm" | Today at 14:00 |
+| Input | Expected Interpretation | Common Pitfall |
+|-------|------------------------|----------------|
+| "tonight at 7pm" | Today at 19:00 local time | - |
+| "tomorrow at 7:30pm" | Tomorrow at 19:30 | - |
+| "at 19:00" | Today at 19:00 (24-hour) | - |
+| "at 7pm" | If currently past 7pm, should assume tomorrow | - |
+| "today at 2pm" | Today at 14:00 | - |
+| **"at 11am"** | **Today at 11:00 (NOT 12:00!)** | **Often misinterpreted as noon** |
+| "at 11:30am" | Today at 11:30 | - |
+| "at 12pm" or "noon" | Today at 12:00 | - |
+| "at 12am" or "midnight" | Today at 00:00 | - |
 
 **Steps**:
 1. For each input, create a reservation with that time
-2. In Reservations panel, verify datetime display
+2. In Reservations panel, verify datetime display matches expected time
 3. In Business Client, inspect the `iso_time` field in request payload
 4. Confirm ISO 8601 format and correct datetime
+5. **CRITICAL**: When testing "11am", verify it's 11:00:00, NOT 12:00:00
 
 **Expected Results**:
 - ✅ All common time formats parse correctly
 - ✅ ISO 8601 timestamps are accurate
+- ✅ "11am" correctly parses as 11:00, not 12:00
 - ✅ Timezone handled correctly
 
 ---
 
-### Scenario 10: Concurrent Reservations
+### Scenario 10: Alternative Time Acceptance (Context Retention)
+
+**Objective**: Test that the system retains context when user accepts restaurant-suggested alternative times.
+
+**Prerequisites**: Business Client must be configured to suggest alternative times.
+
+**Steps**:
+1. Type: "make a new reservation for Saturday at 11am for 4 people at Smoothies & Muffins"
+2. Verify: Reservation request sent for 11:00 AM (not 12:00 PM)
+3. In Business Client, respond with status "suggested" and alternative time:
+   ```json
+   {
+     "status": "suggested",
+     "iso_time": "2025-11-01T11:30:00-07:00",
+     "message": "We can't do 11 but can do 11:30"
+   }
+   ```
+4. In AI Concierge Reservations panel, verify suggestion appears
+5. In Chat, type: "Please go ahead with 11:30 then" (or "yes", "book it", "go ahead")
+6. **CRITICAL**: Verify the assistant:
+   - ✅ Immediately sends new reservation request
+   - ✅ Uses same restaurant (Smoothies & Muffins)
+   - ✅ Uses same party size (4 people)
+   - ✅ Uses same date (Saturday)
+   - ✅ Uses new time (11:30 AM)
+   - ✅ Does NOT ask "Which restaurant?" or "How many people?"
+
+**Expected Results**:
+- ✅ System remembers all context from previous message
+- ✅ Only the time is updated to the suggested alternative
+- ✅ No re-prompting for previously provided details
+- ✅ New reservation request sent automatically
+
+**Common Failure Mode**:
+- ❌ System asks "Could you please confirm the date again for the Saturday reservation?"
+- ❌ System doesn't find restaurant details and asks to confirm
+- ❌ System loses party size or date information
+
+**Additional Test Cases**:
+- User says "yes" → should accept suggested time
+- User says "book it" → should accept suggested time
+- User says "ok" → should accept suggested time
+- User says "11:30 works" → should accept that time
+
+---
+
+### Scenario 11: Concurrent Reservations
 
 **Objective**: Test handling multiple simultaneous reservations.
 
