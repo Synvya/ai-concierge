@@ -66,6 +66,7 @@ const ASSISTANT_AVATAR_URL = '/assets/doorman.png'
 const USER_AVATAR_URL = '/assets/user.png'
 const LINK_REGEX = /(https?:\/\/[^\s]+)/g
 const LOCATION_STORAGE_KEY = 'ai-concierge-shared-location'
+const PROCESSED_RESPONSES_STORAGE_KEY = 'ai-concierge-processed-responses'
 
 const SuggestedQuery = ({ label, onClick }: { label: string; onClick: (value: string) => void }) => (
   <Tag
@@ -135,7 +136,22 @@ export const ChatPanel = () => {
     coords?: GeoPoint
     status: 'idle' | 'pending' | 'granted' | 'denied'
   }>({ status: 'idle' })
-  const processedResponsesRef = useRef<Set<string>>(new Set())
+  
+  // Initialize processedResponsesRef from localStorage using useMemo for lazy initialization
+  const initialProcessedResponses = useMemo(() => {
+    try {
+      const cached = localStorage.getItem(PROCESSED_RESPONSES_STORAGE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached) as string[]
+        return new Set(parsed)
+      }
+    } catch (error) {
+      console.error('Failed to load processed responses from localStorage:', error)
+    }
+    return new Set<string>()
+  }, [])
+  
+  const processedResponsesRef = useRef<Set<string>>(initialProcessedResponses)
   
   // Contact info modal state
   const { isOpen: isContactModalOpen, onOpen: onContactModalOpen, onClose: onContactModalClose } = useDisclosure()
@@ -165,6 +181,33 @@ export const ChatPanel = () => {
     }
   }, [])
 
+  // Clean up processed responses that are no longer in any thread
+  useEffect(() => {
+    if (!reservationThreads || reservationThreads.length === 0) return
+    
+    // Get all current response IDs from all threads
+    const currentResponseIds = new Set<string>()
+    reservationThreads.forEach((thread) => {
+      thread.messages
+        .filter((m) => m.type === 'response')
+        .forEach((m) => currentResponseIds.add(m.giftWrap.id))
+    })
+    
+    // Remove any processed IDs that are no longer in any thread
+    const processedIds = Array.from(processedResponsesRef.current)
+    const validIds = processedIds.filter((id) => currentResponseIds.has(id))
+    
+    // Only update if something was removed
+    if (validIds.length < processedIds.length) {
+      processedResponsesRef.current = new Set(validIds)
+      try {
+        localStorage.setItem(PROCESSED_RESPONSES_STORAGE_KEY, JSON.stringify(validIds))
+      } catch (error) {
+        console.error('Failed to save cleaned up processed responses:', error)
+      }
+    }
+  }, [reservationThreads])
+
   // Watch for new reservation responses and notify user
   useEffect(() => {
     // Guard against undefined reservationThreads
@@ -183,6 +226,14 @@ export const ChatPanel = () => {
 
       // Mark as processed immediately to prevent duplicate processing
       processedResponsesRef.current.add(responseId)
+      
+      // Persist to localStorage
+      try {
+        const processedArray = Array.from(processedResponsesRef.current)
+        localStorage.setItem(PROCESSED_RESPONSES_STORAGE_KEY, JSON.stringify(processedArray))
+      } catch (error) {
+        console.error('Failed to save processed responses to localStorage:', error)
+      }
 
       // Get response details
       const response = latestResponse.payload as any
