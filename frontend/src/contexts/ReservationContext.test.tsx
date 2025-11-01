@@ -77,6 +77,7 @@ describe('ReservationContext', () => {
     act(() => {
       result.current.addOutgoingMessage(
         mockMessage,
+        'restaurant-test-123',
         'Test Restaurant',
         'npub1restaurant'
       )
@@ -131,6 +132,7 @@ describe('ReservationContext', () => {
     act(() => {
       result.current.addOutgoingMessage(
         requestMessage,
+        'restaurant-test-456',
         'Test Restaurant',
         'npub1restaurant'
       )
@@ -239,11 +241,11 @@ describe('ReservationContext', () => {
     }
 
     act(() => {
-      result.current.addOutgoingMessage(message1, 'Restaurant One', 'npub1rest1')
+      result.current.addOutgoingMessage(message1, 'restaurant-one', 'Restaurant One', 'npub1rest1')
     })
 
     act(() => {
-      result.current.addOutgoingMessage(message2, 'Restaurant Two', 'npub1rest2')
+      result.current.addOutgoingMessage(message2, 'restaurant-two', 'Restaurant Two', 'npub1rest2')
     })
 
     await waitFor(() => {
@@ -308,6 +310,7 @@ describe('ReservationContext', () => {
     act(() => {
       result.current.addOutgoingMessage(
         mockMessage,
+        'restaurant-test-persist',
         'Test Restaurant',
         'npub1restaurant'
       )

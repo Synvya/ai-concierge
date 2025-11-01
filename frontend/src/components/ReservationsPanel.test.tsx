@@ -68,6 +68,7 @@ describe('ReservationsPanel', () => {
     const mockThreads: ReservationThread[] = [
       {
         threadId: 'thread-123',
+        restaurantId: 'restaurant-123',
         restaurantName: "Mario's Pizza",
         restaurantNpub: 'npub1test123',
         messages: [],
@@ -81,6 +82,7 @@ describe('ReservationsPanel', () => {
       },
       {
         threadId: 'thread-456',
+        restaurantId: 'restaurant-456',
         restaurantName: 'La Terraza',
         restaurantNpub: 'npub1test456',
         messages: [],
@@ -93,6 +95,7 @@ describe('ReservationsPanel', () => {
       },
       {
         threadId: 'thread-789',
+        restaurantId: 'restaurant-789',
         restaurantName: 'The Olive Garden',
         restaurantNpub: 'npub1test789',
         messages: [],
@@ -246,6 +249,7 @@ describe('ReservationsPanel', () => {
       vi.spyOn(ReservationContext, 'useReservations').mockReturnValue({
         threads: [{
           threadId: 'thread-123',
+          restaurantId: 'restaurant-123',
           restaurantName: "Mario's Pizza",
           restaurantNpub: 'npub1test',
           messages: [],
@@ -292,6 +296,7 @@ describe('ReservationsPanel', () => {
 
       const threads = statuses.map((status, index) => ({
         threadId: `thread-${index}`,
+        restaurantId: `restaurant-${index}`,
         restaurantName: `Restaurant ${index}`,
         restaurantNpub: `npub1test${index}`,
         messages: [],
