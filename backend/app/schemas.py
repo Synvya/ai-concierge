@@ -22,6 +22,15 @@ class GeoPoint(BaseModel):
     longitude: float
 
 
+class ActiveReservationContext(BaseModel):
+    """Context from an active reservation thread (e.g., when user is responding to a suggestion)"""
+    restaurant_id: str
+    restaurant_name: str
+    npub: str
+    party_size: int
+    original_time: str
+    suggested_time: str | None = None
+    
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
@@ -31,6 +40,7 @@ class ChatRequest(BaseModel):
     debug: bool = False
     user_location: str | None = None
     user_coordinates: GeoPoint | None = None
+    active_reservation_context: ActiveReservationContext | None = None
 
 
 class SearchRequest(BaseModel):

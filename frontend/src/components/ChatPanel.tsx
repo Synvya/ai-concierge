@@ -412,7 +412,7 @@ export const ChatPanel = () => {
         giftWrap: giftWrapToMerchant,
       }
       const restaurantDisplayName = getRestaurantDisplayName(restaurant);
-      addOutgoingMessage(reservationMessage, restaurantDisplayName, restaurant.npub)
+      addOutgoingMessage(reservationMessage, restaurant.id, restaurantDisplayName, restaurant.npub)
 
       // Show success message
       const confirmationMessage: ChatMessage = {
@@ -527,6 +527,23 @@ export const ChatPanel = () => {
     setMessages(nextHistory)
     setInputValue('')
 
+    // Check if there's an active "suggested" reservation to include context
+    let activeReservationContext = undefined
+    if (reservationThreads && reservationThreads.length > 0) {
+      // Find the most recent thread with "suggested" status
+      const suggestedThread = reservationThreads.find(t => t.status === 'suggested')
+      if (suggestedThread && suggestedThread.restaurantId !== 'unknown') {
+        activeReservationContext = {
+          restaurant_id: suggestedThread.restaurantId,
+          restaurant_name: suggestedThread.restaurantName,
+          npub: suggestedThread.restaurantNpub,
+          party_size: suggestedThread.request.partySize,
+          original_time: suggestedThread.request.isoTime,
+          suggested_time: suggestedThread.suggestedTime,
+        }
+      }
+    }
+
     // Always send to backend - let OpenAI handle the intelligence
     setIsLoading(true)
     try {
@@ -537,6 +554,7 @@ export const ChatPanel = () => {
         history: nextHistory,
         user_location: sharedLocation.status === 'granted' ? sharedLocation.label : undefined,
         user_coordinates: sharedLocation.status === 'granted' ? sharedLocation.coords : undefined,
+        active_reservation_context: activeReservationContext,
       })
       await handleChatResponse(payload)
     } catch (error) {
@@ -549,7 +567,7 @@ export const ChatPanel = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [sessionId, visitorId, inputValue, messages, toast, handleChatResponse, sharedLocation])
+  }, [sessionId, visitorId, inputValue, messages, toast, handleChatResponse, sharedLocation, reservationThreads])
 
   const handleSuggestedQuery = (query: string) => {
     setInputValue(query)

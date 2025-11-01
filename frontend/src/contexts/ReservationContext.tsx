@@ -54,6 +54,8 @@ const SHOULD_START_RESERVATION_SUBSCRIPTION = (() => {
 export interface ReservationThread {
   /** Unique thread identifier (root event ID) */
   threadId: string;
+  /** Restaurant database ID */
+  restaurantId: string;
   /** Restaurant name */
   restaurantName: string;
   /** Restaurant's Nostr public key */
@@ -68,6 +70,8 @@ export interface ReservationThread {
   };
   /** Current conversation status */
   status: 'sent' | 'confirmed' | 'declined' | 'suggested' | 'expired' | 'cancelled';
+  /** Latest suggested time from restaurant (if status is 'suggested') */
+  suggestedTime?: string;
   /** Timestamp of last message (Unix timestamp in seconds) */
   lastUpdated: number;
 }
@@ -78,7 +82,7 @@ interface ReservationContextValue {
   /** Whether the messenger is actively subscribed */
   isActive: boolean;
   /** Add a message to a thread (for sent messages) */
-  addOutgoingMessage: (message: ReservationMessage, restaurantName: string, restaurantNpub: string) => void;
+  addOutgoingMessage: (message: ReservationMessage, restaurantId: string, restaurantName: string, restaurantNpub: string) => void;
 }
 
 const ReservationContext = createContext<ReservationContextValue | null>(null);
@@ -164,7 +168,7 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
   }, [handleIncomingMessage, nostrIdentity]);
 
   const addOutgoingMessage = useCallback(
-    (message: ReservationMessage, restaurantName: string, restaurantNpub: string) => {
+    (message: ReservationMessage, restaurantId: string, restaurantName: string, restaurantNpub: string) => {
       setThreads((prev) => {
         // Find thread by extracting thread context
         const threadContext = getThreadContext(message.rumor as any); // Rumor extends UnsignedEvent but getThreadContext expects Event
@@ -189,6 +193,7 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
           const request = message.payload as ReservationRequest;
           const newThread: ReservationThread = {
             threadId,
+            restaurantId,
             restaurantName,
             restaurantNpub,
             messages: [message],
@@ -280,6 +285,11 @@ function updateThreadWithMessage(
     if (message.type === 'response') {
       const response = message.payload as ReservationResponse;
       updatedThread.status = response.status;
+      
+      // If it's a suggested status, store the suggested time
+      if (response.status === 'suggested' && response.iso_time) {
+        updatedThread.suggestedTime = response.iso_time;
+      }
     }
 
     return threads
@@ -292,6 +302,7 @@ function updateThreadWithMessage(
       const request = message.payload as ReservationRequest;
       const newThread: ReservationThread = {
         threadId,
+        restaurantId: 'unknown', // We don't have this info from incoming message
         restaurantName: 'Unknown Restaurant', // We don't have this info from incoming message
         restaurantNpub: message.senderPubkey,
         messages: [message],

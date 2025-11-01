@@ -158,6 +158,7 @@ async def generate_response(
     query: str,
     results: list[SellerResult],
     history: list[ChatMessage],
+    active_reservation_context: Any | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """Call OpenAI to craft a concierge-style response.
 
@@ -188,6 +189,26 @@ async def generate_response(
         # Get current date/time for OpenAI to use as reference
         now = datetime.now(timezone.utc)
         current_datetime = now.isoformat()
+
+        # Build active reservation context if present
+        reservation_context_block = ""
+        if active_reservation_context:
+            reservation_context_block = (
+                "\n\nACTIVE RESERVATION CONTEXT:\n"
+                "The user has an active reservation conversation for the following restaurant:\n"
+                f"- Restaurant ID: {active_reservation_context.restaurant_id}\n"
+                f"- Restaurant Name: {active_reservation_context.restaurant_name}\n"
+                f"- Nostr Public Key (npub): {active_reservation_context.npub}\n"
+                f"- Party Size: {active_reservation_context.party_size}\n"
+                f"- Originally Requested Time: {active_reservation_context.original_time}\n"
+            )
+            if active_reservation_context.suggested_time:
+                reservation_context_block += f"- Restaurant Suggested Time: {active_reservation_context.suggested_time}\n"
+            reservation_context_block += (
+                "\nWhen the user confirms or accepts (e.g., 'yes', 'go ahead', 'book it'), "
+                "use send_reservation_request with these details immediately. "
+                "If they're accepting a suggested time, use the suggested_time as iso_time.\n"
+            )
 
         system_prompt = (
             "You are a friendly AI concierge helping people discover and book local businesses. "
@@ -234,6 +255,7 @@ async def generate_response(
             "\n"
             "- If 'supports_reservations' is false or missing, suggest they contact the business directly.\n"
             "- Ask clarifying questions only if details are missing or ambiguous AND not in conversation history.\n"
+            f"{reservation_context_block}"
             "\n"
             "Respond concisely with at most three recommendations, include the city and a verbatim highlight drawn from the context, "
             "and suggest a follow-up only when it clearly adds value."

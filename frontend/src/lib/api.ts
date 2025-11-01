@@ -70,6 +70,15 @@ export interface ReservationAction {
   notes?: string
 }
 
+export interface ActiveReservationContext {
+  restaurant_id: string
+  restaurant_name: string
+  npub: string
+  party_size: number
+  original_time: string
+  suggested_time?: string
+}
+
 export interface ChatRequestPayload {
   message: string
   session_id?: string
@@ -79,6 +88,7 @@ export interface ChatRequestPayload {
   debug?: boolean
   user_location?: string
   user_coordinates?: GeoPoint
+  active_reservation_context?: ActiveReservationContext
 }
 
 export interface ChatResponse {
