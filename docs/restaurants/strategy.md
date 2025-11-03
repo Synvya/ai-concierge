@@ -92,25 +92,31 @@ const restaurants = await pool.querySync(relays, {
 
 // Step 2: Check which restaurants handle reservations
 const restaurantPubkeys = restaurants.map(e => e.pubkey);
-const recommendations = await pool.querySync(relays, {
+
+// Check for reservation support (9901/9902)
+const reservationRecommendations = await pool.querySync(relays, {
   kinds: [31989],
   authors: restaurantPubkeys,
   "#d": ["9901"]  // Looking for reservation.request handlers
 });
 
-// Step 3: (Optional) Fetch detailed handler information
-for (const rec of recommendations) {
-  const aTag = rec.tags.find(t => t[0] === "a" && t[1].startsWith("31990:"));
-  if (aTag) {
-    const [kind, pubkey, dTag] = aTag[1].split(":");
-    const handlerInfo = await pool.get(relays, {
-      kinds: [31990],
-      authors: [pubkey],
-      "#d": [dTag]
-    });
-    // handlerInfo contains k tags listing supported event kinds
-  }
-}
+// Check for modification support (9903/9904) - Optional but recommended
+const modificationRecommendations = await pool.querySync(relays, {
+  kinds: [31989],
+  authors: restaurantPubkeys,
+  "#d": ["9903", "9904"]  // Looking for modification handler recommendations
+});
+
+// Build maps of restaurant capabilities
+const reservationCapable = new Set(reservationRecommendations.map(e => e.pubkey));
+const modificationCapable = new Set(modificationRecommendations.map(e => e.pubkey));
+
+// Filter and annotate restaurants
+const availableRestaurants = restaurantData.map(r => ({
+  ...r,
+  supports_reservations: reservationCapable.has(r.pubkey),
+  supports_modifications: modificationCapable.has(r.pubkey)
+})).filter(r => r.supports_reservations);
 ```
 
 ### Benefits
@@ -137,6 +143,9 @@ for (const rec of recommendations) {
 
 3. **Gift wrap**
    - Create a `kind:1059` **gift wrap event** that contains the seal and is addressed to the restaurant (`p` tag = restaurant pubkey).
+   - **Create TWO gift wraps**: one for recipient, one for self (Self CC)
+   - Publish both to relays
+   - **Thread ID**: Store the recipient's gift wrap ID as the thread ID for future messages
 
 ### Reservation Response
 
@@ -149,14 +158,52 @@ for (const rec of recommendations) {
 3. **Gift wrap**
    - Create a `kind:1059` gift wrap event addressed to the **AI Concierge**.
 
-### Calendar Event Exchange
+### Reservation Response
 
-- The same **Rumor → Seal → Gift Wrap** structure is used for:
-  - Reservation confirmation (`kind:31923`, NIP-52)
-  - RSVP (`kind:31925`)
-  - Calendar updates (`kind:31924`)
+1. **Create a rumor**
+   - Unsigned event of `kind:9902` containing the reservation response payload.
+   - Payload encrypted with **NIP-44**.
+   - Include NIP-10 threading tags: `[["e", "<original_request_giftwrap_id>", "", "root"]]`
 
-All are encrypted and exchanged as NIP-59 gift-wrapped payloads.
+2. **Seal the rumor**
+   - Create a `kind:13` seal event containing the rumor.
+
+3. **Gift wrap**
+   - Create a `kind:1059` gift wrap event addressed to the **AI Concierge**.
+   - **Create TWO gift wraps**: one for recipient, one for self (Self CC)
+   - Publish both to relays
+
+### Modification Request
+
+1. **Create a rumor**
+   - Unsigned event of `kind:9903` containing the modification request payload.
+   - Payload encrypted with **NIP-44**.
+   - Include NIP-10 threading tags: `[["e", "<original_request_giftwrap_id>", "", "root"]]`
+
+2. **Seal the rumor**
+   - Create a `kind:13` seal event containing the rumor.
+
+3. **Gift wrap**
+   - Create a `kind:1059` gift wrap event addressed to the **AI Concierge**.
+   - **Create TWO gift wraps**: one for recipient, one for self (Self CC)
+   - Publish both to relays
+
+### Modification Response
+
+1. **Create a rumor**
+   - Unsigned event of `kind:9904` containing the modification response payload.
+   - Payload encrypted with **NIP-44**.
+   - Include NIP-10 threading tags:
+     - `[["e", "<original_request_giftwrap_id>", "", "root"]]`
+     - `[["e", "<modification_request_giftwrap_id>", "", "reply"]]`
+
+2. **Seal the rumor**
+   - Create a `kind:13` seal event containing the rumor.
+
+3. **Gift wrap**
+   - Create a `kind:1059` gift wrap event addressed to the **Restaurant**.
+   - **Create TWO gift wraps**: one for recipient, one for self (Self CC)
+   - Publish both to relays
 
 ---
 
