@@ -24,7 +24,9 @@ This design avoids fragmented API integrations and builds a **universal agent-to
    - App-specific kinds (in the **30000–30999** range) are assigned as:
      - `kind:9901` — `reservation.request`
      - `kind:9902` — `reservation.response`
-   - Calendar messages (NIP-52) are also exchanged via NIP-59 wrapping.
+     - `kind:9903` — `reservation.modification.request`
+     - `kind:9904` — `reservation.modification.response`
+   - All messages are encrypted and exchanged via NIP-59 gift wrap.
 
 4. **NIP References**
    - **NIP-01:** Core protocol + Addressable Events
@@ -43,12 +45,12 @@ This design avoids fragmented API integrations and builds a **universal agent-to
 
 Before AI agents can send reservation requests, they must **discover which restaurants support reservations**. This is accomplished using **NIP-89 Application Handlers**, which provide a standardized way for applications to announce their capabilities.
 
-### Three-Event Pattern
+### Five-Event Pattern
 
-When a restaurant with `businessType === "restaurant"` publishes their profile, three additional events are automatically published:
+When a restaurant with `businessType === "restaurant"` publishes their profile, five additional events are automatically published:
 
 1. **Handler Information (kind 31990)**
-   - Declares support for `kind:9901` (reservation.request) and `kind:9902` (reservation.response)
+   - Declares support for `kind:9901` (reservation.request), `kind:9902` (reservation.response), `kind:9903` (reservation.modification.request), and `kind:9904` (reservation.modification.response)
    - Tagged with `["d", "synvya-restaurants-v1.0"]` for identification
    - Content is empty (refer to kind 0 profile for restaurant metadata)
 
@@ -60,6 +62,16 @@ When a restaurant with `businessType === "restaurant"` publishes their profile, 
 3. **Handler Recommendation for 9902 (kind 31989)**
    - Recommends the restaurant's 31990 handler for processing reservation responses
    - Tagged with `["d", "9902"]`
+   - Includes same `a` tag format as above
+
+4. **Handler Recommendation for 9903 (kind 31989)** - Optional but recommended
+   - Recommends the restaurant's 31990 handler for processing modification requests
+   - Tagged with `["d", "9903"]`
+   - Includes same `a` tag format as above
+
+5. **Handler Recommendation for 9904 (kind 31989)** - Optional but recommended
+   - Recommends the restaurant's 31990 handler for processing modification responses
+   - Tagged with `["d", "9904"]`
    - Includes same `a` tag format as above
 
 ### Publishing Lifecycle
@@ -107,6 +119,7 @@ for (const rec of recommendations) {
 - **Standards-Compliant:** Uses official NIP-89 for application handlers
 - **Explicit Opt-In:** Restaurants choose to enable reservation support
 - **Efficient Queries:** AI agents can filter capabilities before sending requests
+- **Backward Compatible:** Modification messages (9903/9904) work even without NIP-89 handlers
 - **Composable:** Same pattern can extend to orders, payments, and other capabilities
 
 ---
@@ -161,20 +174,37 @@ Do **not** use the deprecated `d` tag for addressable identification.
 
 ## End-to-End Flow Summary
 
+### Complete 4-Message Flow
+
 1. **AI Concierge → Restaurant**
    - Sends `reservation.request` (`kind:9901`) wrapped via NIP-59.
+   - Thread ID: Gift wrap event ID of this request (becomes root for all subsequent messages)
 
-2. **Restaurant ↔ Concierge**
-   - Exchanges `reservation.response` (`kind:9902`) via NIP-59, threaded with NIP-10.
+2. **Restaurant → Concierge** (One of two paths)
+   - **Path A**: Sends `reservation.response` (`kind:9902`) with `status: "confirmed"` or `status: "declined"` → Conversation ends
+   - **Path B**: Sends `reservation.modification.request` (`kind:9903`) suggesting alternative time → Continue to step 3
 
-3. **Restaurant → Concierge**
-   - Sends confirmed **NIP-52 calendar event** (`kind:31923`), wrapped via NIP-59.
+3. **AI Concierge → Restaurant** (If modification requested)
+   - Sends `reservation.modification.response` (`kind:9904`) with `status: "accepted"` or `status: "declined"`
+   - Threads link to original request (root) and modification request (reply)
 
-4. **Concierge → Restaurant**
-   - Sends RSVP (`kind:31925`), wrapped via NIP-59.
+4. **Restaurant → Concierge** (After modification response)
+   - Sends `reservation.response` (`kind:9902`) with `status: "confirmed"` or `status: "declined"` → Conversation ends
 
-5. **Restaurant**
-   - Stores the confirmed reservation in its calendar (`kind:31924`).
+### Threading
+
+All messages in a conversation thread must reference the original request's gift wrap event ID:
+- **Thread ID**: Gift wrap event ID of the original reservation request (kind:9901)
+- **NIP-10 Tags**: All subsequent messages include `["e", "<thread_id>", "", "root"]` tag
+- **Modification Response**: Also includes `["e", "<modification_request_id>", "", "reply"]` tag
+
+### Self CC Pattern
+
+All outgoing messages use **Self CC** (Copy to Self):
+- **Two gift wraps** created for each message: one for recipient, one for sender
+- Enables remote storage, multi-device sync, and recovery from local storage loss
+- Both gift wraps published to relays
+- Recipient's gift wrap ID is used as thread ID for consistency
 
 ---
 
