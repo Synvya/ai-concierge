@@ -240,8 +240,9 @@ export function useReservations(): ReservationContextValue {
 
 /**
  * Updates thread list with a new incoming message
+ * @internal Exported for testing purposes
  */
-function updateThreadWithMessage(
+export function updateThreadWithMessage(
   threads: ReservationThread[],
   message: ReservationMessage
 ): ReservationThread[] {
