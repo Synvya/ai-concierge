@@ -8,7 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.config import get_settings
 from ..db import get_session
 from ..repositories.sellers import search_sellers
-from ..schemas import ChatRequest, ChatResponse, ReservationAction, SellerResult
+from ..schemas import (
+    ChatRequest,
+    ChatResponse,
+    ModificationResponseAction,
+    ReservationAction,
+    SellerResult,
+)
 from ..services.analytics import analytics_service
 from ..services.assistant import generate_response
 from ..services.embedding import embed_text
@@ -44,7 +50,7 @@ async def chat(
 
     results = [SellerResult(**seller) for seller in sellers]
 
-    answer, function_call_data = await generate_response(
+    answer, function_call_data, modification_response_data = await generate_response(
         payload.message, results, payload.history, payload.active_reservation_context
     )
 
@@ -55,6 +61,14 @@ async def chat(
             reservation_action = ReservationAction(**function_call_data)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to create ReservationAction: %s", exc)
+
+    # Convert modification response data to ModificationResponseAction if present
+    modification_response_action = None
+    if modification_response_data:
+        try:
+            modification_response_action = ModificationResponseAction(**modification_response_data)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to create ModificationResponseAction: %s", exc)
 
     analytics_summary = None
     try:
@@ -93,4 +107,5 @@ async def chat(
         user_location=user_location,
         user_coordinates=user_coordinates,
         reservation_action=reservation_action,
+        modification_response_action=modification_response_action,
     )

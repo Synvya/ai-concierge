@@ -790,11 +790,37 @@ export const ChatPanel = () => {
       setMessages((prev) => [...prev, assistantMessage])
     }
 
+    // Handle modification response action from backend (priority - comes from OpenAI function call)
+    if (payload.modification_response_action) {
+      const action = payload.modification_response_action
+      
+      // Find the modification thread
+      const modificationThread = reservationThreads?.find(
+        (t) => t.threadId === action.thread_id && t.status === 'modification_requested'
+      )
+
+      if (modificationThread) {
+        await sendModificationResponse(
+          modificationThread,
+          action.status as 'accepted' | 'declined',
+          action.message
+        )
+      } else {
+        toast({
+          title: 'Thread not found',
+          description: 'Could not find the modification request thread.',
+          status: 'error',
+        })
+      }
+      return
+    }
+
     // Handle reservation action from backend
     if (payload.reservation_action) {
       const action = payload.reservation_action
       
       // Check if this is a modification acceptance (thread_id matches a modification_requested thread)
+      // This is a fallback for backward compatibility
       const modificationThread = action.thread_id
         ? reservationThreads?.find(
             (t) => t.threadId === action.thread_id && t.status === 'modification_requested'

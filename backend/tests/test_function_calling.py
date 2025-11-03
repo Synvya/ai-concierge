@@ -39,10 +39,11 @@ async def test_generate_response_returns_tuple():
             )
         ]
 
-        text, function_data = await generate_response("Find smoothies", results, [])
+        text, function_data, modification_data = await generate_response("Find smoothies", results, [])
 
         assert text == "I found Smoothies & Muffins!"
         assert function_data is None
+        assert modification_data is None
 
 
 @pytest.mark.asyncio
@@ -88,7 +89,7 @@ async def test_generate_response_with_function_call():
             )
         ]
 
-        text, function_data = await generate_response(
+        text, function_data, modification_data = await generate_response(
             "Book for 2 at 3pm tomorrow", results, []
         )
 
@@ -98,6 +99,7 @@ async def test_generate_response_with_function_call():
         assert function_data["restaurant_id"] == "test123"
         assert function_data["party_size"] == 2
         assert function_data["iso_time"] == "2025-10-25T15:00:00-07:00"
+        assert modification_data is None
 
 
 @pytest.mark.asyncio
