@@ -95,12 +95,12 @@ class TestNostrRelayPool:
         npub1 = "npub1test123"
         npub2 = "npub1test456"
 
-        # Populate cache
+        # Populate cache with new format (includes d_tags suffix)
         now = datetime.now()
-        relay_pool.cache[f"nip89:{npub1}"] = CacheEntry(
+        relay_pool.cache[f"nip89:9901:{npub1}"] = CacheEntry(
             value=True, expires_at=now + timedelta(seconds=300)
         )
-        relay_pool.cache[f"nip89:{npub2}"] = CacheEntry(
+        relay_pool.cache[f"nip89:9901:{npub2}"] = CacheEntry(
             value=False, expires_at=now + timedelta(seconds=300)
         )
 
@@ -141,11 +141,11 @@ class TestNostrRelayPool:
             assert results[npub1] is True
             assert results[npub2] is False
 
-            # Check cache was populated
-            assert f"nip89:{npub1}" in relay_pool.cache
-            assert f"nip89:{npub2}" in relay_pool.cache
-            assert relay_pool.cache[f"nip89:{npub1}"].value is True
-            assert relay_pool.cache[f"nip89:{npub2}"].value is False
+            # Check cache was populated with new format (includes d_tags suffix)
+            assert f"nip89:9901:{npub1}" in relay_pool.cache
+            assert f"nip89:9901:{npub2}" in relay_pool.cache
+            assert relay_pool.cache[f"nip89:9901:{npub1}"].value is True
+            assert relay_pool.cache[f"nip89:9901:{npub2}"].value is False
 
     @pytest.mark.asyncio
     async def test_check_handlers_handles_invalid_npub(self, relay_pool):
@@ -189,7 +189,7 @@ class TestNostrRelayPool:
             mock_ensure.return_value = mock_client
             mock_wait_for.side_effect = asyncio.TimeoutError
 
-            events = await relay_pool._query_relays(["abcd1234" * 8])
+            events = await relay_pool._query_relays(["abcd1234" * 8], ["9901"])
 
             assert events == []
 
@@ -229,7 +229,7 @@ class TestNostrRelayPool:
             mock_events_result.to_vec.return_value = mock_events
             mock_client.fetch_events = AsyncMock(return_value=mock_events_result)
 
-            events = await relay_pool._query_relays(hex_pubkeys)
+            events = await relay_pool._query_relays(hex_pubkeys, ["9901"])
 
             assert events == mock_events
             # Verify filter was built correctly (Kind, PublicKey, and SingleLetterTag wrappers are used)
@@ -423,8 +423,8 @@ class TestCacheHitRate:
     @pytest.mark.asyncio
     async def test_cache_hit_rate_tracking(self, relay_pool):
         """Test that cache hits and misses are tracked correctly."""
-        # Populate cache
-        relay_pool.cache["nip89:npub1test123"] = CacheEntry(
+        # Populate cache with new format (includes d_tags suffix)
+        relay_pool.cache["nip89:9901:npub1test123"] = CacheEntry(
             value=True, expires_at=datetime.now() + timedelta(seconds=300)
         )
 
@@ -453,8 +453,8 @@ class TestCacheHitRate:
     @pytest.mark.asyncio
     async def test_get_cache_stats_includes_hit_rate(self, relay_pool):
         """Test that cache stats include hit rate."""
-        # Populate cache
-        relay_pool.cache["nip89:npub1test123"] = CacheEntry(
+        # Populate cache with new format (includes d_tags suffix)
+        relay_pool.cache["nip89:9901:npub1test123"] = CacheEntry(
             value=True, expires_at=datetime.now() + timedelta(seconds=300)
         )
         relay_pool._cache_hits = 8
@@ -582,8 +582,8 @@ class TestRelayMetrics:
 
             mock_ensure.return_value = mock_client_instance
 
-            # Perform query
-            await relay_pool._query_relays(["test_hex"])
+            # Perform query with d_tags parameter
+            await relay_pool._query_relays(["test_hex"], ["9901"])
 
             # Check that metrics were updated
             for relay_url in relay_pool.relays:
@@ -644,8 +644,8 @@ class TestBatchQueries:
     @pytest.mark.asyncio
     async def test_batch_query_with_mixed_cache_hits(self, relay_pool):
         """Test batch query with some npubs cached and some not."""
-        # Populate cache with one npub
-        relay_pool.cache["nip89:npub1cached"] = CacheEntry(
+        # Populate cache with one npub using new format (includes d_tags suffix)
+        relay_pool.cache["nip89:9901:npub1cached"] = CacheEntry(
             value=True, expires_at=datetime.now() + timedelta(seconds=300)
         )
 
