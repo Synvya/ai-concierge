@@ -12,6 +12,7 @@ import { unwrapEvent, type Rumor } from "../lib/nostr/nip59";
 import {
     parseReservationRequest,
     parseReservationResponse,
+    parseReservationModificationRequest,
 } from "../lib/nostr/reservationEvents";
 import type { ReservationRequest, ReservationResponse, ReservationModificationRequest, ReservationModificationResponse } from "../types/reservation";
 
@@ -183,6 +184,19 @@ export class ReservationSubscription {
                     giftWrap: event,
                 });
                 console.log('[ReservationMessenger] Response message delivered to callback');
+            } else if (rumor.kind === 9903) {
+                // Reservation modification request
+                console.log('[ReservationMessenger] Parsing kind:9903 modification request');
+                const payload = parseReservationModificationRequest(rumor, privateKey);
+                console.log('[ReservationMessenger] Modification request parsed successfully');
+                onMessage({
+                    rumor,
+                    type: "modification_request",
+                    payload,
+                    senderPubkey: rumor.pubkey,
+                    giftWrap: event,
+                });
+                console.log('[ReservationMessenger] Modification request message delivered to callback');
             } else {
                 // Unknown kind - ignore or log
                 console.debug(`Received gift wrap with unexpected kind: ${rumor.kind}`);
