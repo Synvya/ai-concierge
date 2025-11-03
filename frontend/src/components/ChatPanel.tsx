@@ -41,13 +41,14 @@ import { ArrowForwardIcon } from '@chakra-ui/icons'
 import { useClientIds } from '../hooks/useClientIds'
 import { useNostrIdentity } from '../hooks/useNostrIdentity'
 import { useUserContactInfo } from '../hooks/useUserContactInfo'
-import { useReservations } from '../contexts/ReservationContext'
+import { useReservations, type ReservationThread } from '../contexts/ReservationContext'
 import type {
   ChatMessage,
   ChatResponse,
   GeoPoint,
   ListingPrice,
   ProductListing,
+  ActiveReservationContext,
   SellerResult,
 } from '../lib/api'
 import { chat } from '../lib/api'
@@ -67,6 +68,125 @@ const USER_AVATAR_URL = '/assets/user.png'
 const LINK_REGEX = /(https?:\/\/[^\s]+)/g
 const LOCATION_STORAGE_KEY = 'ai-concierge-shared-location'
 const PROCESSED_RESPONSES_STORAGE_KEY = 'ai-concierge-processed-responses'
+
+const ACCEPTANCE_PATTERNS = [
+  /\byes\b/i,
+  /\baccept\b/i,
+  /\bconfirm\b/i,
+  /\bgo ahead\b/i,
+  /\bthat works\b/i,
+  /\bsounds good\b/i,
+  /\bsure\b/i,
+  /\bok\b/i,
+  /\bokay\b/i,
+  /\blet'?s go\b/i,
+  /\blet'?s do it\b/i,
+] as const
+
+const RESERVATION_KEYWORD_PATTERNS = [/\breservation\b/i, /\bbook\b/i, /\btable\b/i] as const
+const PARTY_SIZE_PATTERN = /\bfor\s+(\d+)(?:\s+(?:people|person|guests?|pax))?\b/i
+
+function extractTimesInMinutes(message: string): number[] {
+  const times = new Set<number>()
+  const normalized = message.toLowerCase()
+
+  const timeWithMinutes = normalized.matchAll(/\b(\d{1,2})(?::|\.)(\d{2})\s*(am|pm)?\b/g)
+  for (const match of timeWithMinutes) {
+    const hours = parseInt(match[1] ?? '', 10)
+    const minutes = parseInt(match[2] ?? '', 10)
+    if (Number.isNaN(hours) || Number.isNaN(minutes) || hours > 23 || minutes > 59) {
+      continue
+    }
+    const meridiem = match[3]?.toLowerCase()
+    let hours24 = hours
+    if (meridiem === 'pm' && hours24 !== 12) {
+      hours24 += 12
+    } else if (meridiem === 'am' && hours24 === 12) {
+      hours24 = 0
+    }
+    times.add(hours24 * 60 + minutes)
+  }
+
+  const timeWithMeridiem = normalized.matchAll(/\b(\d{1,2})\s*(am|pm)\b/g)
+  for (const match of timeWithMeridiem) {
+    const hours = parseInt(match[1] ?? '', 10)
+    if (Number.isNaN(hours) || hours > 12 || hours === 0) {
+      continue
+    }
+    const meridiem = match[2]?.toLowerCase()
+    let hours24 = hours
+    if (meridiem === 'pm' && hours24 !== 12) {
+      hours24 += 12
+    } else if (meridiem === 'am' && hours24 === 12) {
+      hours24 = 0
+    }
+    times.add(hours24 * 60)
+  }
+
+  return Array.from(times)
+}
+
+function getMinutesFromIsoTime(iso?: string): number | null {
+  if (!iso) return null
+  const match = iso.match(/T(\d{2}):(\d{2})/)
+  if (!match) return null
+  const hours = parseInt(match[1] ?? '', 10)
+  const minutes = parseInt(match[2] ?? '', 10)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null
+  }
+  return hours * 60 + minutes
+}
+
+export function buildActiveContextForSuggestionAcceptance(
+  message: string,
+  thread: ReservationThread | undefined,
+): ActiveReservationContext | undefined {
+  if (!thread || thread.status !== 'suggested') {
+    return undefined
+  }
+  if (thread.restaurantId === 'unknown' || !thread.suggestedTime) {
+    return undefined
+  }
+
+  const trimmedMessage = message.trim()
+  if (!trimmedMessage) {
+    return undefined
+  }
+
+  const containsAcceptance = ACCEPTANCE_PATTERNS.some((pattern) => pattern.test(trimmedMessage))
+  if (!containsAcceptance) {
+    return undefined
+  }
+
+  const hasReservationKeyword = RESERVATION_KEYWORD_PATTERNS.some((pattern) => pattern.test(trimmedMessage))
+  const hasPartySizeDetail = PARTY_SIZE_PATTERN.test(trimmedMessage)
+  const timeMentions = extractTimesInMinutes(trimmedMessage)
+
+  let hasConflictingTime = false
+  if (timeMentions.length > 0) {
+    const suggestedMinutes = getMinutesFromIsoTime(thread.suggestedTime ?? thread.request.isoTime)
+    if (suggestedMinutes === null) {
+      hasConflictingTime = true
+    } else {
+      hasConflictingTime = timeMentions.some((value) => value !== suggestedMinutes)
+    }
+  }
+
+  if (hasReservationKeyword || hasPartySizeDetail || hasConflictingTime) {
+    return undefined
+  }
+
+  return {
+    restaurant_id: thread.restaurantId,
+    restaurant_name: thread.restaurantName,
+    npub: thread.restaurantNpub,
+    party_size: thread.request.partySize,
+    original_time: thread.request.isoTime,
+    suggested_time: thread.suggestedTime,
+    thread_id: thread.threadId,
+  }
+}
 
 const SuggestedQuery = ({ label, onClick }: { label: string; onClick: (value: string) => void }) => (
   <Tag
@@ -539,49 +659,13 @@ export const ChatPanel = () => {
 
     // Check if there's an active "suggested" reservation to include context
     // Only pass this if the user's message seems to be accepting the suggestion (not making a new request)
-    let activeReservationContext = undefined
+    let activeReservationContext: ActiveReservationContext | undefined
     if (reservationThreads && reservationThreads.length > 0) {
-      // Find the most recent thread with "suggested" status
-      const suggestedThread = reservationThreads.find(t => t.status === 'suggested')
-      if (suggestedThread && suggestedThread.restaurantId !== 'unknown' && suggestedThread.suggestedTime) {
-        const lowerMessage = inputValue.toLowerCase()
-        
-        // Only include context if message is a simple acceptance (no new time/date/party size specified)
-        // If the message contains "reservation", "book", "table", or time-related words, it's likely a NEW request
-        const hasNewRequestIndicators = lowerMessage.includes('reservation') ||
-                                       lowerMessage.includes('book') ||
-                                       lowerMessage.includes('table') ||
-                                       lowerMessage.includes('for ') || // "for 3 people"
-                                       /\d+:\d+/.test(lowerMessage) || // time pattern like "11:15"
-                                       /\d+\s*(am|pm)/.test(lowerMessage) || // time pattern like "11am"
-                                       lowerMessage.includes('today') ||
-                                       lowerMessage.includes('tomorrow') ||
-                                       lowerMessage.includes('tonight')
-        
-        // Simple acceptance keywords that don't specify new details
-        const isSimpleAcceptance = (lowerMessage.includes('yes') ||
-                                   lowerMessage.includes('accept') ||
-                                   lowerMessage.includes('confirm') ||
-                                   lowerMessage.includes('go ahead') ||
-                                   lowerMessage.includes('that works') ||
-                                   lowerMessage.includes('sounds good') ||
-                                   lowerMessage.includes('sure') ||
-                                   lowerMessage.includes('ok') ||
-                                   lowerMessage.includes('okay')) &&
-                                  !hasNewRequestIndicators
-        
-        if (isSimpleAcceptance) {
-          activeReservationContext = {
-            restaurant_id: suggestedThread.restaurantId,
-            restaurant_name: suggestedThread.restaurantName,
-            npub: suggestedThread.restaurantNpub,
-            party_size: suggestedThread.request.partySize,
-            original_time: suggestedThread.request.isoTime,
-            suggested_time: suggestedThread.suggestedTime,
-            thread_id: suggestedThread.threadId, // Include thread ID for linking
-          }
-        }
-      }
+      const suggestedThread = reservationThreads.find((t) => t.status === 'suggested')
+      activeReservationContext = buildActiveContextForSuggestionAcceptance(
+        userMessage.content,
+        suggestedThread,
+      )
     }
 
     // Always send to backend - let OpenAI handle the intelligence
