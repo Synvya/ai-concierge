@@ -3,9 +3,8 @@
 ## Purpose
 
 You are helping build the **Synvya Client** — the application used by restaurants and other businesses to:
-- receive reservation messages from AI agents,
-- reply with confirmations or alternate times, and
-- publish calendar events, all over Nostr with **NIP-59 Gift Wrap**.
+- receive reservation messages from AI agents, and
+- reply with confirmations or alternate times, all over Nostr with **NIP-59 Gift Wrap**.
 
 ---
 
@@ -17,9 +16,6 @@ You are helping build the **Synvya Client** — the application used by restaura
 | Send reservation response | `9902` | Confirmation or decline |
 | Send modification request | `9903` | Suggest alternative time |
 | Receive modification response | `9904` | Customer accepts or declines modification |
-| Send calendar event | `31923` | Time-based event (NIP-52) |
-| Store confirmed reservation | `31924` | Business calendar (NIP-52) |
-| Receive RSVP | `31925` | Confirmation from user (NIP-52) |
 
 All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift Wrap).
 
@@ -104,19 +100,6 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 
 ---
 
-## Final Confirmation via Calendar Event
-
-1. When agreement is reached:
-   - Create a NIP-52 **Time-Based Calendar Event** (`kind:31923`).
-   - Follow same Rumor → Seal → Gift Wrap structure.
-   - Address to the AI Concierge.
-
-2. Await RSVP (`kind:31925`) via NIP-59 gift wrap.
-
-3. Store the confirmed booking in local calendar (`kind:31924`).
-
----
-
 ## Implementation Notes
 
 - Always use **NIP-44 encryption** for rumor payloads.
@@ -198,12 +181,6 @@ npm run build         # Build for production
 - Manually track expiration in application logic for now
 - Consider implementing client-side expiration checks
 
-### Calendar Events (NIP-52)
-- Calendar events (kinds 31923, 31924, 31925) **not yet implemented**
-- Phase 1 focuses on message-based negotiation only (9901/9902)
-- Confirmed reservations stored in local React state only
-- **Phase 2 will add calendar integration for finalized bookings**
-
 ### Relay Configuration
 - Currently configured in Settings page
 - Default relays used if none configured
@@ -247,7 +224,6 @@ client/src/
 
 ## Future Work
 
-- **Phase 2**: Calendar events (NIP-52) and finalization flow
 - **Phase 2**: NIP-13 Proof of Work enforcement
 - **Phase 2**: NIP-40 Expiration timestamps
 - **Phase 3**: Notifications for new messages (WebSocket or push)
