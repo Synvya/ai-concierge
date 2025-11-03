@@ -143,10 +143,10 @@ export function buildActiveContextForSuggestionAcceptance(
   message: string,
   thread: ReservationThread | undefined,
 ): ActiveReservationContext | undefined {
-  if (!thread || thread.status !== 'suggested') {
+  if (!thread || thread.status !== 'modification_requested') {
     return undefined
   }
-  if (thread.restaurantId === 'unknown' || !thread.suggestedTime) {
+  if (thread.restaurantId === 'unknown' || !thread.modificationRequest) {
     return undefined
   }
 
@@ -166,7 +166,7 @@ export function buildActiveContextForSuggestionAcceptance(
 
   let hasConflictingTime = false
   if (timeMentions.length > 0) {
-    const suggestedMinutes = getMinutesFromIsoTime(thread.suggestedTime ?? thread.request.isoTime)
+    const suggestedMinutes = getMinutesFromIsoTime(thread.modificationRequest.iso_time ?? thread.request.isoTime)
     if (suggestedMinutes === null) {
       hasConflictingTime = true
     } else {
@@ -184,7 +184,7 @@ export function buildActiveContextForSuggestionAcceptance(
     npub: thread.restaurantNpub,
     party_size: thread.request.partySize,
     original_time: thread.request.isoTime,
-    suggested_time: thread.suggestedTime,
+    suggested_time: thread.modificationRequest.iso_time,
     thread_id: thread.threadId,
   }
 }
@@ -410,12 +410,6 @@ export const ChatPanel = () => {
             response.message ? `\n\n${response.message}` : ''
           }`
           break
-        case 'suggested':
-          notificationTitle = '💡 Alternative Time Suggested'
-          notificationDescription = `${restaurantName} suggested ${
-            response.iso_time ? new Date(response.iso_time).toLocaleString() : 'an alternative time'
-          } instead.${response.message ? `\n\n${response.message}` : ''}`
-          break
         case 'declined':
           notificationTitle = '❌ Reservation Declined'
           notificationDescription = `${restaurantName} could not accommodate your request.${
@@ -434,6 +428,7 @@ export const ChatPanel = () => {
             response.message ? `\n\n${response.message}` : ''
           }`
           break
+        // Note: 'suggested' status is deprecated - restaurants should use modification_request (kind 9903) instead
         default:
           notificationTitle = '📬 Reservation Update'
           notificationDescription = `${restaurantName} sent a response about your reservation.${
@@ -696,14 +691,14 @@ export const ChatPanel = () => {
     setMessages(nextHistory)
     setInputValue('')
 
-    // Check if there's an active "suggested" reservation to include context
-    // Only pass this if the user's message seems to be accepting the suggestion (not making a new request)
+    // Check if there's an active modification request to include context
+    // Only pass this if the user's message seems to be accepting the modification (not making a new request)
     let activeReservationContext: ActiveReservationContext | undefined
     if (reservationThreads && reservationThreads.length > 0) {
-      const suggestedThread = reservationThreads.find((t) => t.status === 'suggested')
+      const modificationThread = reservationThreads.find((t) => t.status === 'modification_requested')
       activeReservationContext = buildActiveContextForSuggestionAcceptance(
         userMessage.content,
-        suggestedThread,
+        modificationThread,
       )
     }
 

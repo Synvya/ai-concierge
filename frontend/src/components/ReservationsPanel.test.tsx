@@ -289,7 +289,7 @@ describe('ReservationsPanel', () => {
         'sent',
         'confirmed',
         'declined',
-        'suggested',
+        'modification_requested',
         'expired',
         'cancelled',
       ];
@@ -317,7 +317,7 @@ describe('ReservationsPanel', () => {
       expect(screen.getAllByText('Sent').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Confirmed').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Declined').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Alternative Suggested').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Modification Requested').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Expired').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Cancelled').length).toBeGreaterThan(0);
     });

@@ -28,6 +28,7 @@ export function ThreadCard({ thread, onClick }: ThreadCardProps) {
     confirmed: 'green',
     declined: 'red',
     suggested: 'orange',
+    modification_requested: 'orange',
     expired: 'gray',
     cancelled: 'gray',
   };
@@ -37,6 +38,7 @@ export function ThreadCard({ thread, onClick }: ThreadCardProps) {
     confirmed: 'Confirmed',
     declined: 'Declined',
     suggested: 'Alternative Suggested',
+    modification_requested: 'Modification Requested',
     expired: 'Expired',
     cancelled: 'Cancelled',
   };
