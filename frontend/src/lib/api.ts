@@ -68,6 +68,7 @@ export interface ReservationAction {
   party_size: number
   iso_time: string
   notes?: string
+  thread_id?: string
 }
 
 export interface ActiveReservationContext {
