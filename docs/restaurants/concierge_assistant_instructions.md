@@ -15,7 +15,9 @@ You are helping build the **Synvya AI Concierge**, the agent that:
 | Action | Event Kind | Description |
 |--------|-------------|--------------|
 | Send reservation request | `9901` | Request to restaurant |
-| Receive reservation response | `9902` | Restaurant reply |
+| Receive reservation response | `9902` | Restaurant reply (confirmed/declined) |
+| Receive modification request | `9903` | Restaurant suggests alternative time |
+| Send modification response | `9904` | Accept or decline modification |
 | Receive confirmed calendar | `31923` | NIP-52 event from restaurant |
 | Send RSVP | `31925` | Confirmation of booking |
 | Store confirmed events | `31924` | User calendar |
@@ -65,21 +67,36 @@ Query for NIP-89 handler recommendation events (kind 31989) to find which restau
 ```typescript
 const restaurantPubkeys = restaurants.map(e => e.pubkey);
 
-const recommendations = await pool.querySync(relays, {
+// Check for reservation support (9901/9902)
+const reservationRecommendations = await pool.querySync(relays, {
   kinds: [31989],
   authors: restaurantPubkeys,
   "#d": ["9901"]  // Looking for reservation.request handlers
 });
 
+// Check for modification support (9903/9904)
+const modificationRecommendations = await pool.querySync(relays, {
+  kinds: [31989],
+  authors: restaurantPubkeys,
+  "#d": ["9903", "9904"]  // Looking for modification handler recommendations
+});
+
 // Build a Set of restaurants that support reservations
 const reservationCapableRestaurants = new Set(
-  recommendations.map(e => e.pubkey)
+  reservationRecommendations.map(e => e.pubkey)
+);
+
+// Build a Set of restaurants that support modifications
+const modificationCapableRestaurants = new Set(
+  modificationRecommendations.map(e => e.pubkey)
 );
 
 // Filter restaurants to only reservation-capable ones
-const availableRestaurants = restaurantData.filter(r =>
-  reservationCapableRestaurants.has(r.pubkey)
-);
+const availableRestaurants = restaurantData.map(r => ({
+  ...r,
+  supports_reservations: reservationCapableRestaurants.has(r.pubkey),
+  supports_modifications: modificationCapableRestaurants.has(r.pubkey)
+})).filter(r => r.supports_reservations);
 ```
 
 #### Step 3: (Optional) Fetch Handler Details
@@ -115,15 +132,14 @@ for (const rec of recommendations) {
         .map(t => t[1]);
       
       console.log(`Restaurant ${pubkey} supports: ${supportedKinds.join(", ")}`);
-      // Expected: ["9901", "9902"]
+      // Expected: ["9901", "9902"] for basic reservations
+      // Expected: ["9901", "9902", "9903", "9904"] for full modification support
     }
   }
 }
 ```
 
 ### Expected Handler Structure
-
-Restaurants that support reservations publish three events:
 
 1. **Handler Info (kind 31990)**
    ```json
@@ -133,7 +149,9 @@ Restaurants that support reservations publish three events:
      "tags": [
        ["d", "synvya-restaurants-v1.0"],
        ["k", "9901"],
-       ["k", "9902"]
+       ["k", "9902"],
+       ["k", "9903"],
+       ["k", "9904"]
      ],
      "content": ""
    }
@@ -159,6 +177,32 @@ Restaurants that support reservations publish three events:
      "pubkey": "<restaurant_pubkey>",
      "tags": [
        ["d", "9902"],
+       ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "wss://relay.damus.io", "all"]
+     ],
+     "content": ""
+   }
+   ```
+
+4. **Handler Recommendation for 9903 (kind 31989)** - Optional, for modification support
+   ```json
+   {
+     "kind": 31989,
+     "pubkey": "<restaurant_pubkey>",
+     "tags": [
+       ["d", "9903"],
+       ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "wss://relay.damus.io", "all"]
+     ],
+     "content": ""
+   }
+   ```
+
+5. **Handler Recommendation for 9904 (kind 31989)** - Optional, for modification support
+   ```json
+   {
+     "kind": 31989,
+     "pubkey": "<restaurant_pubkey>",
+     "tags": [
+       ["d", "9904"],
        ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "wss://relay.damus.io", "all"]
      ],
      "content": ""
@@ -211,19 +255,21 @@ Restaurants that support reservations publish three events:
    - Addressed to Concierge’s pubkey.
    - Unwrap → decrypt → extract rumor (`kind:9902`).
 
-2. **Parse Payload**
+2. **Parse Payload (Modification Request - kind:9903)**
    ```json
    {
-     "status": "suggested",
      "iso_time": "2025-10-17T19:30:00-07:00",
-     "message": "7pm full, 7:30 works."
+     "message": "7pm full, 7:30 works.",
+     "original_iso_time": "2025-10-17T19:00:00-07:00"
    }
    ```
 
 3. **User Interaction**
-   - Display message in natural language.
-   - Await user decision (accept / suggest new time).
-   - Send new `reservation.response` using same NIP-59 structure.
+   - Display modification request in natural language, showing original vs. suggested time.
+   - Await user decision (accept / decline modification).
+   - Send `reservation.modification.response` (kind:9904) with status "accepted" or "declined".
+   - If accepted, include `iso_time` matching the suggested time.
+   - **Note**: The system will respond to modification requests even if the restaurant doesn't advertise modification support via NIP-89 (backward compatibility).
 
 4. **Thread Management**
    - Maintain message threads with **NIP-10** tags (`root` / `reply`).
@@ -364,7 +410,7 @@ const rootEventId = context.rootId || rumor.id;
 ### 5. Handle by Type
 - **confirmed**: Await calendar event (kind 31923) in Phase 2
 - **declined**: Notify user, end thread
-- **suggested**: Present alternative to user for decision
+- **modification_requested**: Present modification request to user for decision (accept/decline)
 - **expired**: Mark thread as closed
 - **cancelled**: Update status, notify user
 

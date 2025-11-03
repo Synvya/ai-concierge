@@ -12,7 +12,6 @@ The schemas formalize the JSON structure of each payload, enabling validation, l
 schemas/
 ├── examples/
 │   ├── reservation.request.example.json
-│   ├── reservation.response.suggested.example.json
 │   ├── reservation.response.confirmed.example.json
 │   ├── reservation.response.declined.example.json
 │   ├── reservation.modification.request.example.json
@@ -85,7 +84,7 @@ npx ajv validate -s reservation.request.schema.json -d examples/reservation.requ
 
 #### Using Python
 ```bash
-python -m jsonschema -i examples/reservation.response.suggested.example.json reservation.response.schema.json
+python -m jsonschema -i examples/reservation.response.confirmed.example.json reservation.response.schema.json
 python -m jsonschema -i examples/reservation.modification.request.example.json reservation.modification.request.schema.json
 python -m jsonschema -i examples/reservation.modification.response.accepted.example.json reservation.modification.response.schema.json
 ```
