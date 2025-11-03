@@ -528,11 +528,22 @@ export const ChatPanel = () => {
     setInputValue('')
 
     // Check if there's an active "suggested" reservation to include context
+    // Only include context if the message seems like a follow-up to accept a suggestion
     let activeReservationContext = undefined
-    if (reservationThreads && reservationThreads.length > 0) {
+    const lowerMessage = inputValue.toLowerCase()
+    const isFollowUp = lowerMessage.includes('yes') || 
+                       lowerMessage.includes('accept') || 
+                       lowerMessage.includes('confirm') || 
+                       lowerMessage.includes('go ahead') ||
+                       lowerMessage.includes('that works') ||
+                       lowerMessage.includes('sounds good') ||
+                       lowerMessage.includes('ok') ||
+                       lowerMessage.includes('okay')
+    
+    if (isFollowUp && reservationThreads && reservationThreads.length > 0) {
       // Find the most recent thread with "suggested" status
       const suggestedThread = reservationThreads.find(t => t.status === 'suggested')
-      if (suggestedThread && suggestedThread.restaurantId !== 'unknown') {
+      if (suggestedThread && suggestedThread.restaurantId !== 'unknown' && suggestedThread.suggestedTime) {
         activeReservationContext = {
           restaurant_id: suggestedThread.restaurantId,
           restaurant_name: suggestedThread.restaurantName,
