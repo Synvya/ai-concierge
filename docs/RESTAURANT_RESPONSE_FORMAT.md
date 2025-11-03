@@ -23,6 +23,8 @@ Restaurants should send a kind:9902 response in the following scenarios:
 
 **Important**: If the requested time is unavailable and you want to suggest an alternative time, use **kind:9903** (modification request) instead of kind:9902. See [RESERVATION_MODIFICATION_FORMAT.md](./RESERVATION_MODIFICATION_FORMAT.md).
 
+**NIP-89 Discovery**: To advertise modification support (kinds 9903 and 9904), publish NIP-89 handler recommendations. See [NIP-89 Integration Guide](./nip89-integration.md) for details. However, you can still send modification requests without NIP-89 handlers (backward compatible).
+
 ## Message Structure
 
 ### Outer Layer (Gift Wrap - kind:1059)
@@ -273,6 +275,8 @@ For questions or issues with reservation message handling, please refer to:
 - [NIP-59 Specification](https://github.com/nostr-protocol/nips/blob/master/59.md)
 - [NIP-44 Specification](https://github.com/nostr-protocol/nips/blob/master/44.md)
 - [NIP-10 Specification](https://github.com/nostr-protocol/nips/blob/master/10.md) (Threading)
+- [NIP-89 Specification](https://github.com/nostr-protocol/nips/blob/master/89.md) (Application Handlers)
+- [NIP-89 Integration Guide](./nip89-integration.md) (Capability discovery)
 - [Reservation Request Format](./RESERVATION_REQUEST_FORMAT.md)
 - [Reservation Modification Format](./RESERVATION_MODIFICATION_FORMAT.md)
 - [Implementation Status](./restaurants/implementation-status.md)

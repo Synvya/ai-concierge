@@ -23,11 +23,15 @@ Send a modification request when:
 
 **Do NOT use** kind:9902 with `status: "suggested"` (deprecated). Use kind:9903 instead.
 
+**NIP-89 Discovery**: Restaurants should publish NIP-89 handler recommendations (kind:31989) with `d:9903` and `d:9904` to advertise modification support. See [NIP-89 Integration Guide](./nip89-integration.md) for details. However, the system will still process modification requests even if not advertised via NIP-89.
+
 ### Customer → Restaurant (kind:9904)
 
 Send a modification response when:
 - You receive a modification request (kind:9903) from a restaurant
 - You want to accept or decline the suggested alternative time
+
+**Implementation Note**: The AI Concierge will respond to modification requests even if the restaurant doesn't advertise modification support via NIP-89. This ensures backward compatibility with restaurants that support modifications but haven't published NIP-89 handlers yet.
 
 ## Message Structure
 
@@ -335,6 +339,12 @@ This ensures all messages in the conversation are properly linked.
    - If `status: "accepted"`: Send kind:9902 with `status: "confirmed"`
    - If `status: "declined"`: You can send another modification request or decline with kind:9902
 
+4. **NIP-89 Discovery** (Recommended):
+   - Publish NIP-89 handler recommendations (kind:31989) with `d:9903` and `d:9904` to advertise modification support
+   - This helps AI Concierge systems discover your modification capabilities
+   - See [NIP-89 Integration Guide](./nip89-integration.md) for implementation details
+   - **Note**: You can still send modification requests without NIP-89 handlers (backward compatible)
+
 ### For Customers (AI Concierge)
 
 1. **Handling Modification Requests**:
@@ -346,6 +356,14 @@ This ensures all messages in the conversation are properly linked.
    - Always include `iso_time` when accepting
    - Link properly to both original request and modification request
    - Wait for restaurant's final response (kind:9902)
+
+3. **NIP-89 Discovery and Behavior**:
+   - The system checks for modification support via NIP-89 discovery (queries for `d:9903` and `d:9904`)
+   - If a restaurant sends a modification request (kind:9903) but doesn't advertise support via NIP-89:
+     - The system will log a warning but **still process the modification request**
+     - Modification responses (kind:9904) will be sent normally
+     - This ensures backward compatibility with restaurants that support modifications but haven't published NIP-89 handlers
+   - See [NIP-89 Integration Guide](./nip89-integration.md) for discovery details
 
 ## Schema Validation
 
@@ -368,6 +386,8 @@ For questions or issues with modification message handling, please refer to:
 - [NIP-59 Specification](https://github.com/nostr-protocol/nips/blob/master/59.md)
 - [NIP-44 Specification](https://github.com/nostr-protocol/nips/blob/master/44.md)
 - [NIP-10 Specification](https://github.com/nostr-protocol/nips/blob/master/10.md) (Threading)
+- [NIP-89 Specification](https://github.com/nostr-protocol/nips/blob/master/89.md) (Application Handlers)
+- [NIP-89 Integration Guide](./nip89-integration.md) (Modification discovery)
 - [Reservation Request Format](./RESERVATION_REQUEST_FORMAT.md)
 - [Restaurant Response Format](./RESTAURANT_RESPONSE_FORMAT.md)
 - [Implementation Status](./restaurants/implementation-status.md)
