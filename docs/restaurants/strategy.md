@@ -119,6 +119,36 @@ const availableRestaurants = restaurantData.map(r => ({
 })).filter(r => r.supports_reservations);
 ```
 
+### Step 3: (Optional) Fetch Detailed Handler Information
+
+If you need detailed handler information, parse the `a` tag from the recommendation to find the handler info event:
+
+```typescript
+// Check both reservation and modification recommendations
+for (const rec of [...reservationRecommendations, ...modificationRecommendations]) {
+  const aTag = rec.tags.find(t => t[0] === "a" && t[1].startsWith("31990:"));
+  if (aTag) {
+    const [kind, pubkey, dTag] = aTag[1].split(":");
+    const handlerInfo = await pool.get(relays, {
+      kinds: [31990],
+      authors: [pubkey],
+      "#d": [dTag]
+    });
+    
+    if (handlerInfo) {
+      // Extract supported event kinds from 'k' tags
+      const supportedKinds = handlerInfo.tags
+        .filter(t => t[0] === "k")
+        .map(t => t[1]);
+      
+      console.log(`Restaurant ${pubkey} supports: ${supportedKinds.join(", ")}`);
+      // Expected: ["9901", "9902"] for basic reservations
+      // Expected: ["9901", "9902", "9903", "9904"] for full modification support
+    }
+  }
+}
+```
+
 ### Benefits
 
 - **Decentralized Discovery:** No central registry or API required
