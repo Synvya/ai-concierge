@@ -71,7 +71,6 @@ describe('useModificationResponse', () => {
             pubkey: keypair.publicKeyHex,
             tags: [],
             id: 'modification-request-id',
-            sig: 'sig',
           },
           type: 'modification_request',
           payload: modificationRequest,
