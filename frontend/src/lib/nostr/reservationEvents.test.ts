@@ -8,13 +8,15 @@ import {
     validateReservationRequest,
     validateReservationResponse,
     validateReservationModificationRequest,
+    validateReservationModificationResponse,
     buildReservationRequest,
     buildReservationResponse,
+    buildReservationModificationResponse,
     parseReservationRequest,
     parseReservationResponse,
     parseReservationModificationRequest,
 } from "./reservationEvents";
-import type { ReservationRequest, ReservationResponse, ReservationModificationRequest } from "../../types/reservation";
+import type { ReservationRequest, ReservationResponse, ReservationModificationRequest, ReservationModificationResponse } from "../../types/reservation";
 import { unwrapAndDecrypt, wrapEvent } from "./nip59";
 import { encryptMessage } from "./nip44";
 
@@ -347,6 +349,201 @@ describe("reservationEvents", () => {
             expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow(
                 "Invalid reservation modification request"
             );
+        });
+    });
+
+    describe("validateReservationModificationResponse", () => {
+        it("validates a valid accepted response", () => {
+            const response: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Yes, 7:30pm works perfectly!",
+            };
+
+            const result = validateReservationModificationResponse(response);
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toBeUndefined();
+        });
+
+        it("validates a valid declined response", () => {
+            const response: ReservationModificationResponse = {
+                status: "declined",
+                message: "Unfortunately 7:30pm doesn't work for us.",
+            };
+
+            const result = validateReservationModificationResponse(response);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it("validates accepted response without message", () => {
+            const response: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+            };
+
+            const result = validateReservationModificationResponse(response);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it("rejects accepted response missing required iso_time", () => {
+            const response = {
+                status: "accepted",
+                // missing required iso_time for accepted status
+            };
+
+            const result = validateReservationModificationResponse(response);
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toBeDefined();
+            expect(result.errors!.length).toBeGreaterThan(0);
+        });
+
+        it("rejects response missing required status", () => {
+            const response = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+            };
+
+            const result = validateReservationModificationResponse(response);
+
+            expect(result.valid).toBe(false);
+        });
+
+        it("rejects response with invalid status", () => {
+            const response = {
+                status: "invalid-status",
+            } as unknown as ReservationModificationResponse;
+
+            const result = validateReservationModificationResponse(response);
+
+            expect(result.valid).toBe(false);
+        });
+
+        it("rejects response with message too long", () => {
+            const response = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "x".repeat(2001), // Max 2000
+            };
+
+            const result = validateReservationModificationResponse(response);
+
+            expect(result.valid).toBe(false);
+        });
+
+        it("accepts declined response without iso_time", () => {
+            const response: ReservationModificationResponse = {
+                status: "declined",
+            };
+
+            const result = validateReservationModificationResponse(response);
+
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe("buildReservationModificationResponse", () => {
+        it("builds encrypted event template for accepted response", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const response: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Yes, 7:30pm works perfectly!",
+            };
+
+            const template = buildReservationModificationResponse(
+                response,
+                sender.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            expect(template.kind).toBe(9904);
+            expect(template.content).toBeTruthy();
+            expect(template.content).not.toContain("status"); // Encrypted
+            expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
+        });
+
+        it("builds encrypted event template for declined response", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const response: ReservationModificationResponse = {
+                status: "declined",
+                message: "Unfortunately 7:30pm doesn't work for us.",
+            };
+
+            const template = buildReservationModificationResponse(
+                response,
+                sender.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            expect(template.kind).toBe(9904);
+            expect(template.content).toBeTruthy();
+            expect(template.content).not.toContain("status"); // Encrypted
+            expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
+        });
+
+        it("includes additional tags for thread linking", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const response: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+            };
+
+            const template = buildReservationModificationResponse(
+                response,
+                sender.privateKeyHex,
+                recipient.publicKeyHex,
+                [
+                    ["e", "original-request-id", "", "root"],
+                    ["e", "modification-request-id", "", "reply"],
+                ]
+            );
+
+            expect(template.tags).toContainEqual(["e", "original-request-id", "", "root"]);
+            expect(template.tags).toContainEqual(["e", "modification-request-id", "", "reply"]);
+        });
+
+        it("throws on invalid accepted response (missing iso_time)", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const invalidResponse = {
+                status: "accepted",
+                // missing required iso_time
+            } as ReservationModificationResponse;
+
+            expect(() =>
+                buildReservationModificationResponse(
+                    invalidResponse,
+                    sender.privateKeyHex,
+                    recipient.publicKeyHex
+                )
+            ).toThrow("Invalid reservation modification response");
+        });
+
+        it("throws on invalid response (invalid status)", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const invalidResponse = {
+                status: "invalid-status",
+            } as unknown as ReservationModificationResponse;
+
+            expect(() =>
+                buildReservationModificationResponse(
+                    invalidResponse,
+                    sender.privateKeyHex,
+                    recipient.publicKeyHex
+                )
+            ).toThrow("Invalid reservation modification response");
         });
     });
 

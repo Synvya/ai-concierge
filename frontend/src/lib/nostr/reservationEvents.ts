@@ -12,6 +12,7 @@ import type {
     ReservationRequest,
     ReservationResponse,
     ReservationModificationRequest,
+    ReservationModificationResponse,
     ValidationResult,
     ValidationError,
 } from "../../types/reservation";
@@ -22,6 +23,7 @@ import { hexToBytes } from '@noble/hashes/utils';
 import requestSchema from "../../../../docs/schemas/reservation.request.schema.json";
 import responseSchema from "../../../../docs/schemas/reservation.response.schema.json";
 import modificationRequestSchema from "../../../../docs/schemas/reservation.modification.request.schema.json";
+import modificationResponseSchema from "../../../../docs/schemas/reservation.modification.response.schema.json";
 
 // Initialize AJV with formats support
 const ajv = new Ajv({ allErrors: true, validateSchema: false });
@@ -31,6 +33,7 @@ addFormats(ajv);
 const validateRequest = ajv.compile(requestSchema);
 const validateResponse = ajv.compile(responseSchema);
 const validateModificationRequest = ajv.compile(modificationRequestSchema);
+const validateModificationResponse = ajv.compile(modificationResponseSchema);
 
 /**
  * Validates a reservation request payload against the JSON schema.
@@ -362,5 +365,103 @@ export function parseReservationModificationRequest(
 
     return payload as ReservationModificationRequest;
 }
+
+/**
+ * Validates a reservation modification response payload against the JSON schema.
+ * 
+ * @param payload - The modification response payload to validate
+ * @returns Validation result with errors if invalid
+ * 
+ * @example
+ * ```typescript
+ * const result = validateReservationModificationResponse({
+ *   status: "accepted",
+ *   iso_time: "2025-10-20T19:30:00-07:00"
+ * });
+ * 
+ * if (!result.valid) {
+ *   console.error('Validation errors:', result.errors);
+ * }
+ * ```
+ */
+export function validateReservationModificationResponse(payload: unknown): ValidationResult {
+    const valid = validateModificationResponse(payload);
+
+    if (valid) {
+        return { valid: true };
+    }
+
+    const errors: ValidationError[] = (validateModificationResponse.errors || []).map((err) => ({
+        field: err.instancePath || err.params?.missingProperty,
+        message: err.message || "Validation failed",
+        value: err.data,
+    }));
+
+    return { valid: false, errors };
+}
+
+/**
+ * Creates an encrypted rumor event for a reservation modification response (kind 9904).
+ * 
+ * @param response - The reservation modification response payload
+ * @param senderPrivateKey - Sender's private key in hex format for encryption
+ * @param recipientPublicKey - Recipient's public key in hex format for encryption
+ * @param additionalTags - Optional additional tags (e.g., thread markers)
+ * @returns Event template ready to be wrapped with NIP-59
+ * @throws Error if validation fails
+ * 
+ * @example
+ * ```typescript
+ * const rumor = buildReservationModificationResponse(
+ *   {
+ *     status: "accepted",
+ *     iso_time: "2025-10-20T19:30:00-07:00",
+ *     message: "Yes, 7:30pm works perfectly!"
+ *   },
+ *   myPrivateKeyHex,
+ *   restaurantPublicKeyHex,
+ *   [
+ *     ["e", originalRequestId, "", "root"],  // Reference original request
+ *     ["e", modificationRequestId, "", "reply"]  // Reference modification request
+ *   ]
+ * );
+ * 
+ * // Wrap and send
+ * const giftWrap = wrapEvent(rumor, myPrivateKeyHex, restaurantPublicKeyHex);
+ * await publishToRelays(giftWrap, relays);
+ * ```
+ */
+export function buildReservationModificationResponse(
+    response: ReservationModificationResponse,
+    senderPrivateKey: string,
+    recipientPublicKey: string,
+    additionalTags: string[][] = []
+): EventTemplate {
+    // Validate payload
+    const validation = validateReservationModificationResponse(response);
+    if (!validation.valid) {
+        const errorMessages = validation.errors?.map(e => e.message).join(", ");
+        throw new Error(`Invalid reservation modification response: ${errorMessages}`);
+    }
+
+    // Encrypt the payload
+    const encrypted = encryptMessage(
+        JSON.stringify(response),
+        senderPrivateKey,
+        recipientPublicKey
+    );
+
+    // Build event template
+    return {
+        kind: 9904,
+        content: encrypted,
+        tags: [
+            ["p", recipientPublicKey],
+            ...additionalTags,
+        ],
+        created_at: Math.floor(Date.now() / 1000),
+    };
+}
+
 
 
