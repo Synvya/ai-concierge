@@ -205,9 +205,14 @@ async def generate_response(
             if active_reservation_context.suggested_time:
                 reservation_context_block += f"- Restaurant Suggested Time: {active_reservation_context.suggested_time}\n"
             reservation_context_block += (
-                "\nWhen the user confirms or accepts (e.g., 'yes', 'go ahead', 'book it'), "
-                "use send_reservation_request with these details immediately. "
-                "If they're accepting a suggested time, use the suggested_time as iso_time.\n"
+                "\n**IMPORTANT**: When the user confirms or accepts (e.g., 'yes', 'go ahead', 'book it'), "
+                "IMMEDIATELY call send_reservation_request using EXACTLY these values:\n"
+                f"  restaurant_id='{active_reservation_context.restaurant_id}'\n"
+                f"  restaurant_name='{active_reservation_context.restaurant_name}'\n"
+                f"  npub='{active_reservation_context.npub}'\n"
+                f"  party_size={active_reservation_context.party_size}\n"
+                f"  iso_time='{active_reservation_context.suggested_time if active_reservation_context.suggested_time else active_reservation_context.original_time}'\n"
+                "Do NOT search for or guess these values. Use the values above verbatim.\n"
             )
 
         system_prompt = (
@@ -267,7 +272,7 @@ async def generate_response(
                 "type": "function",
                 "function": {
                     "name": "send_reservation_request",
-                    "description": "Send a reservation request to a restaurant via Nostr protocol. IMPORTANT: When the user confirms a reservation (e.g., 'go ahead', 'yes', 'book it'), ALWAYS check conversation history for previous restaurant details (restaurant_id, restaurant_name, npub, party_size, date) and use them. Only ask for missing details if they're not in conversation history or current context.",
+                    "description": "Send a reservation request to a restaurant via Nostr protocol. CRITICAL: If ACTIVE RESERVATION CONTEXT is provided in the system prompt, you MUST use those exact values (restaurant_id, restaurant_name, npub, party_size, iso_time) when calling this function. Do NOT search for or extract values from conversation history when context is provided. Only search history if no active context exists.",
                     "parameters": {
                         "type": "object",
                         "properties": {
