@@ -8,7 +8,7 @@ The AI Concierge uses [NIP-89 Application Handlers](https://github.com/nostr-pro
 
 ### Restaurant Side (synvya-client-2)
 
-When a restaurant publishes their profile with `businessType: "restaurant"`, three handler events are automatically published:
+When a restaurant publishes their profile with `businessType: "restaurant"`, five handler events are automatically published:
 
 #### 1. Handler Information (kind 31990)
 Declares support for reservation event kinds:
@@ -20,6 +20,8 @@ Declares support for reservation event kinds:
     ["d", "synvya-restaurants-v1.0"],
     ["k", "9901"],  // reservation.request
     ["k", "9902"],  // reservation.response
+    ["k", "9903"],  // reservation.modification.request
+    ["k", "9904"],  // reservation.modification.response
     ["alt", "Synvya Restaurants Handler v1.0"]
   ],
   "content": ""
@@ -48,6 +50,34 @@ Recommends the handler for processing reservation responses:
   "pubkey": "<restaurant_pubkey>",
   "tags": [
     ["d", "9902"],
+    ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]
+  ],
+  "content": ""
+}
+```
+
+#### 4. Handler Recommendation for 9903 (kind 31989)
+Recommends the handler for processing reservation modification requests:
+```json
+{
+  "kind": 31989,
+  "pubkey": "<restaurant_pubkey>",
+  "tags": [
+    ["d", "9903"],
+    ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]
+  ],
+  "content": ""
+}
+```
+
+#### 5. Handler Recommendation for 9904 (kind 31989)
+Recommends the handler for processing reservation modification responses:
+```json
+{
+  "kind": 31989,
+  "pubkey": "<restaurant_pubkey>",
+  "tags": [
+    ["d", "9904"],
     ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]
   ],
   "content": ""

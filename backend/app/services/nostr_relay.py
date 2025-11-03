@@ -157,42 +157,50 @@ class NostrRelayPool:
             logger.warning(f"Failed to convert npub {npub}: {e}")
             return None
 
-    async def check_handlers(self, npubs: list[str]) -> dict[str, bool | None]:
+    async def check_handlers(self, npubs: list[str], d_tags: list[str] | None = None) -> dict[str, bool | None]:
         """
         Check NIP-89 handler support for multiple npubs.
 
-        Queries relays for kind 31989 events with d:9901 to determine if
-        restaurants have published reservation.request handlers.
+        Queries relays for kind 31989 events with specified d tags to determine if
+        restaurants have published handler recommendations.
 
         Args:
             npubs: List of Nostr public keys (npub format)
+            d_tags: List of d tag values to query for (default: ["9901"] for reservation support)
 
         Returns:
-            Dictionary mapping npub -> supports_reservations status
+            Dictionary mapping npub -> handler support status
             - True: Handler found
             - False: No handler (but npub is valid)
             - None: Query failed or timeout
         """
+        # Default to checking reservation support (d:9901)
+        if d_tags is None:
+            d_tags = ["9901"]
+        
         results: dict[str, bool | None] = {}
         uncached_npubs: list[str] = []
 
+        # Build cache key from d_tags
+        cache_key_suffix = "_".join(sorted(d_tags))
+        
         # Check cache first
         now = datetime.now()
         for npub in npubs:
-            cache_key = f"nip89:{npub}"
+            cache_key = f"nip89:{cache_key_suffix}:{npub}"
             cached = self.cache.get(cache_key)
 
             if cached and cached.expires_at > now:
                 results[npub] = cached.value
                 self._cache_hits += 1
-                logger.debug(f"Cache hit for {npub}: {cached.value}")
+                logger.debug(f"Cache hit for {npub} (kinds {d_tags}): {cached.value}")
             else:
                 uncached_npubs.append(npub)
                 self._cache_misses += 1
 
         # Query relays for uncached npubs
         if uncached_npubs:
-            logger.info(f"Querying NIP-89 handlers for {len(uncached_npubs)} npubs")
+            logger.info(f"Querying NIP-89 handlers for {len(uncached_npubs)} npubs (kinds {d_tags})")
 
             # Convert npubs to hex
             hex_pubkeys: list[str] = []
@@ -211,7 +219,7 @@ class NostrRelayPool:
             # Query relays if we have valid hex pubkeys
             if hex_pubkeys:
                 try:
-                    events = await self._query_relays(hex_pubkeys)
+                    events = await self._query_relays(hex_pubkeys, d_tags)
 
                     # Build set of pubkeys that have handlers
                     handler_pubkeys = {event.author().to_hex() for event in events}
@@ -223,13 +231,13 @@ class NostrRelayPool:
                         has_handler = hex_pk in handler_pubkeys
 
                         results[npub] = has_handler
-                        self.cache[f"nip89:{npub}"] = CacheEntry(
+                        self.cache[f"nip89:{cache_key_suffix}:{npub}"] = CacheEntry(
                             value=has_handler, expires_at=expires_at
                         )
-                        logger.debug(f"Cached result for {npub}: {has_handler}")
+                        logger.debug(f"Cached result for {npub} (kinds {d_tags}): {has_handler}")
 
                 except Exception as e:
-                    logger.error(f"Failed to query NIP-89 handlers: {e}")
+                    logger.error(f"Failed to query NIP-89 handlers (kinds {d_tags}): {e}")
                     # Set all uncached to None on error
                     for npub in uncached_npubs:
                         if npub not in results:
@@ -237,7 +245,7 @@ class NostrRelayPool:
 
         return results
 
-    async def _query_relays(self, hex_pubkeys: list[str]) -> list[Event]:
+    async def _query_relays(self, hex_pubkeys: list[str], d_tags: list[str]) -> list[Event]:
         """
         Query relays for NIP-89 handler events.
 
@@ -290,7 +298,7 @@ class NostrRelayPool:
                     metrics.consecutive_errors = 0  # Reset on success
 
             logger.info(
-                f"Found {len(events)} NIP-89 handler events in {latency_ms:.0f}ms"
+                f"Found {len(events)} NIP-89 handler events (d:{d_tags}) in {latency_ms:.0f}ms"
             )
             return events  # Already a list from to_vec()
 

@@ -23,6 +23,10 @@ export function ReservationsPanel() {
   const { sendModificationResponse } = useModificationResponse();
 
   const handleAcceptModification = async (thread: ReservationThread) => {
+    // Note: We don't check supports_modifications here because:
+    // 1. The restaurant already sent a modification request (indicating support)
+    // 2. We don't have direct access to SellerResult in this context
+    // If needed, we could fetch restaurant data from search results
     await sendModificationResponse(thread, 'accepted');
   };
 
