@@ -13,7 +13,7 @@ import {
     parseReservationRequest,
     parseReservationResponse,
 } from "../lib/nostr/reservationEvents";
-import type { ReservationRequest, ReservationResponse } from "../types/reservation";
+import type { ReservationRequest, ReservationResponse, ReservationModificationRequest, ReservationModificationResponse } from "../types/reservation";
 
 /**
  * Parsed reservation message with metadata
@@ -21,10 +21,10 @@ import type { ReservationRequest, ReservationResponse } from "../types/reservati
 export interface ReservationMessage {
     /** The unwrapped rumor event */
     rumor: Rumor;
-    /** Message type (request or response) */
-    type: "request" | "response";
+    /** Message type (request, response, modification_request, or modification_response) */
+    type: "request" | "response" | "modification_request" | "modification_response";
     /** Parsed payload */
-    payload: ReservationRequest | ReservationResponse;
+    payload: ReservationRequest | ReservationResponse | ReservationModificationRequest | ReservationModificationResponse;
     /** Sender's public key */
     senderPubkey: string;
     /** Original gift wrap event */
