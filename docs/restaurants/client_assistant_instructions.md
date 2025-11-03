@@ -115,6 +115,156 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 
 ---
 
+## Threading (NIP-10)
+
+All reservation messages must be linked using NIP-10 threading tags to maintain conversation context.
+
+### Thread ID Specification
+
+**The thread ID is the gift wrap event ID (`id` field) of the original reservation request (kind:9901).**
+
+This gift wrap event ID becomes the root identifier for the entire conversation thread. All subsequent messages in the thread must reference this root event ID.
+
+### Threading Rules by Message Type
+
+#### 1. Reservation Request (kind:9901)
+- **Thread ID**: This is the root message, so no threading tags needed initially
+- **Gift Wrap ID**: The gift wrap event ID (`giftWrap.id`) becomes the thread ID for all future messages
+- Store this ID for use in responses and modifications
+
+#### 2. Reservation Response (kind:9902)
+- **Root tag**: `["e", "<original_request_giftwrap_id>", "", "root"]`
+- Reference the gift wrap event ID from the original request
+
+#### 3. Modification Request (kind:9903)
+- **Root tag**: `["e", "<original_request_giftwrap_id>", "", "root"]`
+- Reference the gift wrap event ID from the original request
+
+#### 4. Modification Response (kind:9904)
+- **Root tag**: `["e", "<original_request_giftwrap_id>", "", "root"]`
+- **Reply tag**: `["e", "<modification_request_giftwrap_id>", "", "reply"]`
+- Reference both the original request and the modification request being replied to
+
+### Example Threading Tags
+
+```typescript
+// Reservation Request (kind:9901) - No threading tags (this is the root)
+const requestGiftWrap = wrapEvent(requestRumor, privateKey, restaurantPubkey);
+const threadId = requestGiftWrap.id; // Store this as thread ID
+
+// Reservation Response (kind:9902)
+const responseTags = [
+  ["e", threadId, "", "root"]  // Link to original request
+];
+
+// Modification Request (kind:9903)
+const modificationTags = [
+  ["e", threadId, "", "root"]  // Link to original request
+];
+
+// Modification Response (kind:9904)
+const modificationResponseTags = [
+  ["e", threadId, "", "root"],                    // Link to original request
+  ["e", modificationRequestGiftWrap.id, "", "reply"]  // Reply to modification request
+];
+```
+
+### Thread Detection
+
+When receiving messages, extract the thread ID from NIP-10 tags:
+- Look for `e` tag with `"root"` marker → this is the thread ID
+- If no root tag exists, use the rumor's `id` field as the thread ID (for root messages)
+
+---
+
+## Self CC (Copy to Self)
+
+The Self CC pattern ensures that all sent messages are stored on relays for remote access and multi-device synchronization.
+
+### Why Self CC?
+
+With Self CC, you can:
+- **Retrieve sent messages** from relays (not just received messages)
+- **Sync across devices** by querying relays for your own messages
+- **Backup conversation history** remotely, not just locally
+- **Recover from local storage loss** by re-fetching from relays
+
+### How It Works
+
+When sending any message, create **TWO gift wrap events**:
+
+1. **Gift Wrap to Recipient**: Encrypted for the recipient's public key
+   - Addressed to recipient: `["p", "<recipient_pubkey_hex>"]`
+   - Recipient can decrypt and read
+
+2. **Gift Wrap to Self**: Encrypted for your own public key
+   - Addressed to self: `["p", "<your_pubkey_hex>"]`
+   - You can decrypt and read (for storage/sync)
+
+### Implementation Pattern
+
+```typescript
+// Build the rumor (same for both)
+const rumor = buildReservationResponse(
+  payload,
+  privateKey,
+  recipientPublicKey,
+  threadTags
+);
+
+// Create TWO gift wraps
+const giftWrapToRecipient = wrapEvent(
+  rumor,
+  privateKey,
+  recipientPublicKey  // Encrypted for recipient
+);
+
+const giftWrapToSelf = wrapEvent(
+  rumor,
+  privateKey,
+  yourPublicKey  // Encrypted for self
+);
+
+// Publish BOTH to relays
+await Promise.all([
+  publishToRelays(giftWrapToRecipient, relays),
+  publishToRelays(giftWrapToSelf, relays)
+]);
+```
+
+### Receiving Self CC Messages
+
+When subscribing to relays:
+
+1. Subscribe to gift wraps addressed to your pubkey: `["#p", [yourPubkey]]`
+2. You'll receive **both** gift wraps:
+   - Gift wrap to recipient (encrypted for recipient) → **Cannot decrypt** → Silently ignore "invalid MAC" errors
+   - Gift wrap to self (encrypted for you) → **Can decrypt** → Process normally
+
+3. Handle decryption failures gracefully:
+   ```typescript
+   try {
+     const rumor = unwrapEvent(giftWrap, yourPrivateKey);
+     // Process message
+   } catch (error) {
+     if (error.message.includes('invalid MAC')) {
+       // This is a gift wrap encrypted for someone else (expected with Self CC)
+       // Silently ignore - it's the recipient's copy
+       return;
+     }
+     throw error; // Real error
+   }
+   ```
+
+### Important Notes
+
+- **Both gift wraps use identical rumors** (same kind, content, tags, timestamp)
+- **Only difference is the recipient** (different `p` tag and encryption key)
+- **Both should be published** to ensure reliable delivery
+- **Thread ID is the same** for both gift wraps (use the recipient's gift wrap ID)
+
+---
+
 ## Example Flow
 
 ```
