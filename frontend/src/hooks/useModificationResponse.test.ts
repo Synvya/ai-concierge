@@ -10,6 +10,7 @@ import { ReservationProvider } from '../contexts/ReservationContext';
 import { generateKeypair } from '../lib/nostr/keys';
 import type { ReservationThread } from '../contexts/ReservationContext';
 import type { ReservationModificationRequest } from '../types/reservation';
+import * as relayPool from '../lib/nostr/relayPool';
 
 // Mock dependencies
 vi.mock('./useNostrIdentity', () => ({
@@ -49,6 +50,7 @@ vi.mock('../services/reservationMessenger', () => ({
 describe('useModificationResponse', () => {
   const createMockThread = (overrides?: Partial<ReservationThread>): ReservationThread => {
     const keypair = generateKeypair();
+    const restaurantKeypair = generateKeypair(); // Generate valid npub for restaurant
     const modificationRequest: ReservationModificationRequest = {
       iso_time: '2025-10-25T16:00:00Z',
       message: 'We can accommodate you at 4pm instead',
@@ -59,7 +61,7 @@ describe('useModificationResponse', () => {
       threadId: 'test-thread-id',
       restaurantId: 'restaurant-123',
       restaurantName: 'Test Restaurant',
-      restaurantNpub: 'npub1test',
+      restaurantNpub: restaurantKeypair.npub, // Use valid npub format
       messages: [
         {
           rumor: {
@@ -112,20 +114,13 @@ describe('useModificationResponse', () => {
     );
 
     const thread = createMockThread();
-    
-    // Add thread to context first
-    const { result: contextResult } = renderHook(() => {
-      const { addOutgoingMessage } = require('../contexts/ReservationContext').useReservations();
-      return { addOutgoingMessage };
-    }, { wrapper: ReservationProvider });
 
     await act(async () => {
       await result.current.sendModificationResponse(thread, 'accepted', 'Yes, that works!');
     });
 
-    // Should not throw - verify by checking that publishToRelays was called
-    const { publishToRelays } = require('../lib/nostr/relayPool');
-    expect(publishToRelays).toHaveBeenCalled();
+    // Verify that publishToRelays was called
+    expect(relayPool.publishToRelays).toHaveBeenCalled();
   });
 
   it('sends declined modification response', async () => {
@@ -145,8 +140,7 @@ describe('useModificationResponse', () => {
       await result.current.sendModificationResponse(thread, 'declined', 'Sorry, that time does not work.');
     });
 
-    const { publishToRelays } = require('../lib/nostr/relayPool');
-    expect(publishToRelays).toHaveBeenCalled();
+    expect(relayPool.publishToRelays).toHaveBeenCalled();
   });
 
   it('returns early when thread has no modification request', async () => {
@@ -170,10 +164,8 @@ describe('useModificationResponse', () => {
       await result.current.sendModificationResponse(thread, 'accepted');
     });
 
-    // Verify toast was called (indirectly via require)
-    const { publishToRelays } = require('../lib/nostr/relayPool');
     // Should not have published anything
-    expect(publishToRelays).not.toHaveBeenCalled();
+    expect(relayPool.publishToRelays).not.toHaveBeenCalled();
   });
 
   it('handles missing modification request message in thread', async () => {
@@ -216,8 +208,7 @@ describe('useModificationResponse', () => {
     });
 
     // Verify publishToRelays was called (indirect verification that iso_time was included)
-    const { publishToRelays } = require('../lib/nostr/relayPool');
-    expect(publishToRelays).toHaveBeenCalled();
+    expect(relayPool.publishToRelays).toHaveBeenCalled();
   });
 });
 
