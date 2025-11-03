@@ -77,6 +77,7 @@ export interface ActiveReservationContext {
   party_size: number
   original_time: string
   suggested_time?: string
+  thread_id?: string
 }
 
 export interface ChatRequestPayload {

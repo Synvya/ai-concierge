@@ -30,6 +30,7 @@ class ActiveReservationContext(BaseModel):
     party_size: int
     original_time: str
     suggested_time: str | None = None
+    thread_id: str | None = None  # Thread ID to link acceptance to original request
     
 class ChatRequest(BaseModel):
     message: str
@@ -124,6 +125,7 @@ class ReservationAction(BaseModel):
     notes: str | None = Field(default=None, description="Special requests or dietary restrictions")
     contact_name: str | None = Field(default=None, description="Guest name for the reservation")
     contact_phone: str | None = Field(default=None, description="Guest phone number for the reservation")
+    thread_id: str | None = Field(default=None, description="Original reservation thread ID if this is accepting a suggestion")
 
 
 class ChatResponse(BaseModel):

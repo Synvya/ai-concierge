@@ -296,7 +296,8 @@ export const ChatPanel = () => {
   const sendReservationRequest = useCallback(async (
     restaurant: SellerResult,
     intent: ReservationIntent,
-    overrideContactInfo?: { name: string; phone: string }
+    overrideContactInfo?: { name: string; phone: string },
+    threadId?: string  // Optional thread ID to link this request to an original suggestion
   ) => {
     // Use override contact info if provided (from modal submission), otherwise check stored contact info
     const effectiveContactInfo = overrideContactInfo || contactInfo
@@ -354,16 +355,25 @@ export const ChatPanel = () => {
       // 1. Request TO merchant (encrypted for merchant to read)
       // 2. Request TO self (encrypted for self to read - Self CC)
       
+      // If threadId is provided, add e tag to link this to the original request (NIP-10 threading)
+      const additionalTags: string[][] = []
+      if (threadId) {
+        // Link to the original request thread - this indicates we're accepting their suggestion
+        additionalTags.push(["e", threadId, "", "root"])
+      }
+      
       const rumorToMerchant = buildReservationRequest(
         request,
         nostrIdentity.privateKeyHex,
-        restaurantPubkeyHex  // Encrypted TO merchant
+        restaurantPubkeyHex,  // Encrypted TO merchant
+        additionalTags
       )
 
       const rumorToSelf = buildReservationRequest(
         request,
         nostrIdentity.privateKeyHex,
-        nostrIdentity.publicKeyHex  // Encrypted TO self (Self CC)
+        nostrIdentity.publicKeyHex,  // Encrypted TO self (Self CC)
+        additionalTags
       )
 
       // Create TWO gift wraps
@@ -501,7 +511,7 @@ export const ChatPanel = () => {
           partySize: action.party_size,
           time: action.iso_time,
           notes: action.notes,
-        })
+        }, undefined, action.thread_id) // Pass thread_id to link to original request if accepting a suggestion
       } else {
         toast({
           title: 'Restaurant not found',
@@ -528,19 +538,9 @@ export const ChatPanel = () => {
     setInputValue('')
 
     // Check if there's an active "suggested" reservation to include context
-    // Only include context if the message seems like a follow-up to accept a suggestion
+    // Always pass this if available - let the AI decide whether to use it or make a new request
     let activeReservationContext = undefined
-    const lowerMessage = inputValue.toLowerCase()
-    const isFollowUp = lowerMessage.includes('yes') || 
-                       lowerMessage.includes('accept') || 
-                       lowerMessage.includes('confirm') || 
-                       lowerMessage.includes('go ahead') ||
-                       lowerMessage.includes('that works') ||
-                       lowerMessage.includes('sounds good') ||
-                       lowerMessage.includes('ok') ||
-                       lowerMessage.includes('okay')
-    
-    if (isFollowUp && reservationThreads && reservationThreads.length > 0) {
+    if (reservationThreads && reservationThreads.length > 0) {
       // Find the most recent thread with "suggested" status
       const suggestedThread = reservationThreads.find(t => t.status === 'suggested')
       if (suggestedThread && suggestedThread.restaurantId !== 'unknown' && suggestedThread.suggestedTime) {
@@ -551,6 +551,7 @@ export const ChatPanel = () => {
           party_size: suggestedThread.request.partySize,
           original_time: suggestedThread.request.isoTime,
           suggested_time: suggestedThread.suggestedTime,
+          thread_id: suggestedThread.threadId, // Include thread ID for linking
         }
       }
     }

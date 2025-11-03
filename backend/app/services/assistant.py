@@ -192,7 +192,11 @@ async def generate_response(
 
         # Build active reservation context if present
         reservation_context_block = ""
+        thread_id_for_context = None
         if active_reservation_context:
+            # Store thread_id if available (will be used in function calling)
+            thread_id_for_context = getattr(active_reservation_context, 'thread_id', None)
+            
             reservation_context_block = (
                 "\n\nACTIVE RESERVATION CONTEXT:\n"
                 "The user has an active reservation conversation for the following restaurant:\n"
@@ -204,15 +208,27 @@ async def generate_response(
             )
             if active_reservation_context.suggested_time:
                 reservation_context_block += f"- Restaurant Suggested Time: {active_reservation_context.suggested_time}\n"
+            if thread_id_for_context:
+                reservation_context_block += f"- Thread ID: {thread_id_for_context}\n"
+            
             reservation_context_block += (
-                "\n**IMPORTANT**: When the user confirms or accepts (e.g., 'yes', 'go ahead', 'book it'), "
+                "\n**CRITICAL INSTRUCTIONS FOR HANDLING THIS CONTEXT:**\n"
+                "1. If the user is confirming/accepting THIS suggestion (e.g., 'yes', 'go ahead', 'book it', 'that works'), "
                 "IMMEDIATELY call send_reservation_request using EXACTLY these values:\n"
-                f"  restaurant_id='{active_reservation_context.restaurant_id}'\n"
-                f"  restaurant_name='{active_reservation_context.restaurant_name}'\n"
-                f"  npub='{active_reservation_context.npub}'\n"
-                f"  party_size={active_reservation_context.party_size}\n"
-                f"  iso_time='{active_reservation_context.suggested_time if active_reservation_context.suggested_time else active_reservation_context.original_time}'\n"
-                "Do NOT search for or guess these values. Use the values above verbatim.\n"
+                f"   - restaurant_id='{active_reservation_context.restaurant_id}'\n"
+                f"   - restaurant_name='{active_reservation_context.restaurant_name}'\n"
+                f"   - npub='{active_reservation_context.npub}'\n"
+                f"   - party_size={active_reservation_context.party_size}\n"
+                f"   - iso_time='{active_reservation_context.suggested_time if active_reservation_context.suggested_time else active_reservation_context.original_time}'\n"
+            )
+            if thread_id_for_context:
+                reservation_context_block += f"   - thread_id='{thread_id_for_context}' (REQUIRED - links this to the original request)\n"
+            reservation_context_block += (
+                "2. If the user is making a NEW/DIFFERENT reservation request (different restaurant, time, or party size), "
+                "IGNORE this context and treat it as a fresh request. Extract the new details from the user's message. "
+                "Do NOT include thread_id for new requests.\n"
+                "3. NEVER mix this context with a new request. They are completely separate.\n"
+                "4. Do NOT search conversation history for values when context is provided - use context values verbatim.\n"
             )
 
         system_prompt = (
@@ -301,6 +317,10 @@ async def generate_response(
                             "notes": {
                                 "type": "string",
                                 "description": "Optional special requests, dietary restrictions, or seating preferences",
+                            },
+                            "thread_id": {
+                                "type": "string",
+                                "description": "Optional thread ID from ACTIVE RESERVATION CONTEXT. Include this ONLY when accepting a suggestion to link it to the original request. DO NOT include for new reservations.",
                             },
                         },
                         "required": [
