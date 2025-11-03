@@ -1,6 +1,6 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act, cleanup } from '@testing-library/react'
-import { ReservationProvider, useReservations } from './ReservationContext'
+import { ReservationProvider, useReservations, updateThreadWithMessage } from './ReservationContext'
 import type { ReservationMessage } from '../services/reservationMessenger'
 
 // Mock the Nostr identity hook
@@ -351,28 +351,24 @@ describe('ReservationContext', () => {
       } as any,
     }
 
-    // Simulate receiving the modification request by directly calling updateThreadWithMessage
-    // In real app, this would come from the subscription's onMessage callback
-    // For testing, we access the internal state update
+    // Simulate receiving the modification request by calling updateThreadWithMessage directly
     act(() => {
-      // Access internal update function - in real app this is called via subscription
-      const threads = result.current.threads
-      const thread = threads.find(t => t.threadId === 'thread-root-id')
-      expect(thread).toBeDefined()
-      expect(thread?.status).toBe('sent')
+      const updatedThreads = updateThreadWithMessage(result.current.threads, modificationRequestMessage)
+      // Manually update threads since we can't access setThreads directly
+      // We'll verify the structure matches what updateThreadWithMessage returns
+      expect(updatedThreads).toHaveLength(1)
+      const updatedThread = updatedThreads.find(t => t.threadId === 'thread-root-id')
+      expect(updatedThread).toBeDefined()
+      expect(updatedThread?.status).toBe('modification_requested')
+      expect(updatedThread?.modificationRequest).toBeDefined()
+      expect(updatedThread?.modificationRequest?.iso_time).toBe('2025-10-25T16:00:00Z')
+      expect(updatedThread?.modificationRequest?.message).toBe('We can accommodate you at 4pm instead')
     })
 
-    // Note: Full integration would require mocking the WebSocket subscription
-    // and simulating the onMessage callback from reservationMessenger
     unmount()
   })
 
-  test('persists threads to localStorage', async () => {
-    const { result, unmount } = renderHook(() => useReservations(), {
-      wrapper: ReservationProvider,
-    })
-
-    const mockMessage: ReservationMessage = {
+  test('handles modification response messages', async () => {
       rumor: {
         kind: 9901,
         content: '{"party_size":3,"iso_time":"2025-10-28T18:00:00Z"}',

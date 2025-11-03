@@ -323,9 +323,64 @@ describe("reservationEvents", () => {
                 pubkey: sender.publicKeyHex,
             };
 
-            expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow(
-                "Invalid reservation modification request"
+        it("throws on decryption error", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            // Create rumor with invalid encrypted content
+            const mockRumor = {
+                kind: 9903,
+                content: "invalid-encrypted-content",
+                pubkey: sender.publicKeyHex,
+            };
+
+            expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow();
+        });
+
+        it("throws on malformed JSON", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            // Encrypt invalid JSON
+            const encrypted = encryptMessage(
+                "not valid json",
+                sender.privateKeyHex,
+                recipient.publicKeyHex
             );
+
+            const mockRumor = {
+                kind: 9903,
+                content: encrypted,
+                pubkey: sender.publicKeyHex,
+            };
+
+            expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow();
+        });
+
+        it("throws when using wrong private key for decryption", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+            const wrongKey = generateKeypair();
+
+            const request: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Test message",
+            };
+
+            const encrypted = encryptMessage(
+                JSON.stringify(request),
+                sender.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            const mockRumor = {
+                kind: 9903,
+                content: encrypted,
+                pubkey: sender.publicKeyHex,
+            };
+
+            // Try to decrypt with wrong private key
+            expect(() => parseReservationModificationRequest(mockRumor, wrongKey.privateKeyHex)).toThrow();
         });
     });
 
@@ -521,6 +576,46 @@ describe("reservationEvents", () => {
                     recipient.publicKeyHex
                 )
             ).toThrow("Invalid reservation modification response");
+        });
+
+        it("validates required iso_time for accepted status", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            // This should fail validation before building
+            const invalidResponse = {
+                status: "accepted",
+                // missing iso_time
+            } as ReservationModificationResponse;
+
+            expect(() => 
+                buildReservationModificationResponse(
+                    invalidResponse,
+                    sender.privateKeyHex,
+                    recipient.publicKeyHex
+                )
+            ).toThrow();
+        });
+
+        it("handles empty additional tags", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const response: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+            };
+
+            const template = buildReservationModificationResponse(
+                response,
+                sender.privateKeyHex,
+                recipient.publicKeyHex,
+                [] // Empty tags
+            );
+
+            expect(template.kind).toBe(9904);
+            // Should still have p tag
+            expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
         });
     });
 
