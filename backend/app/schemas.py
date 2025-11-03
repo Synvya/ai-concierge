@@ -23,13 +23,13 @@ class GeoPoint(BaseModel):
 
 
 class ActiveReservationContext(BaseModel):
-    """Context from an active reservation thread (e.g., when user is responding to a suggestion)"""
+    """Context from an active reservation thread (e.g., when user is responding to a modification request)"""
     restaurant_id: str
     restaurant_name: str
     npub: str
     party_size: int
     original_time: str
-    suggested_time: str | None = None
+    suggested_time: str | None = None  # Deprecated: use modification_request.iso_time instead
     thread_id: str | None = None  # Thread ID to link acceptance to original request
     
 class ChatRequest(BaseModel):
@@ -109,6 +109,27 @@ class SellerResult(BaseModel):
         return
 
 
+class ModificationResponseAction(BaseModel):
+    """Structured modification response data returned by OpenAI function calling."""
+
+    action: str = Field(
+        default="send_modification_response",
+        description="Action type: 'send_modification_response'"
+    )
+    restaurant_id: str = Field(description="Database ID of the restaurant")
+    restaurant_name: str = Field(description="Name of the restaurant")
+    npub: str = Field(description="Nostr public key (npub) of the restaurant")
+    status: str = Field(
+        description="Whether customer accepts or declines the modification",
+        pattern="^(accepted|declined)$"
+    )
+    iso_time: str = Field(
+        description="ISO 8601 datetime string with timezone (required if status is 'accepted')",
+    )
+    thread_id: str = Field(description="Modification request thread ID")
+    message: str | None = Field(default=None, description="Optional message from customer")
+
+
 class ReservationAction(BaseModel):
     """Structured reservation data returned by OpenAI function calling."""
 
@@ -125,7 +146,7 @@ class ReservationAction(BaseModel):
     notes: str | None = Field(default=None, description="Special requests or dietary restrictions")
     contact_name: str | None = Field(default=None, description="Guest name for the reservation")
     contact_phone: str | None = Field(default=None, description="Guest phone number for the reservation")
-    thread_id: str | None = Field(default=None, description="Original reservation thread ID if this is accepting a suggestion")
+    thread_id: str | None = Field(default=None, description="Original reservation thread ID (for backward compatibility, not used for modification responses)")
 
 
 class ChatResponse(BaseModel):
@@ -140,6 +161,10 @@ class ChatResponse(BaseModel):
     reservation_action: ReservationAction | None = Field(
         default=None,
         description="Structured reservation data when OpenAI determines a booking is ready",
+    )
+    modification_response_action: ModificationResponseAction | None = Field(
+        default=None,
+        description="Structured modification response data when user accepts/declines a modification request",
     )
 
 

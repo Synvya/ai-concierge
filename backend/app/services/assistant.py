@@ -159,14 +159,14 @@ async def generate_response(
     results: list[SellerResult],
     history: list[ChatMessage],
     active_reservation_context: Any | None = None,
-) -> tuple[str, dict[str, Any] | None]:
+) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
     """Call OpenAI to craft a concierge-style response.
 
     Returns:
-        tuple: (response_text, function_call_data or None)
+        tuple: (response_text, function_call_data or None, modification_response_data or None)
     """
 
-    def _call() -> tuple[str, dict[str, Any] | None]:
+    def _call() -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
         # Lazy import to avoid dependency requirements when only using _build_context in tests
         from datetime import datetime, timezone
 
@@ -193,9 +193,14 @@ async def generate_response(
         # Build active reservation context if present
         reservation_context_block = ""
         thread_id_for_context = None
+        is_modification_context = False
         if active_reservation_context:
             # Store thread_id if available (will be used in function calling)
             thread_id_for_context = getattr(active_reservation_context, 'thread_id', None)
+            # Check if this is a modification request context (has suggested_time and thread_id)
+            is_modification_context = bool(
+                active_reservation_context.suggested_time and thread_id_for_context
+            )
             
             reservation_context_block = (
                 "\n\nACTIVE RESERVATION CONTEXT:\n"
@@ -207,29 +212,57 @@ async def generate_response(
                 f"- Originally Requested Time: {active_reservation_context.original_time}\n"
             )
             if active_reservation_context.suggested_time:
-                reservation_context_block += f"- Restaurant Suggested Time: {active_reservation_context.suggested_time}\n"
+                reservation_context_block += f"- Restaurant Modification Request Time: {active_reservation_context.suggested_time}\n"
             if thread_id_for_context:
                 reservation_context_block += f"- Thread ID: {thread_id_for_context}\n"
             
-            reservation_context_block += (
-                "\n**CRITICAL INSTRUCTIONS FOR HANDLING THIS CONTEXT:**\n"
-                "1. If the user is confirming/accepting THIS suggestion (e.g., 'yes', 'go ahead', 'book it', 'that works'), "
-                "IMMEDIATELY call send_reservation_request using EXACTLY these values:\n"
-                f"   - restaurant_id='{active_reservation_context.restaurant_id}'\n"
-                f"   - restaurant_name='{active_reservation_context.restaurant_name}'\n"
-                f"   - npub='{active_reservation_context.npub}'\n"
-                f"   - party_size={active_reservation_context.party_size}\n"
-                f"   - iso_time='{active_reservation_context.suggested_time if active_reservation_context.suggested_time else active_reservation_context.original_time}'\n"
-            )
-            if thread_id_for_context:
-                reservation_context_block += f"   - thread_id='{thread_id_for_context}' (REQUIRED - links this to the original request)\n"
-            reservation_context_block += (
-                "2. If the user is making a NEW/DIFFERENT reservation request (different restaurant, time, or party size), "
-                "IGNORE this context and treat it as a fresh request. Extract the new details from the user's message. "
-                "Do NOT include thread_id for new requests.\n"
-                "3. NEVER mix this context with a new request. They are completely separate.\n"
-                "4. Do NOT search conversation history for values when context is provided - use context values verbatim.\n"
-            )
+            if is_modification_context:
+                # Modification request context - user is responding to a modification suggestion
+                reservation_context_block += (
+                    "\n**CRITICAL INSTRUCTIONS FOR HANDLING MODIFICATION REQUEST CONTEXT:**\n"
+                    "The restaurant has sent a MODIFICATION REQUEST suggesting a different time.\n"
+                    "1. If the user is ACCEPTING the modification (e.g., 'yes', 'ok', 'sure', 'that works', 'go ahead'), "
+                    "IMMEDIATELY call send_modification_response with:\n"
+                    f"   - restaurant_id='{active_reservation_context.restaurant_id}'\n"
+                    f"   - restaurant_name='{active_reservation_context.restaurant_name}'\n"
+                    f"   - npub='{active_reservation_context.npub}'\n"
+                    f"   - status='accepted'\n"
+                    f"   - iso_time='{active_reservation_context.suggested_time}'\n"
+                    f"   - thread_id='{thread_id_for_context}' (REQUIRED)\n"
+                    "2. If the user is DECLINING the modification (e.g., 'no', 'doesn't work', 'can't do that'), "
+                    "call send_modification_response with:\n"
+                    f"   - restaurant_id='{active_reservation_context.restaurant_id}'\n"
+                    f"   - restaurant_name='{active_reservation_context.restaurant_name}'\n"
+                    f"   - npub='{active_reservation_context.npub}'\n"
+                    f"   - status='declined'\n"
+                    f"   - iso_time='{active_reservation_context.suggested_time}' (still required for declined)\n"
+                    f"   - thread_id='{thread_id_for_context}' (REQUIRED)\n"
+                    "3. If the user is making a NEW/DIFFERENT reservation request (different restaurant, time, or party size), "
+                    "IGNORE this context and treat it as a fresh request. Extract the new details from the user's message. "
+                    "Do NOT call send_modification_response for new requests.\n"
+                    "4. NEVER mix this modification context with a new request. They are completely separate.\n"
+                )
+            else:
+                # Regular reservation context (for backward compatibility)
+                reservation_context_block += (
+                    "\n**CRITICAL INSTRUCTIONS FOR HANDLING THIS CONTEXT:**\n"
+                    "1. If the user is confirming/accepting THIS suggestion (e.g., 'yes', 'go ahead', 'book it', 'that works'), "
+                    "IMMEDIATELY call send_reservation_request using EXACTLY these values:\n"
+                    f"   - restaurant_id='{active_reservation_context.restaurant_id}'\n"
+                    f"   - restaurant_name='{active_reservation_context.restaurant_name}'\n"
+                    f"   - npub='{active_reservation_context.npub}'\n"
+                    f"   - party_size={active_reservation_context.party_size}\n"
+                    f"   - iso_time='{active_reservation_context.suggested_time if active_reservation_context.suggested_time else active_reservation_context.original_time}'\n"
+                )
+                if thread_id_for_context:
+                    reservation_context_block += f"   - thread_id='{thread_id_for_context}' (REQUIRED - links this to the original request)\n"
+                reservation_context_block += (
+                    "2. If the user is making a NEW/DIFFERENT reservation request (different restaurant, time, or party size), "
+                    "IGNORE this context and treat it as a fresh request. Extract the new details from the user's message. "
+                    "Do NOT include thread_id for new requests.\n"
+                    "3. NEVER mix this context with a new request. They are completely separate.\n"
+                    "4. Do NOT search conversation history for values when context is provided - use context values verbatim.\n"
+                )
 
         system_prompt = (
             "You are a friendly AI concierge helping people discover and book local businesses. "
@@ -278,7 +311,7 @@ async def generate_response(
             "and suggest a follow-up only when it clearly adds value."
         )
 
-        # Define the send_reservation_request function for OpenAI function calling
+        # Define the send_reservation_request and send_modification_response functions for OpenAI function calling
         tools = [
             {
                 "type": "function",
@@ -328,7 +361,56 @@ async def generate_response(
                         ],
                     },
                 },
-            }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "send_modification_response",
+                    "description": "Send a modification response to a restaurant when user accepts or declines a modification request. CRITICAL: Only use this function when ACTIVE RESERVATION CONTEXT indicates a modification request (has suggested_time and thread_id). Use the exact values from the context.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "restaurant_id": {
+                                "type": "string",
+                                "description": "The database ID of the restaurant (from ACTIVE RESERVATION CONTEXT)",
+                            },
+                            "restaurant_name": {
+                                "type": "string",
+                                "description": "The name of the restaurant (from ACTIVE RESERVATION CONTEXT)",
+                            },
+                            "npub": {
+                                "type": "string",
+                                "description": "The Nostr public key (npub) of the restaurant (from ACTIVE RESERVATION CONTEXT)",
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": ["accepted", "declined"],
+                                "description": "Whether customer accepts or declines the modification request",
+                            },
+                            "iso_time": {
+                                "type": "string",
+                                "description": "ISO 8601 datetime with timezone from the modification request (required even if declined)",
+                            },
+                            "thread_id": {
+                                "type": "string",
+                                "description": "Modification request thread ID from ACTIVE RESERVATION CONTEXT (REQUIRED)",
+                            },
+                            "message": {
+                                "type": "string",
+                                "description": "Optional message from customer",
+                            },
+                        },
+                        "required": [
+                            "restaurant_id",
+                            "restaurant_name",
+                            "npub",
+                            "status",
+                            "iso_time",
+                            "thread_id",
+                        ],
+                    },
+                },
+            },
         ]
         messages = [
             {"role": "system", "content": system_prompt},
@@ -371,23 +453,27 @@ async def generate_response(
 
         # Check if OpenAI wants to call a function
         function_call_data = None
+        modification_response_data = None
         if choice.tool_calls:
             tool_call = choice.tool_calls[0]
-            # Only process function tool calls, not custom tool calls
-            if (
-                hasattr(tool_call, "function")
-                and tool_call.function.name == "send_reservation_request"
-            ):
+            # Process function tool calls
+            if hasattr(tool_call, "function"):
                 import json
 
-                function_call_data = {
-                    "action": "send_reservation_request",
-                    **json.loads(tool_call.function.arguments),
-                }
+                if tool_call.function.name == "send_reservation_request":
+                    function_call_data = {
+                        "action": "send_reservation_request",
+                        **json.loads(tool_call.function.arguments),
+                    }
+                elif tool_call.function.name == "send_modification_response":
+                    modification_response_data = {
+                        "action": "send_modification_response",
+                        **json.loads(tool_call.function.arguments),
+                    }
 
         # Determine response text based on whether we have a function call
-        if function_call_data:
-            # When making a reservation, provide a minimal message since the frontend
+        if function_call_data or modification_response_data:
+            # When making a reservation or modification response, provide a minimal message since the frontend
             # will add the full confirmation message
             response_text = choice.content or ""
         else:
@@ -396,6 +482,6 @@ async def generate_response(
                 choice.content
                 or "I couldn't find anything right now, please try again."
             )
-        return response_text, function_call_data
+        return response_text, function_call_data, modification_response_data
 
     return await asyncio.to_thread(_call)
