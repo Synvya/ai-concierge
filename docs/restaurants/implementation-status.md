@@ -96,10 +96,14 @@ This document tracks the implementation status of the Synvya reservation messagi
 - ✅ Handler event builders (kind 31990, kind 31989)
 - ✅ Auto-publish on restaurant profile creation
 - ✅ Auto-delete on business type change
-- ✅ Three-event pattern:
-  - One kind 31990 (handler info declaring support for 9901 & 9902)
+- ✅ Five-event pattern:
+  - One kind 31990 (handler info declaring support for 9901, 9902, 9903, 9904)
   - One kind 31989 with `d:"9901"` (recommendation for reservation.request)
   - One kind 31989 with `d:"9902"` (recommendation for reservation.response)
+  - One kind 31989 with `d:"9903"` (recommendation for reservation.modification.request) - Optional but recommended
+  - One kind 31989 with `d:"9904"` (recommendation for reservation.modification.response) - Optional but recommended
+- ✅ Backend discovery checks for modification support via NIP-89 queries
+- ✅ Backward compatibility: Modification messages work even without NIP-89 handlers (system warns but proceeds)
 
 
 ---
