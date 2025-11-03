@@ -42,6 +42,7 @@ import { useClientIds } from '../hooks/useClientIds'
 import { useNostrIdentity } from '../hooks/useNostrIdentity'
 import { useUserContactInfo } from '../hooks/useUserContactInfo'
 import { useReservations, type ReservationThread } from '../contexts/ReservationContext'
+import { useModificationResponse } from '../hooks/useModificationResponse'
 import type {
   ChatMessage,
   ChatResponse,
@@ -289,6 +290,7 @@ export const ChatPanel = () => {
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
+  const { sendModificationResponse } = useModificationResponse(setIsLoading)
   const [sharedLocation, setSharedLocation] = useState<{
     label?: string
     coords?: GeoPoint
@@ -435,6 +437,56 @@ export const ChatPanel = () => {
             response.message ? `\n\n${response.message}` : ''
           }`
       }
+
+      // Add message to chat
+      const chatMessage: ChatMessage = {
+        role: 'assistant',
+        content: `${notificationTitle}\n\n${notificationDescription}`,
+      }
+      setMessages((prev) => [...prev, chatMessage])
+    })
+  }, [reservationThreads])
+
+  // Process modification requests and display them in chat
+  useEffect(() => {
+    if (!reservationThreads) return
+
+    reservationThreads.forEach((thread) => {
+      // Get modification request messages
+      const modificationRequestMessages = thread.messages.filter((m) => m.type === 'modification_request')
+      if (modificationRequestMessages.length === 0) return
+
+      const latestModificationRequest = modificationRequestMessages[modificationRequestMessages.length - 1]
+      const modificationRequestId = latestModificationRequest.giftWrap.id
+
+      // Check if we've already processed this modification request
+      if (processedResponsesRef.current.has(`modification-${modificationRequestId}`)) return
+
+      // Mark as processed
+      processedResponsesRef.current.add(`modification-${modificationRequestId}`)
+
+      // Persist to localStorage
+      try {
+        const processedArray = Array.from(processedResponsesRef.current)
+        localStorage.setItem(PROCESSED_RESPONSES_STORAGE_KEY, JSON.stringify(processedArray))
+      } catch (error) {
+        console.error('Failed to save processed modification requests to localStorage:', error)
+      }
+
+      // Get modification request details
+      const modificationRequest = latestModificationRequest.payload as any
+      const restaurantName = thread.restaurantName
+
+      // Format the modification request message
+      const originalTime = new Date(thread.request.isoTime).toLocaleString()
+      const suggestedTime = modificationRequest.iso_time 
+        ? new Date(modificationRequest.iso_time).toLocaleString()
+        : 'unknown time'
+
+      const notificationTitle = '💡 Modification Request'
+      const notificationDescription = `${restaurantName} suggests a different time:\n\n` +
+        `Original: ${originalTime}\n` +
+        `Suggested: ${suggestedTime}${modificationRequest.message ? `\n\n${modificationRequest.message}` : ''}`
 
       // Add message to chat
       const chatMessage: ChatMessage = {
@@ -599,146 +651,6 @@ export const ChatPanel = () => {
       setIsLoading(false)
     }
   }, [nostrIdentity, toast, addOutgoingMessage, contactInfo, onContactModalOpen, setPendingReservation])
-
-  const sendModificationResponse = useCallback(async (
-    thread: ReservationThread,
-    status: 'accepted' | 'declined',
-    message?: string
-  ) => {
-    if (!nostrIdentity) {
-      toast({
-        title: 'Nostr keys not available',
-        description: 'Please refresh the page and try again.',
-        status: 'error',
-      })
-      return
-    }
-
-    if (!thread.modificationRequest) {
-      toast({
-        title: 'Modification request not found',
-        description: 'Unable to find the modification request to respond to.',
-        status: 'error',
-      })
-      return
-    }
-
-    try {
-      setIsLoading(true)
-
-      const restaurantPubkeyHex = npubToHex(thread.restaurantNpub)
-      if (!restaurantPubkeyHex) {
-        throw new Error('Invalid restaurant public key')
-      }
-
-      // Build modification response payload
-      const response: ReservationModificationResponse = {
-        status,
-        iso_time: status === 'accepted' ? thread.modificationRequest.iso_time : undefined,
-        message,
-      }
-
-      // Find the modification request message to get its event ID for threading
-      const modificationRequestMessage = thread.messages.find(
-        (m) => m.type === 'modification_request'
-      )
-
-      if (!modificationRequestMessage) {
-        throw new Error('Modification request message not found in thread')
-      }
-
-      // Build NIP-10 thread tags:
-      // - root: original request (thread.threadId)
-      // - reply: modification request (modificationRequestMessage.giftWrap.id)
-      const additionalTags: string[][] = [
-        ["e", thread.threadId, "", "root"],  // Link to original request
-        ["e", modificationRequestMessage.giftWrap.id, "", "reply"],  // Reply to modification request
-      ]
-
-      const rumorToMerchant = buildReservationModificationResponse(
-        response,
-        nostrIdentity.privateKeyHex,
-        restaurantPubkeyHex,
-        additionalTags
-      )
-
-      const rumorToSelf = buildReservationModificationResponse(
-        response,
-        nostrIdentity.privateKeyHex,
-        nostrIdentity.publicKeyHex,
-        additionalTags
-      )
-
-      // Create gift wraps
-      const giftWrapToMerchant = wrapEvent(
-        rumorToMerchant,
-        nostrIdentity.privateKeyHex,
-        restaurantPubkeyHex
-      )
-
-      const giftWrapToSelf = wrapEvent(
-        rumorToSelf,
-        nostrIdentity.privateKeyHex,
-        nostrIdentity.publicKeyHex
-      )
-
-      console.log('📤 Sent modification response - Thread ID:', giftWrapToMerchant.id)
-      console.log('📤 Self CC - Thread ID:', giftWrapToSelf.id)
-
-      // Publish to default relays
-      const relays = [
-        'wss://relay.damus.io',
-        'wss://nos.lol',
-        'wss://relay.nostr.band',
-      ]
-
-      // Publish BOTH gift wraps to relays
-      await Promise.all([
-        publishToRelays(giftWrapToMerchant, relays),
-        publishToRelays(giftWrapToSelf, relays),
-      ])
-
-      // Add to reservation context for tracking
-      const rumorWithId: Rumor = {
-        ...rumorToSelf,
-        id: giftWrapToMerchant.id,
-        pubkey: nostrIdentity.publicKeyHex,
-      }
-
-      const reservationMessage: ReservationMessage = {
-        rumor: rumorWithId,
-        type: 'modification_response',
-        payload: response,
-        senderPubkey: nostrIdentity.publicKeyHex,
-        giftWrap: giftWrapToMerchant,
-      }
-
-      addOutgoingMessage(reservationMessage, thread.restaurantId, thread.restaurantName, thread.restaurantNpub)
-
-      // Show success message
-      const statusText = status === 'accepted' ? 'accepted' : 'declined'
-      const confirmationMessage: ChatMessage = {
-        role: 'assistant',
-        content: `I've ${statusText} the modification request from ${thread.restaurantName}.${status === 'accepted' && thread.modificationRequest.iso_time ? ` The new time is ${new Date(thread.modificationRequest.iso_time).toLocaleString()}.` : ''}\n\nYou'll receive confirmation from the restaurant shortly.`,
-      }
-      setMessages((prev) => [...prev, confirmationMessage])
-
-      toast({
-        title: `Modification ${statusText}`,
-        description: `Sent to ${thread.restaurantName}`,
-        status: 'success',
-      })
-    } catch (error) {
-      console.error('Failed to send modification response:', error)
-      toast({
-        title: 'Failed to send modification response',
-        description: error instanceof Error ? error.message : 'Please try again.',
-        status: 'error',
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }, [nostrIdentity, toast, addOutgoingMessage])
 
   // Handler for saving contact info and proceeding with reservation
   const handleContactInfoSubmit = useCallback(() => {

@@ -8,21 +8,25 @@
 import {
   Badge,
   Box,
+  Button,
   Card,
   CardBody,
   Flex,
   Heading,
   Text,
   VStack,
+  HStack,
 } from '@chakra-ui/react';
 import type { ReservationThread } from '../contexts/ReservationContext';
 
 interface ThreadCardProps {
   thread: ReservationThread;
   onClick: () => void;
+  onAcceptModification?: (thread: ReservationThread) => void;
+  onDeclineModification?: (thread: ReservationThread) => void;
 }
 
-export function ThreadCard({ thread, onClick }: ThreadCardProps) {
+export function ThreadCard({ thread, onClick, onAcceptModification, onDeclineModification }: ThreadCardProps) {
   const statusColorScheme = {
     sent: 'blue',
     confirmed: 'green',
@@ -115,19 +119,83 @@ export function ThreadCard({ thread, onClick }: ThreadCardProps) {
               </Text>
             )}
 
+            {/* Show modification request details if status is modification_requested */}
+            {thread.status === 'modification_requested' && thread.modificationRequest && (
+              <Box
+                mt={2}
+                p={3}
+                bg="orange.50"
+                borderRadius="md"
+                border="1px solid"
+                borderColor="orange.200"
+              >
+                <Text fontSize="sm" fontWeight="medium" color="orange.800" mb={2}>
+                  ⏰ Modification Request
+                </Text>
+                <VStack align="flex-start" spacing={1} fontSize="sm">
+                  <Text color="gray.700">
+                    <Text as="span" fontWeight="medium">Original:</Text>{' '}
+                    {formatDateTime(thread.request.isoTime)}
+                  </Text>
+                  <Text color="gray.700">
+                    <Text as="span" fontWeight="medium">Suggested:</Text>{' '}
+                    {formatDateTime(thread.modificationRequest.iso_time)}
+                  </Text>
+                  {thread.modificationRequest.message && (
+                    <Text color="gray.600" mt={1} fontStyle="italic">
+                      "{thread.modificationRequest.message}"
+                    </Text>
+                  )}
+                </VStack>
+              </Box>
+            )}
+
             <Text fontSize="xs" color="gray.400">
               {formatLastUpdated(thread.lastUpdated)}
             </Text>
           </VStack>
 
-          <Badge
-            colorScheme={statusColorScheme[thread.status]}
-            fontSize="xs"
-            px={2}
-            py={1}
-          >
-            {statusLabel[thread.status]}
-          </Badge>
+          <VStack align="flex-end" spacing={2}>
+            <Badge
+              colorScheme={statusColorScheme[thread.status]}
+              fontSize="xs"
+              px={2}
+              py={1}
+            >
+              {statusLabel[thread.status]}
+            </Badge>
+
+            {/* Show Accept/Decline buttons for modification requests */}
+            {thread.status === 'modification_requested' && (onAcceptModification || onDeclineModification) && (
+              <HStack spacing={2} mt={2}>
+                {onAcceptModification && (
+                  <Button
+                    size="xs"
+                    colorScheme="green"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAcceptModification(thread);
+                    }}
+                  >
+                    Accept
+                  </Button>
+                )}
+                {onDeclineModification && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    colorScheme="red"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeclineModification(thread);
+                    }}
+                  >
+                    Decline
+                  </Button>
+                )}
+              </HStack>
+            )}
+          </VStack>
         </Flex>
       </CardBody>
     </Card>
