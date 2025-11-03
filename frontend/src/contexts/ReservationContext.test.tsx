@@ -369,19 +369,25 @@ describe('ReservationContext', () => {
   })
 
   test('handles modification response messages', async () => {
+    const { result, unmount } = renderHook(() => useReservations(), {
+      wrapper: ReservationProvider,
+    })
+
+    // First add a request
+    const requestMessage: ReservationMessage = {
       rumor: {
         kind: 9901,
-        content: '{"party_size":3,"iso_time":"2025-10-28T18:00:00Z"}',
+        content: '{"party_size":2,"iso_time":"2025-10-25T15:00:00Z"}',
         created_at: Math.floor(Date.now() / 1000),
         pubkey: 'test-pubkey-hex',
-        tags: [['p', 'restaurant-pubkey']],
-        id: 'request-id-persist',
+        tags: [],
+        id: 'thread-root-id',
         sig: 'sig',
       } as any,
       type: 'request',
       payload: {
-        party_size: 3,
-        iso_time: '2025-10-28T18:00:00Z',
+        party_size: 2,
+        iso_time: '2025-10-25T15:00:00Z',
       },
       senderPubkey: 'test-pubkey-hex',
       giftWrap: {
@@ -390,15 +396,15 @@ describe('ReservationContext', () => {
         created_at: Math.floor(Date.now() / 1000),
         pubkey: 'random-pubkey',
         tags: [['p', 'restaurant-pubkey']],
-        id: 'giftwrap-id-persist',
+        id: 'thread-root-id',
         sig: 'sig',
       } as any,
     }
 
     act(() => {
       result.current.addOutgoingMessage(
-        mockMessage,
-        'restaurant-test-persist',
+        requestMessage,
+        'restaurant-test-789',
         'Test Restaurant',
         'npub1restaurant'
       )
@@ -408,15 +414,80 @@ describe('ReservationContext', () => {
       expect(result.current.threads).toHaveLength(1)
     })
 
-    // Verify localStorage was updated
-    const stored = localStorage.getItem('reservation_threads')
-    expect(stored).not.toBeNull()
+    // Add modification request first
+    const modificationRequestMessage: ReservationMessage = {
+      rumor: {
+        kind: 9903,
+        content: '{"iso_time":"2025-10-25T16:00:00Z","message":"We can accommodate you at 4pm instead"}',
+        created_at: Math.floor(Date.now() / 1000) + 60,
+        pubkey: 'restaurant-pubkey',
+        tags: [['e', 'thread-root-id', '', 'root']],
+        id: 'modification-request-id-1',
+        sig: 'sig',
+      } as any,
+      type: 'modification_request',
+      payload: {
+        iso_time: '2025-10-25T16:00:00Z',
+        message: 'We can accommodate you at 4pm instead',
+        original_iso_time: '2025-10-25T15:00:00Z',
+      },
+      senderPubkey: 'restaurant-pubkey',
+      giftWrap: {
+        kind: 1059,
+        content: 'encrypted',
+        created_at: Math.floor(Date.now() / 1000) + 60,
+        pubkey: 'random-pubkey-2',
+        tags: [['p', 'test-pubkey-hex']],
+        id: 'giftwrap-modification-request-id-1',
+        sig: 'sig',
+      } as any,
+    }
+
+    // Apply modification request
+    const threadsWithModification = updateThreadWithMessage(result.current.threads, modificationRequestMessage)
     
-    const parsed = JSON.parse(stored!)
-    expect(parsed).toHaveLength(1)
-    expect(parsed[0].restaurantName).toBe('Test Restaurant')
-    expect(parsed[0].request.partySize).toBe(3)
+    // Now add modification response (customer accepts)
+    const modificationResponseMessage: ReservationMessage = {
+      rumor: {
+        kind: 9904,
+        content: '{"status":"accepted","iso_time":"2025-10-25T16:00:00Z"}',
+        created_at: Math.floor(Date.now() / 1000) + 120,
+        pubkey: 'test-pubkey-hex',
+        tags: [
+          ['e', 'thread-root-id', '', 'root'],
+          ['e', 'modification-request-id-1', '', 'reply'],
+        ],
+        id: 'modification-response-id-1',
+        sig: 'sig',
+      } as any,
+      type: 'modification_response',
+      payload: {
+        status: 'accepted',
+        iso_time: '2025-10-25T16:00:00Z',
+      },
+      senderPubkey: 'test-pubkey-hex',
+      giftWrap: {
+        kind: 1059,
+        content: 'encrypted',
+        created_at: Math.floor(Date.now() / 1000) + 120,
+        pubkey: 'random-pubkey-3',
+        tags: [['p', 'restaurant-pubkey']],
+        id: 'giftwrap-modification-response-id-1',
+        sig: 'sig',
+      } as any,
+    }
+
+    // Apply modification response
+    const finalThreads = updateThreadWithMessage(threadsWithModification, modificationResponseMessage)
     
+    expect(finalThreads).toHaveLength(1)
+    const finalThread = finalThreads.find(t => t.threadId === 'thread-root-id')
+    expect(finalThread).toBeDefined()
+    expect(finalThread?.messages).toHaveLength(3) // Request + modification request + modification response
+    expect(finalThread?.messages[2].type).toBe('modification_response')
+    // Status should remain modification_requested until restaurant sends final response
+    expect(finalThread?.status).toBe('modification_requested')
+
     unmount()
   })
 
