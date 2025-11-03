@@ -13,7 +13,7 @@ import {
   type ReservationSubscription,
 } from '../services/reservationMessenger';
 import { getThreadContext, type ThreadContext } from '../lib/nostr/nip10';
-import type { ReservationRequest, ReservationResponse } from '../types/reservation';
+import type { ReservationRequest, ReservationResponse, ReservationModificationRequest } from '../types/reservation';
 
 /**
  * Determine whether we should start the live reservation subscription.
@@ -69,9 +69,9 @@ export interface ReservationThread {
     notes?: string;
   };
   /** Current conversation status */
-  status: 'sent' | 'confirmed' | 'declined' | 'suggested' | 'expired' | 'cancelled';
-  /** Latest suggested time from restaurant (if status is 'suggested') */
-  suggestedTime?: string;
+  status: 'sent' | 'confirmed' | 'declined' | 'modification_requested' | 'expired' | 'cancelled';
+  /** Latest modification request from restaurant (if status is 'modification_requested') */
+  modificationRequest?: ReservationModificationRequest;
   /** Timestamp of last message (Unix timestamp in seconds) */
   lastUpdated: number;
 }
@@ -284,19 +284,32 @@ function updateThreadWithMessage(
     // Update status based on latest response
     if (message.type === 'response') {
       const response = message.payload as ReservationResponse;
-      updatedThread.status = response.status;
-      
-      // If it's a suggested status, store the suggested time
-      if (response.status === 'suggested' && response.iso_time) {
-        updatedThread.suggestedTime = response.iso_time;
+      // Map response status to thread status
+      // Note: 'suggested' status is deprecated in favor of modification_request (kind 9903)
+      // If we receive a suggested response, ignore it (should use modification_request instead)
+      if (response.status === 'confirmed' || response.status === 'declined' || 
+          response.status === 'expired' || response.status === 'cancelled') {
+        updatedThread.status = response.status;
       }
+      // If status is 'suggested', log warning but don't change thread status
+      // The restaurant should send a modification_request (9903) instead
+    } else if (message.type === 'modification_request') {
+      // Handle modification request
+      const modificationRequest = message.payload as ReservationModificationRequest;
+      updatedThread.status = 'modification_requested';
+      updatedThread.modificationRequest = modificationRequest;
+    } else if (message.type === 'modification_response') {
+      // Handle modification response (customer accepts/declines)
+      // After modification response, status will be updated when restaurant sends final response
+      // For now, keep current status or mark as pending
+      // The restaurant will send a final response (kind 9902) after receiving modification response
     }
 
     return threads
       .map((t) => (t.threadId === threadId ? updatedThread : t))
       .sort((a, b) => b.lastUpdated - a.lastUpdated);
   } else {
-    // This shouldn't happen for incoming responses, but handle gracefully
+    // This shouldn't happen for incoming responses/modifications, but handle gracefully
     // Create a new thread (message must be a request)
     if (message.type === 'request') {
       const request = message.payload as ReservationRequest;
@@ -318,11 +331,11 @@ function updateThreadWithMessage(
       return [newThread, ...threads].sort((a, b) => b.lastUpdated - a.lastUpdated);
     }
 
-    // Response without a matching thread - log warning and ignore
-    console.warn('[ReservationContext] ⚠️ Received response for unknown thread');
-    console.warn('[ReservationContext] Response threadId:', threadId);
+    // Response/modification without a matching thread - log warning and ignore
+    console.warn('[ReservationContext] ⚠️ Received message for unknown thread:', message.type);
+    console.warn('[ReservationContext] Message threadId:', threadId);
     console.warn('[ReservationContext] Available threadIds:', threads.map(t => t.threadId));
-    console.warn('[ReservationContext] Response e-tags:', message.rumor.tags.filter(t => t[0] === 'e'));
+    console.warn('[ReservationContext] Message e-tags:', message.rumor.tags.filter(t => t[0] === 'e'));
     console.warn('[ReservationContext] Full message:', message);
     return threads;
   }

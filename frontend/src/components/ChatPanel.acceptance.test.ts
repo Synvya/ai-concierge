@@ -15,8 +15,12 @@ const baseThread: ReservationThread = {
     partySize: 3,
     isoTime: '2025-11-03T11:15:00-08:00',
   },
-  status: 'suggested',
-  suggestedTime: '2025-11-03T11:30:00-08:00',
+  status: 'modification_requested',
+  modificationRequest: {
+    iso_time: '2025-11-03T11:30:00-08:00',
+    message: 'We can accommodate you at 11:30am instead',
+    original_iso_time: '2025-11-03T11:15:00-08:00',
+  },
   lastUpdated: 0,
 }
 
