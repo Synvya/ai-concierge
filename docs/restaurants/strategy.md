@@ -181,17 +181,6 @@ for (const rec of [...reservationRecommendations, ...modificationRecommendations
 
 1. **Create a rumor**
    - Unsigned event of `kind:9902` containing the reservation response payload.
-
-2. **Seal the rumor**
-   - Create a `kind:13` seal event containing the rumor.
-
-3. **Gift wrap**
-   - Create a `kind:1059` gift wrap event addressed to the **AI Concierge**.
-
-### Reservation Response
-
-1. **Create a rumor**
-   - Unsigned event of `kind:9902` containing the reservation response payload.
    - Payload encrypted with **NIP-44**.
    - Include NIP-10 threading tags: `[["e", "<original_request_giftwrap_id>", "", "root"]]`
 
