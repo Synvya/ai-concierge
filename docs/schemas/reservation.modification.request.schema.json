@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synvya.com/schemas/reservation.modification.request.schema.json",
+  "title": "Synvya Reservation Modification Request Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "iso_time",
+    "message"
+  ],
+  "properties": {
+    "iso_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Suggested alternative time in ISO8601 format with timezone offset"
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Explanation of why modification is needed and details about the suggested time"
+    },
+    "original_iso_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Original requested time (for reference)"
+    }
+  }
+}
+
