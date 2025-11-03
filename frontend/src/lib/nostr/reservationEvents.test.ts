@@ -323,6 +323,11 @@ describe("reservationEvents", () => {
                 pubkey: sender.publicKeyHex,
             };
 
+            expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow(
+                "Invalid reservation modification request"
+            );
+        });
+
         it("throws on decryption error", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
