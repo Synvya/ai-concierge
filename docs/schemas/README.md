@@ -15,6 +15,9 @@ schemas/
 │   ├── reservation.response.suggested.example.json
 │   ├── reservation.response.confirmed.example.json
 │   ├── reservation.response.declined.example.json
+│   ├── reservation.modification.request.example.json
+│   ├── reservation.modification.response.accepted.example.json
+│   ├── reservation.modification.response.declined.example.json
 │   ├── calendar.31923.example.json
 │   ├── calendar.31924.example.json
 │   ├── calendar.31925.rsvp.example.json
@@ -24,6 +27,8 @@ schemas/
 │   └── nostr.giftwrap.kind1059.example.json
 ├── reservation.request.schema.json
 ├── reservation.response.schema.json
+├── reservation.modification.request.schema.json
+├── reservation.modification.response.schema.json
 ├── calendar.31923.schema.json
 ├── calendar.31924.schema.json
 ├── calendar.31925.schema.json
@@ -38,8 +43,10 @@ schemas/
 
 | Schema File | Purpose |
 |--------------|----------|
-| `reservation.request.schema.json` | Defines user → restaurant booking request |
-| `reservation.response.schema.json` | Defines restaurant → user negotiation replies |
+| `reservation.request.schema.json` | Defines user → restaurant booking request (kind 9901) |
+| `reservation.response.schema.json` | Defines restaurant → user negotiation replies (kind 9902) |
+| `reservation.modification.request.schema.json` | Defines restaurant → user modification suggestion (kind 9903) |
+| `reservation.modification.response.schema.json` | Defines user → restaurant modification acceptance/decline (kind 9904) |
 | `calendar.31923.schema.json` | NIP-52 Time-Based Calendar Event |
 | `calendar.31924.schema.json` | Restaurant or user calendar definition |
 | `calendar.31925.schema.json` | RSVP confirmation payload |
@@ -79,6 +86,8 @@ npx ajv validate -s reservation.request.schema.json -d examples/reservation.requ
 #### Using Python
 ```bash
 python -m jsonschema -i examples/reservation.response.suggested.example.json reservation.response.schema.json
+python -m jsonschema -i examples/reservation.modification.request.example.json reservation.modification.request.schema.json
+python -m jsonschema -i examples/reservation.modification.response.accepted.example.json reservation.modification.response.schema.json
 ```
 
 All provided examples should pass validation successfully.
