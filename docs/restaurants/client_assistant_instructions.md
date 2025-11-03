@@ -71,6 +71,7 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 3. **Create Gift Wrap (`kind:1059`)**
    - Addressed to the AI Concierge (pubkey in `p` tag).
    - Include NIP-10 threading tags: `[["e", "<original_request_giftwrap_id>", "", "root"]]`
+     - Use the gift wrap event ID (`id` field) from the original request (kind:9901) as the thread root
    - **Create TWO gift wraps**: one for customer, one for self (Self CC)
    - Publish both to relays.
 
@@ -95,6 +96,7 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 3. **Create Gift Wrap (`kind:1059`)**
    - Addressed to the AI Concierge (pubkey in `p` tag).
    - Include NIP-10 threading tags: `[["e", "<original_request_giftwrap_id>", "", "root"]]`
+     - Use the gift wrap event ID (`id` field) from the original request (kind:9901) as the thread root
    - **Create TWO gift wraps**: one for customer, one for self (Self CC)
    - Publish both to relays.
 
