@@ -14,11 +14,21 @@ import {
   VStack,
   Icon,
 } from '@chakra-ui/react';
-import { useReservations } from '../contexts/ReservationContext';
+import { useReservations, type ReservationThread } from '../contexts/ReservationContext';
 import { ThreadCard } from './ThreadCard';
+import { useModificationResponse } from '../hooks/useModificationResponse';
 
 export function ReservationsPanel() {
   const { threads } = useReservations();
+  const { sendModificationResponse } = useModificationResponse();
+
+  const handleAcceptModification = async (thread: ReservationThread) => {
+    await sendModificationResponse(thread, 'accepted');
+  };
+
+  const handleDeclineModification = async (thread: ReservationThread) => {
+    await sendModificationResponse(thread, 'declined');
+  };
 
   if (threads.length === 0) {
     return (
@@ -62,6 +72,8 @@ export function ReservationsPanel() {
               // TODO: Navigate to thread detail view
               console.log('Navigate to thread:', thread.threadId);
             }}
+            onAcceptModification={handleAcceptModification}
+            onDeclineModification={handleDeclineModification}
           />
         ))}
       </Stack>
