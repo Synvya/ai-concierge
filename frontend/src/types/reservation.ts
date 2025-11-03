@@ -45,7 +45,6 @@ export interface ReservationRequest {
 export type ReservationStatus =
     | "confirmed"
     | "declined"
-    | "suggested"
     | "expired"
     | "cancelled";
 

@@ -285,14 +285,11 @@ function updateThreadWithMessage(
     if (message.type === 'response') {
       const response = message.payload as ReservationResponse;
       // Map response status to thread status
-      // Note: 'suggested' status is deprecated in favor of modification_request (kind 9903)
-      // If we receive a suggested response, ignore it (should use modification_request instead)
+      // Only valid statuses are: confirmed, declined, expired, cancelled
       if (response.status === 'confirmed' || response.status === 'declined' || 
           response.status === 'expired' || response.status === 'cancelled') {
         updatedThread.status = response.status;
       }
-      // If status is 'suggested', log warning but don't change thread status
-      // The restaurant should send a modification_request (9903) instead
     } else if (message.type === 'modification_request') {
       // Handle modification request
       const modificationRequest = message.payload as ReservationModificationRequest;

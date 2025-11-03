@@ -283,17 +283,6 @@ describe('ChatPanel - Reservation Notifications', () => {
         expect(expectedTitle).toContain('Declined')
     })
 
-    test('processes suggested time response correctly', async () => {
-        const mockResponse = {
-            status: 'suggested',
-            iso_time: '2025-10-25T16:00:00-07:00',
-            message: 'How about 4pm instead?',
-        }
-
-        const expectedTitle = '💡 Alternative Time Suggested'
-        expect(expectedTitle).toContain('Alternative')
-    })
-
     test('processes expired reservation response correctly', async () => {
         const mockResponse = {
             status: 'expired',

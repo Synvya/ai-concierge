@@ -13,7 +13,6 @@
       "enum": [
         "confirmed",
         "declined",
-        "suggested",
         "expired",
         "cancelled"
       ]
@@ -39,20 +38,6 @@
     }
   },
   "allOf": [
-    {
-      "if": {
-        "properties": {
-          "status": {
-            "const": "suggested"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "iso_time"
-        ]
-      }
-    },
     {
       "if": {
         "properties": {

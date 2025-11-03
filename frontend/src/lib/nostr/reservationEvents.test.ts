@@ -133,18 +133,6 @@ describe("reservationEvents", () => {
             expect(result.valid).toBe(true);
         });
 
-        it("validates suggested response", () => {
-            const response: ReservationResponse = {
-                status: "suggested",
-                iso_time: "2025-10-20T19:30:00-07:00",
-                message: "7pm is full, how about 7:30?",
-            };
-
-            const result = validateReservationResponse(response);
-
-            expect(result.valid).toBe(true);
-        });
-
         it("validates declined response", () => {
             const response: ReservationResponse = {
                 status: "declined",
@@ -180,17 +168,6 @@ describe("reservationEvents", () => {
             const response = {
                 status: "confirmed",
                 // missing required iso_time for confirmed status
-            };
-
-            const result = validateReservationResponse(response);
-
-            expect(result.valid).toBe(false);
-        });
-
-        it("rejects suggested response without iso_time", () => {
-            const response = {
-                status: "suggested",
-                // missing required iso_time for suggested status
             };
 
             const result = validateReservationResponse(response);
@@ -859,65 +836,6 @@ describe("reservationEvents", () => {
             expect(parsedResponse.status).toBe("confirmed");
             expect(parsedResponse.table).toBe("A4");
             expect(parsedResponse.message).toContain("Happy anniversary");
-        });
-
-        it("handles suggested time alternative", () => {
-            const concierge = generateKeypair();
-            const restaurant = generateKeypair();
-
-            const request: ReservationRequest = {
-                party_size: 6,
-                iso_time: "2025-10-20T19:00:00-07:00",
-            };
-
-            const requestRumor = buildReservationRequest(
-                request,
-                concierge.privateKeyHex,
-                restaurant.publicKeyHex
-            );
-
-            const requestGiftWrap = wrapEvent(
-                requestRumor,
-                concierge.privateKeyHex,
-                restaurant.publicKeyHex
-            );
-
-            const { rumor: unwrappedRequest } = unwrapAndDecrypt(
-                requestGiftWrap,
-                restaurant.privateKeyHex
-            );
-
-            // Restaurant suggests different time
-            const response: ReservationResponse = {
-                status: "suggested",
-                iso_time: "2025-10-20T20:00:00-07:00",
-                message: "7pm is fully booked. Would 8pm work?",
-            };
-
-            const responseRumor = buildReservationResponse(
-                response,
-                restaurant.privateKeyHex,
-                concierge.publicKeyHex
-            );
-
-            const responseGiftWrap = wrapEvent(
-                responseRumor,
-                restaurant.privateKeyHex,
-                concierge.publicKeyHex
-            );
-
-            const { rumor: unwrappedResponse } = unwrapAndDecrypt(
-                responseGiftWrap,
-                concierge.privateKeyHex
-            );
-
-            const parsedResponse = parseReservationResponse(
-                unwrappedResponse,
-                concierge.privateKeyHex
-            );
-
-            expect(parsedResponse.status).toBe("suggested");
-            expect(parsedResponse.iso_time).toBe("2025-10-20T20:00:00-07:00");
         });
 
         it("handles declined reservation", () => {

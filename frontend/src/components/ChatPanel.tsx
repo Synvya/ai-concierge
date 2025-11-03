@@ -429,7 +429,6 @@ export const ChatPanel = () => {
             response.message ? `\n\n${response.message}` : ''
           }`
           break
-        // Note: 'suggested' status is deprecated - restaurants should use modification_request (kind 9903) instead
         default:
           notificationTitle = '📬 Reservation Update'
           notificationDescription = `${restaurantName} sent a response about your reservation.${
