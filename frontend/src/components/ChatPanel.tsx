@@ -54,9 +54,10 @@ import type {
 } from '../lib/api'
 import { chat } from '../lib/api'
 import type { ReservationIntent } from '../lib/parseReservationIntent'
-import { buildReservationRequest } from '../lib/nostr/reservationEvents'
+import { buildReservationRequest, buildReservationModificationResponse } from '../lib/nostr/reservationEvents'
 import { wrapEvent } from '../lib/nostr/nip59'
 import { publishToRelays } from '../lib/nostr/relayPool'
+import type { ReservationModificationResponse } from '../types/reservation'
 import { npubToHex } from '../lib/nostr/keys'
 import { getRestaurantDisplayName } from '../lib/restaurantName'
 import type { ReservationMessage } from '../services/reservationMessenger'
@@ -139,7 +140,7 @@ function getMinutesFromIsoTime(iso?: string): number | null {
   return hours * 60 + minutes
 }
 
-export function buildActiveContextForSuggestionAcceptance(
+export function buildActiveContextForModificationAcceptance(
   message: string,
   thread: ReservationThread | undefined,
 ): ActiveReservationContext | undefined {
@@ -600,6 +601,146 @@ export const ChatPanel = () => {
     }
   }, [nostrIdentity, toast, addOutgoingMessage, contactInfo, onContactModalOpen, setPendingReservation])
 
+  const sendModificationResponse = useCallback(async (
+    thread: ReservationThread,
+    status: 'accepted' | 'declined',
+    message?: string
+  ) => {
+    if (!nostrIdentity) {
+      toast({
+        title: 'Nostr keys not available',
+        description: 'Please refresh the page and try again.',
+        status: 'error',
+      })
+      return
+    }
+
+    if (!thread.modificationRequest) {
+      toast({
+        title: 'Modification request not found',
+        description: 'Unable to find the modification request to respond to.',
+        status: 'error',
+      })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+
+      const restaurantPubkeyHex = npubToHex(thread.restaurantNpub)
+      if (!restaurantPubkeyHex) {
+        throw new Error('Invalid restaurant public key')
+      }
+
+      // Build modification response payload
+      const response: ReservationModificationResponse = {
+        status,
+        iso_time: status === 'accepted' ? thread.modificationRequest.iso_time : undefined,
+        message,
+      }
+
+      // Find the modification request message to get its event ID for threading
+      const modificationRequestMessage = thread.messages.find(
+        (m) => m.type === 'modification_request'
+      )
+
+      if (!modificationRequestMessage) {
+        throw new Error('Modification request message not found in thread')
+      }
+
+      // Build NIP-10 thread tags:
+      // - root: original request (thread.threadId)
+      // - reply: modification request (modificationRequestMessage.giftWrap.id)
+      const additionalTags: string[][] = [
+        ["e", thread.threadId, "", "root"],  // Link to original request
+        ["e", modificationRequestMessage.giftWrap.id, "", "reply"],  // Reply to modification request
+      ]
+
+      const rumorToMerchant = buildReservationModificationResponse(
+        response,
+        nostrIdentity.privateKeyHex,
+        restaurantPubkeyHex,
+        additionalTags
+      )
+
+      const rumorToSelf = buildReservationModificationResponse(
+        response,
+        nostrIdentity.privateKeyHex,
+        nostrIdentity.publicKeyHex,
+        additionalTags
+      )
+
+      // Create gift wraps
+      const giftWrapToMerchant = wrapEvent(
+        rumorToMerchant,
+        nostrIdentity.privateKeyHex,
+        restaurantPubkeyHex
+      )
+
+      const giftWrapToSelf = wrapEvent(
+        rumorToSelf,
+        nostrIdentity.privateKeyHex,
+        nostrIdentity.publicKeyHex
+      )
+
+      console.log('📤 Sent modification response - Thread ID:', giftWrapToMerchant.id)
+      console.log('📤 Self CC - Thread ID:', giftWrapToSelf.id)
+
+      // Publish to default relays
+      const relays = [
+        'wss://relay.damus.io',
+        'wss://nos.lol',
+        'wss://relay.nostr.band',
+      ]
+
+      // Publish BOTH gift wraps to relays
+      await Promise.all([
+        publishToRelays(giftWrapToMerchant, relays),
+        publishToRelays(giftWrapToSelf, relays),
+      ])
+
+      // Add to reservation context for tracking
+      const rumorWithId: Rumor = {
+        ...rumorToSelf,
+        id: giftWrapToMerchant.id,
+        pubkey: nostrIdentity.publicKeyHex,
+      }
+
+      const reservationMessage: ReservationMessage = {
+        rumor: rumorWithId,
+        type: 'modification_response',
+        payload: response,
+        senderPubkey: nostrIdentity.publicKeyHex,
+        giftWrap: giftWrapToMerchant,
+      }
+
+      addOutgoingMessage(reservationMessage, thread.restaurantId, thread.restaurantName, thread.restaurantNpub)
+
+      // Show success message
+      const statusText = status === 'accepted' ? 'accepted' : 'declined'
+      const confirmationMessage: ChatMessage = {
+        role: 'assistant',
+        content: `I've ${statusText} the modification request from ${thread.restaurantName}.${status === 'accepted' && thread.modificationRequest.iso_time ? ` The new time is ${new Date(thread.modificationRequest.iso_time).toLocaleString()}.` : ''}\n\nYou'll receive confirmation from the restaurant shortly.`,
+      }
+      setMessages((prev) => [...prev, confirmationMessage])
+
+      toast({
+        title: `Modification ${statusText}`,
+        description: `Sent to ${thread.restaurantName}`,
+        status: 'success',
+      })
+    } catch (error) {
+      console.error('Failed to send modification response:', error)
+      toast({
+        title: 'Failed to send modification response',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        status: 'error',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [nostrIdentity, toast, addOutgoingMessage])
+
   // Handler for saving contact info and proceeding with reservation
   const handleContactInfoSubmit = useCallback(() => {
     if (!tempName.trim() || !tempPhone.trim()) {
@@ -653,28 +794,47 @@ export const ChatPanel = () => {
     // Handle reservation action from backend
     if (payload.reservation_action) {
       const action = payload.reservation_action
-      const restaurant = resolveRestaurantForReservationAction(
-        action,
-        payload.results,
-        reservationThreads,
-      )
+      
+      // Check if this is a modification acceptance (thread_id matches a modification_requested thread)
+      const modificationThread = action.thread_id
+        ? reservationThreads?.find(
+            (t) => t.threadId === action.thread_id && t.status === 'modification_requested'
+          )
+        : undefined
 
-      if (restaurant && restaurant.npub) {
-        await sendReservationRequest(restaurant, {
-          restaurantName: action.restaurant_name,
-          partySize: action.party_size,
-          time: action.iso_time,
-          notes: action.notes,
-        }, undefined, action.thread_id)
+      if (modificationThread) {
+        // Send modification response instead of new request
+        // Determine acceptance status from action (if time matches modification request, it's accepted)
+        const isAcceptance = modificationThread.modificationRequest?.iso_time === action.iso_time
+        await sendModificationResponse(
+          modificationThread,
+          isAcceptance ? 'accepted' : 'declined'
+        )
       } else {
-        toast({
-          title: 'Restaurant not found',
-          description: 'Could not find the restaurant to complete the reservation.',
-          status: 'error',
-        })
+        // Regular reservation request flow
+        const restaurant = resolveRestaurantForReservationAction(
+          action,
+          payload.results,
+          reservationThreads,
+        )
+
+        if (restaurant && restaurant.npub) {
+          await sendReservationRequest(restaurant, {
+            restaurantName: action.restaurant_name,
+            partySize: action.party_size,
+            time: action.iso_time,
+            notes: action.notes,
+          }, undefined, action.thread_id)
+        } else {
+          toast({
+            title: 'Restaurant not found',
+            description: 'Could not find the restaurant to complete the reservation.',
+            status: 'error',
+          })
+        }
       }
     }
-  }, [sendReservationRequest, toast, reservationThreads])
+  }, [sendReservationRequest, sendModificationResponse, toast, reservationThreads])
 
   const canSend = useMemo(
     () => Boolean(inputValue.trim()) && Boolean(sessionId) && Boolean(visitorId) && !isLoading,
@@ -696,7 +856,7 @@ export const ChatPanel = () => {
     let activeReservationContext: ActiveReservationContext | undefined
     if (reservationThreads && reservationThreads.length > 0) {
       const modificationThread = reservationThreads.find((t) => t.status === 'modification_requested')
-      activeReservationContext = buildActiveContextForSuggestionAcceptance(
+      activeReservationContext = buildActiveContextForModificationAcceptance(
         userMessage.content,
         modificationThread,
       )

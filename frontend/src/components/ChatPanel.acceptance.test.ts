@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildActiveContextForSuggestionAcceptance, resolveRestaurantForReservationAction } from './ChatPanel'
+import { buildActiveContextForModificationAcceptance, resolveRestaurantForReservationAction } from './ChatPanel'
 import type { ReservationThread } from '../contexts/ReservationContext'
 import type { ReservationMessage } from '../services/reservationMessenger'
 import type { ReservationAction, SellerResult } from '../lib/api'
@@ -31,9 +31,9 @@ function threadFactory(overrides: Partial<ReservationThread> = {}): ReservationT
   }
 }
 
-describe('buildActiveContextForSuggestionAcceptance', () => {
+describe('buildActiveContextForModificationAcceptance', () => {
   it('returns context when user accepts suggested time even if they repeat the time', () => {
-    const context = buildActiveContextForSuggestionAcceptance(
+    const context = buildActiveContextForModificationAcceptance(
       'Ok, lets go with 11.30am then',
       threadFactory(),
     )
@@ -44,7 +44,7 @@ describe('buildActiveContextForSuggestionAcceptance', () => {
   })
 
   it('ignores acceptance when message introduces a different time', () => {
-    const context = buildActiveContextForSuggestionAcceptance(
+    const context = buildActiveContextForModificationAcceptance(
       'Sure, 12pm works better for us',
       threadFactory(),
     )
@@ -53,7 +53,7 @@ describe('buildActiveContextForSuggestionAcceptance', () => {
   })
 
   it('treats reservation keywords and party size as a new request', () => {
-    const context = buildActiveContextForSuggestionAcceptance(
+    const context = buildActiveContextForModificationAcceptance(
       'Ok please book a table for 2 at noon',
       threadFactory(),
     )
@@ -62,7 +62,7 @@ describe('buildActiveContextForSuggestionAcceptance', () => {
   })
 
   it('allows acceptance phrasing that includes "for" without a number', () => {
-    const context = buildActiveContextForSuggestionAcceptance(
+    const context = buildActiveContextForModificationAcceptance(
       'That works for me, thanks!',
       threadFactory(),
     )
