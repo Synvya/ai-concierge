@@ -7,13 +7,16 @@ import { generateKeypair } from "./keys";
 import {
     validateReservationRequest,
     validateReservationResponse,
+    validateReservationModificationRequest,
     buildReservationRequest,
     buildReservationResponse,
     parseReservationRequest,
     parseReservationResponse,
+    parseReservationModificationRequest,
 } from "./reservationEvents";
-import type { ReservationRequest, ReservationResponse } from "../../types/reservation";
+import type { ReservationRequest, ReservationResponse, ReservationModificationRequest } from "../../types/reservation";
 import { unwrapAndDecrypt, wrapEvent } from "./nip59";
+import { encryptMessage } from "./nip44";
 
 describe("reservationEvents", () => {
     describe("validateReservationRequest", () => {
@@ -191,6 +194,159 @@ describe("reservationEvents", () => {
             const result = validateReservationResponse(response);
 
             expect(result.valid).toBe(false);
+        });
+    });
+
+    describe("validateReservationModificationRequest", () => {
+        it("validates a valid modification request", () => {
+            const request: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "We're fully booked at 7pm, but 7:30pm is available.",
+            };
+
+            const result = validateReservationModificationRequest(request);
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toBeUndefined();
+        });
+
+        it("validates modification request with optional original_iso_time", () => {
+            const request: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "We're fully booked at 7pm, but 7:30pm is available.",
+                original_iso_time: "2025-10-20T19:00:00-07:00",
+            };
+
+            const result = validateReservationModificationRequest(request);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it("rejects modification request missing required iso_time", () => {
+            const request = {
+                message: "We're fully booked at 7pm",
+                // missing iso_time
+            };
+
+            const result = validateReservationModificationRequest(request);
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toBeDefined();
+            expect(result.errors!.length).toBeGreaterThan(0);
+        });
+
+        it("rejects modification request missing required message", () => {
+            const request = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                // missing message
+            };
+
+            const result = validateReservationModificationRequest(request);
+
+            expect(result.valid).toBe(false);
+        });
+
+        it("rejects modification request with message too long", () => {
+            const request = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "x".repeat(2001), // Max 2000
+            };
+
+            const result = validateReservationModificationRequest(request);
+
+            expect(result.valid).toBe(false);
+        });
+
+        it("rejects modification request with invalid date format", () => {
+            const request = {
+                iso_time: "not-a-date",
+                message: "Test message",
+            };
+
+            const result = validateReservationModificationRequest(request);
+
+            expect(result.valid).toBe(false);
+        });
+    });
+
+    describe("parseReservationModificationRequest", () => {
+        it("parses and decrypts a valid modification request", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const originalRequest: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "We're fully booked at 7pm, but 7:30pm is available.",
+                original_iso_time: "2025-10-20T19:00:00-07:00",
+            };
+
+            // Build encrypted rumor
+            const rumor = buildReservationRequest(
+                {
+                    party_size: 2,
+                    iso_time: originalRequest.original_iso_time!,
+                } as ReservationRequest,
+                sender.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            // Create modification request rumor manually (since we don't have builder yet)
+            const encrypted = encryptMessage(
+                JSON.stringify(originalRequest),
+                sender.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            const mockRumor = {
+                kind: 9903,
+                content: encrypted,
+                pubkey: sender.publicKeyHex,
+            };
+
+            const parsed = parseReservationModificationRequest(mockRumor, recipient.privateKeyHex);
+
+            expect(parsed.iso_time).toBe(originalRequest.iso_time);
+            expect(parsed.message).toBe(originalRequest.message);
+            expect(parsed.original_iso_time).toBe(originalRequest.original_iso_time);
+        });
+
+        it("throws on wrong event kind", () => {
+            const mockRumor = {
+                kind: 9901, // Wrong kind (should be 9903)
+                content: "encrypted",
+                pubkey: "pubkey",
+            };
+
+            expect(() => parseReservationModificationRequest(mockRumor, "privatekey")).toThrow(
+                "Expected kind 9903"
+            );
+        });
+
+        it("throws on invalid payload", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            // Encrypt invalid payload
+            const invalidPayload = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                // missing required message
+            };
+
+            const encrypted = encryptMessage(
+                JSON.stringify(invalidPayload),
+                sender.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            const mockRumor = {
+                kind: 9903,
+                content: encrypted,
+                pubkey: sender.publicKeyHex,
+            };
+
+            expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow(
+                "Invalid reservation modification request"
+            );
         });
     });
 
