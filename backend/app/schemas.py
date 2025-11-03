@@ -89,6 +89,10 @@ class SellerResult(BaseModel):
         default=None,
         description="Whether restaurant supports reservations via Nostr (NIP-89 discovery)",
     )
+    supports_modifications: bool | None = Field(
+        default=None,
+        description="Whether restaurant supports reservation modifications via Nostr (NIP-89 discovery for kinds 9903/9904)",
+    )
     meta_data: dict[str, Any] | None = None
     filters: dict[str, Any] | None = None
     content: str | None = None

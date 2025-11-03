@@ -489,15 +489,20 @@ async def search_sellers(
                 connection_timeout=settings.nostr_connection_timeout,
                 query_timeout=settings.nostr_query_timeout,
             )
-            handler_support = await relay_pool.check_handlers(npubs_to_check)
+            # Check reservation support (d:9901)
+            handler_support = await relay_pool.check_handlers(npubs_to_check, ["9901"])
+            # Check modification support (d:9903 and/or d:9904)
+            modification_support = await relay_pool.check_handlers(npubs_to_check, ["9903", "9904"])
 
             # Apply results to sellers
             for seller in ranked_sellers:
                 npub = seller.get("npub")
                 if npub:
                     seller["supports_reservations"] = handler_support.get(npub)
+                    seller["supports_modifications"] = modification_support.get(npub)
                 else:
                     seller["supports_reservations"] = False
+                    seller["supports_modifications"] = False
         except Exception as e:
             # Log error but don't fail the search
             import logging
@@ -507,10 +512,12 @@ async def search_sellers(
             # Set all to None on error (fail open)
             for seller in ranked_sellers:
                 seller["supports_reservations"] = None
+                seller["supports_modifications"] = None
     else:
         # No npubs to check
         for seller in ranked_sellers:
             seller["supports_reservations"] = False
+            seller["supports_modifications"] = False
 
     return ranked_sellers[:limit]
 
@@ -556,15 +563,21 @@ async def get_seller_by_id(
                 connection_timeout=settings.nostr_connection_timeout,
                 query_timeout=settings.nostr_query_timeout,
             )
-            handler_support = await relay_pool.check_handlers([npub])
+            # Check reservation support (d:9901)
+            handler_support = await relay_pool.check_handlers([npub], ["9901"])
+            # Check modification support (d:9903 and/or d:9904)
+            modification_support = await relay_pool.check_handlers([npub], ["9903", "9904"])
             seller["supports_reservations"] = handler_support.get(npub)
+            seller["supports_modifications"] = modification_support.get(npub)
         except Exception as e:
             import logging
 
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to check NIP-89 handler for {seller_id}: {e}")
             seller["supports_reservations"] = None
+            seller["supports_modifications"] = None
     else:
         seller["supports_reservations"] = False
+        seller["supports_modifications"] = False
 
     return seller

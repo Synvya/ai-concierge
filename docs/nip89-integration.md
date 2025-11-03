@@ -8,7 +8,7 @@ The AI Concierge uses [NIP-89 Application Handlers](https://github.com/nostr-pro
 
 ### Restaurant Side (synvya-client-2)
 
-When a restaurant publishes their profile with `businessType: "restaurant"`, three handler events are automatically published:
+When a restaurant publishes their profile with `businessType: "restaurant"`, five handler events are automatically published:
 
 #### 1. Handler Information (kind 31990)
 Declares support for reservation event kinds:
@@ -20,6 +20,8 @@ Declares support for reservation event kinds:
     ["d", "synvya-restaurants-v1.0"],
     ["k", "9901"],  // reservation.request
     ["k", "9902"],  // reservation.response
+    ["k", "9903"],  // reservation.modification.request
+    ["k", "9904"],  // reservation.modification.response
     ["alt", "Synvya Restaurants Handler v1.0"]
   ],
   "content": ""
@@ -54,6 +56,34 @@ Recommends the handler for processing reservation responses:
 }
 ```
 
+#### 4. Handler Recommendation for 9903 (kind 31989)
+Recommends the handler for processing reservation modification requests:
+```json
+{
+  "kind": 31989,
+  "pubkey": "<restaurant_pubkey>",
+  "tags": [
+    ["d", "9903"],
+    ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]
+  ],
+  "content": ""
+}
+```
+
+#### 5. Handler Recommendation for 9904 (kind 31989)
+Recommends the handler for processing reservation modification responses:
+```json
+{
+  "kind": 31989,
+  "pubkey": "<restaurant_pubkey>",
+  "tags": [
+    ["d", "9904"],
+    ["a", "31990:<restaurant_pubkey>:synvya-restaurants-v1.0", "<relay_url>", "all"]
+  ],
+  "content": ""
+}
+```
+
 ### AI Concierge Side
 
 When searching for restaurants, the backend:
@@ -67,15 +97,24 @@ Frontend displays the **"🪄 Book via Concierge"** badge for restaurants with `
 
 ### Discovery Query
 
+The backend queries for handler recommendations to determine restaurant capabilities:
+
 ```python
-# Backend relay query
+# Backend relay query for reservation support (kind 9901)
 filters = {
     "kinds": [31989],
     "authors": [restaurant_hex_pubkey],
     "#d": ["9901"]  # Looking for reservation.request handlers
 }
 
-# If any events returned, restaurant supports reservations
+# Backend relay query for modification support (kinds 9903 and 9904)
+modification_filters = {
+    "kinds": [31989],
+    "authors": [restaurant_hex_pubkey],
+    "#d": ["9903", "9904"]  # Looking for modification handler recommendations
+}
+
+# If any events returned, restaurant supports the corresponding capability
 ```
 
 ### Complete Flow Diagram
@@ -92,6 +131,8 @@ filters = {
 │  • kind 31990 (handler info)         │
 │  • kind 31989 (d:9901 recommendation)│
 │  • kind 31989 (d:9902 recommendation)│
+│  • kind 31989 (d:9903 recommendation)│
+│  • kind 31989 (d:9904 recommendation)│
 └──────────────┬───────────────────────┘
                │
                ↓
@@ -327,6 +368,7 @@ NOSTR_RELAYS=wss://your-private-relay.com,wss://relay.damus.io
       "name": "Mario's Pizza",
       "npub": "npub1wxyz...",
       "supports_reservations": true,  // ← NIP-89 discovery result
+      "supports_modifications": true,  // ← Modification support discovery
       "meta_data": {
         "display_name": "Mario's Pizza",
         "address": "123 Main St, Seattle, WA"
@@ -362,8 +404,12 @@ NOSTR_RELAYS=wss://your-private-relay.com,wss://relay.damus.io
 | Field | Type | Description |
 |-------|------|-------------|
 | `supports_reservations` | `bool \| null` | Whether restaurant supports reservations via Nostr |
-| `true` | | Handler found via NIP-89 query |
+| `true` | | Handler found via NIP-89 query (d:9901) |
 | `false` | | No handler found (may still have npub) |
+| `null` | | Relay query failed or timed out |
+| `supports_modifications` | `bool \| null` | Whether restaurant supports modification requests/responses |
+| `true` | | Handler found via NIP-89 query (d:9903 and/or d:9904) |
+| `false` | | No modification handlers found |
 | `null` | | Relay query failed or timed out |
 
 ## Testing

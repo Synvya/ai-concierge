@@ -712,6 +712,19 @@ export const ChatPanel = () => {
       )
 
       if (modificationThread) {
+        // Check if restaurant supports modifications (if available in search results)
+        const restaurant = payload.results.find(
+          (r) => r.id === action.restaurant_id && r.npub === action.npub
+        )
+        
+        // Warn if explicitly not supported, but proceed since they sent a modification request
+        if (restaurant && restaurant.supports_modifications === false) {
+          console.warn(
+            `Restaurant ${action.restaurant_name} does not advertise modification support, ` +
+            `but sent a modification request. Proceeding with response.`
+          )
+        }
+        
         await sendModificationResponse(
           modificationThread,
           action.status as 'accepted' | 'declined',
