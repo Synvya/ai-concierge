@@ -178,21 +178,26 @@ npm run dev
 1. Create a reservation (any restaurant)
 2. Verify initial status: "Sent" (blue badge)
 3. From Business Client, send responses for each status:
-   - **Confirmed**: Response with `status: "confirmed"`
-   - **Declined**: Response with `status: "declined"`
-   - **Suggested**: Response with `status: "suggested"` and alternative times
+   - **Confirmed**: Response (kind:9902) with `status: "confirmed"`
+   - **Declined**: Response (kind:9902) with `status: "declined"`
+   - **Modification Requested**: Send modification request (kind:9903) with alternative time
+   - **Expired**: Response (kind:9902) with `status: "expired"`
+   - **Cancelled**: Response (kind:9902) with `status: "cancelled"`
 4. After each response, check Reservations panel:
    - Status badge updates
    - Badge colors:
      - Sent: Blue
      - Confirmed: Green
      - Declined: Red
-     - Suggested: Orange
+     - Modification Requested: Orange
+     - Expired: Gray
+     - Cancelled: Red
 
 **Expected Results**:
 - ✅ All status types display correctly
 - ✅ Badge colors match status
 - ✅ Real-time updates (within ~5 seconds of relay propagation)
+- ✅ Modification requests show as "Modification Requested" status
 
 ---
 
@@ -278,49 +283,56 @@ npm run dev
 
 ---
 
-### Scenario 10: Alternative Time Acceptance (Context Retention)
+### Scenario 10: Modification Request Flow (Alternative Time Negotiation)
 
-**Objective**: Test that the system retains context when user accepts restaurant-suggested alternative times.
+**Objective**: Test the complete modification request flow when restaurant suggests alternative times.
 
-**Prerequisites**: Business Client must be configured to suggest alternative times.
+**Prerequisites**: Business Client must be configured to send modification requests (kind:9903).
 
 **Steps**:
 1. Type: "make a new reservation for Saturday at 11am for 4 people at Smoothies & Muffins"
-2. Verify: Reservation request sent for 11:00 AM (not 12:00 PM)
-3. In Business Client, respond with status "suggested" and alternative time:
+2. Verify: Reservation request (kind:9901) sent for 11:00 AM (not 12:00 PM)
+3. In Business Client, send a modification request (kind:9903) with alternative time:
    ```json
    {
-     "status": "suggested",
      "iso_time": "2025-11-01T11:30:00-07:00",
-     "message": "We can't do 11 but can do 11:30"
+     "message": "We can't do 11 but can do 11:30. Would that work for you?",
+     "original_iso_time": "2025-11-01T11:00:00-07:00"
    }
    ```
-4. In AI Concierge Reservations panel, verify suggestion appears
-5. In Chat, type: "Please go ahead with 11:30 then" (or "yes", "book it", "go ahead")
+4. In AI Concierge Reservations panel, verify:
+   - Thread status updates to "Modification Requested" (orange badge)
+   - Modification request details appear showing original vs. suggested time
+   - Restaurant's message is displayed
+5. In Chat, type: "Please go ahead with 11:30 then" (or "yes", "book it", "go ahead", "accept")
 6. **CRITICAL**: Verify the assistant:
-   - ✅ Immediately sends new reservation request
-   - ✅ Uses same restaurant (Smoothies & Muffins)
-   - ✅ Uses same party size (4 people)
-   - ✅ Uses same date (Saturday)
-   - ✅ Uses new time (11:30 AM)
+   - ✅ Immediately sends modification response (kind:9904) with `status: "accepted"`
+   - ✅ Includes `iso_time` matching the suggested time (11:30 AM)
+   - ✅ Does NOT send a new reservation request (kind:9901)
    - ✅ Does NOT ask "Which restaurant?" or "How many people?"
+   - ✅ Thread linking maintains conversation history
 
 **Expected Results**:
-- ✅ System remembers all context from previous message
-- ✅ Only the time is updated to the suggested alternative
-- ✅ No re-prompting for previously provided details
-- ✅ New reservation request sent automatically
+- ✅ Modification request (kind:9903) is received and displayed correctly
+- ✅ User acceptance triggers modification response (kind:9904), not new request
+- ✅ System remembers all context from original request
+- ✅ Thread status updates correctly through the flow
+- ✅ Restaurant receives modification response and can confirm
 
-**Common Failure Mode**:
-- ❌ System asks "Could you please confirm the date again for the Saturday reservation?"
-- ❌ System doesn't find restaurant details and asks to confirm
-- ❌ System loses party size or date information
+**Modification Response Flow**:
+7. After sending modification response, Business Client should:
+   - Receive modification response (kind:9904) with `status: "accepted"`
+   - Send final confirmation (kind:9902) with `status: "confirmed"`
+   - Include the confirmed time in the response
 
 **Additional Test Cases**:
-- User says "yes" → should accept suggested time
-- User says "book it" → should accept suggested time
-- User says "ok" → should accept suggested time
-- User says "11:30 works" → should accept that time
+- User says "yes" → should accept modification and send kind:9904
+- User says "book it" → should accept modification and send kind:9904
+- User says "decline" or "no" → should send kind:9904 with `status: "declined"`
+- User says "11:30 works" → should accept that specific time
+- User says "no, that doesn't work" → should decline modification
+
+**Important**: The modification flow uses distinct message types (kinds 9903/9904) instead of sending a new reservation request. This maintains proper conversation threading.
 
 ---
 

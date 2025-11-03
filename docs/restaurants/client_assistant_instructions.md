@@ -14,7 +14,9 @@ You are helping build the **Synvya Client** — the application used by restaura
 | Action | Event Kind | Description |
 |--------|-------------|--------------|
 | Receive reservation request | `9901` | Reservation inquiry from AI Concierge |
-| Send reservation response | `9902` | Confirmation or counter-offer |
+| Send reservation response | `9902` | Confirmation or decline |
+| Send modification request | `9903` | Suggest alternative time |
+| Receive modification response | `9904` | Customer accepts or declines modification |
 | Send calendar event | `31923` | Time-based event (NIP-52) |
 | Store confirmed reservation | `31924` | Business calendar (NIP-52) |
 | Receive RSVP | `31925` | Confirmation from user (NIP-52) |
@@ -46,13 +48,24 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 
 ## How to Send a Reservation Response
 
+### To Confirm or Decline
+
 1. **Create Rumor**
    - Unsigned event `kind:9902` with encrypted payload:
      ```json
      {
-       "status": "suggested",
-       "iso_time": "2025-10-17T19:30:00-07:00",
-       "message": "7pm full, 7:30 available"
+       "status": "confirmed",
+       "iso_time": "2025-10-17T19:00:00-07:00",
+       "message": "Your reservation is confirmed!",
+       "table": "A4"
+     }
+     ```
+   - Or for declined:
+     ```json
+     {
+       "status": "declined",
+       "iso_time": null,
+       "message": "Fully booked tonight, sorry!"
      }
      ```
 
@@ -65,6 +78,29 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 
 4. **Include Light Proof of Work (NIP-13)**
    - To prevent spam and ensure relay acceptance.
+
+### To Suggest Alternative Time
+
+1. **Create Modification Request Rumor**
+   - Unsigned event `kind:9903` with encrypted payload:
+     ```json
+     {
+       "iso_time": "2025-10-17T19:30:00-07:00",
+       "message": "7pm full, 7:30 available. Would that work?",
+       "original_iso_time": "2025-10-17T19:00:00-07:00"
+     }
+     ```
+
+2. **Create Seal (`kind:13`)**
+   - Include the rumor as content.
+
+3. **Create Gift Wrap (`kind:1059`)**
+   - Addressed to the AI Concierge (pubkey in `p` tag).
+   - Include NIP-10 threading tags linking to original request.
+
+4. **After Customer Responds**
+   - If customer accepts (kind:9904 with `status: "accepted"`), send kind:9902 with `status: "confirmed"`.
+   - If customer declines (kind:9904 with `status: "declined"`), send kind:9902 with `status: "declined"` or another modification request.
 
 ---
 

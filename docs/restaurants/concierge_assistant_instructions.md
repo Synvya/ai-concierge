@@ -15,7 +15,9 @@ You are helping build the **Synvya AI Concierge**, the agent that:
 | Action | Event Kind | Description |
 |--------|-------------|--------------|
 | Send reservation request | `9901` | Request to restaurant |
-| Receive reservation response | `9902` | Restaurant reply |
+| Receive reservation response | `9902` | Restaurant reply (confirmed/declined) |
+| Receive modification request | `9903` | Restaurant suggests alternative time |
+| Send modification response | `9904` | Accept or decline modification |
 | Receive confirmed calendar | `31923` | NIP-52 event from restaurant |
 | Send RSVP | `31925` | Confirmation of booking |
 | Store confirmed events | `31924` | User calendar |
@@ -211,19 +213,20 @@ Restaurants that support reservations publish three events:
    - Addressed to Concierge’s pubkey.
    - Unwrap → decrypt → extract rumor (`kind:9902`).
 
-2. **Parse Payload**
+2. **Parse Payload (Modification Request - kind:9903)**
    ```json
    {
-     "status": "suggested",
      "iso_time": "2025-10-17T19:30:00-07:00",
-     "message": "7pm full, 7:30 works."
+     "message": "7pm full, 7:30 works.",
+     "original_iso_time": "2025-10-17T19:00:00-07:00"
    }
    ```
 
 3. **User Interaction**
-   - Display message in natural language.
-   - Await user decision (accept / suggest new time).
-   - Send new `reservation.response` using same NIP-59 structure.
+   - Display modification request in natural language, showing original vs. suggested time.
+   - Await user decision (accept / decline modification).
+   - Send `reservation.modification.response` (kind:9904) with status "accepted" or "declined".
+   - If accepted, include `iso_time` matching the suggested time.
 
 4. **Thread Management**
    - Maintain message threads with **NIP-10** tags (`root` / `reply`).
@@ -364,7 +367,7 @@ const rootEventId = context.rootId || rumor.id;
 ### 5. Handle by Type
 - **confirmed**: Await calendar event (kind 31923) in Phase 2
 - **declined**: Notify user, end thread
-- **suggested**: Present alternative to user for decision
+- **modification_requested**: Present modification request to user for decision (accept/decline)
 - **expired**: Mark thread as closed
 - **cancelled**: Update status, notify user
 

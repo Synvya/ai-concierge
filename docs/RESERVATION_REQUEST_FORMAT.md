@@ -6,6 +6,12 @@ This document describes the format of reservation request messages sent via Nost
 
 Reservation requests are sent from the AI Concierge to restaurants using the Nostr protocol. The message is encrypted using NIP-44 and wrapped in a NIP-59 gift wrap (kind:1059).
 
+This is part of the 4-message reservation flow:
+1. **Reservation.request** (kind:9901) - Customer → Restaurant (this document)
+2. **Reservation.response** (kind:9902) - Restaurant → Customer (confirmed/declined)
+3. **Reservation.modification.request** (kind:9903) - Restaurant → Customer (suggest alternative time)
+4. **Reservation.modification.response** (kind:9904) - Customer → Restaurant (accept/decline modification)
+
 ## Message Structure
 
 ### Outer Layer (Gift Wrap - kind:1059)
@@ -119,8 +125,9 @@ The `content` field of the rumor is encrypted using NIP-44 and contains:
    - Parse using your preferred datetime library
 
 4. **Response Format**:
-   - Respond using kind:9902 (see [RESTAURANT_RESPONSE_FORMAT.md](./RESTAURANT_RESPONSE_FORMAT.md))
-   - Include the original gift wrap `id` in your response's `e` tag for threading
+   - Respond using kind:9902 for confirmed/declined responses (see [RESTAURANT_RESPONSE_FORMAT.md](./RESTAURANT_RESPONSE_FORMAT.md))
+   - If the requested time is unavailable, send a modification request using kind:9903 (see [RESERVATION_MODIFICATION_FORMAT.md](./RESERVATION_MODIFICATION_FORMAT.md))
+   - Include the original gift wrap `id` in your response's `e` tag for threading (NIP-10)
 
 ### Example Implementation (JavaScript/TypeScript)
 

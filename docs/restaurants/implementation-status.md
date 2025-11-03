@@ -37,8 +37,18 @@ This document tracks the implementation status of the Synvya reservation messagi
 
 - **Kind 9902 (reservation.response)**
   - JSON schema validation
-  - Support for: confirmed, declined, suggested, expired, cancelled
+  - Support for: confirmed, declined, expired, cancelled
   - Optional fields: iso_time, message, table
+- **Kind 9903 (reservation.modification.request)**
+  - JSON schema validation
+  - Restaurant suggests alternative time
+  - Required fields: iso_time, message
+  - Optional fields: original_iso_time
+- **Kind 9904 (reservation.modification.response)**
+  - JSON schema validation
+  - Customer accepts or declines modification
+  - Required fields: status (accepted/declined)
+  - Conditionally required: iso_time (when accepted)
 
 ### Business Client Features
 - **Relay Subscription**
@@ -131,11 +141,12 @@ This document tracks the implementation status of the Synvya reservation messagi
 
 ### Complete Reservation Flow
 1. AI Concierge → Restaurant: Request (9901)
-2. Restaurant → Concierge: Response (9902) - confirmed, declined, or suggested
-3. If suggested: AI Concierge → Restaurant: New request with suggested time
-4. Restaurant → Concierge: Calendar event (31923) - after confirmation
-5. Concierge → Restaurant: RSVP (31925)
-6. Both parties: Store in calendar (31924)
+2. Restaurant → Concierge: Modification request (9903) if time unavailable, or Response (9902) if confirmed/declined
+3. If modification requested: Customer → Restaurant: Modification response (9904) - accept or decline
+4. Restaurant → Concierge: Response (9902) - confirmed or declined based on modification response
+5. Restaurant → Concierge: Calendar event (31923) - after confirmation
+6. Concierge → Restaurant: RSVP (31925)
+7. Both parties: Store in calendar (31924)
 
 ---
 
