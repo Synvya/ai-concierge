@@ -70,7 +70,9 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 
 3. **Create Gift Wrap (`kind:1059`)**
    - Addressed to the AI Concierge (pubkey in `p` tag).
-   - Publish to appropriate relay.
+   - Include NIP-10 threading tags: `[["e", "<original_request_giftwrap_id>", "", "root"]]`
+   - **Create TWO gift wraps**: one for customer, one for self (Self CC)
+   - Publish both to relays.
 
 4. **Include Light Proof of Work (NIP-13)**
    - To prevent spam and ensure relay acceptance.
@@ -92,7 +94,9 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 
 3. **Create Gift Wrap (`kind:1059`)**
    - Addressed to the AI Concierge (pubkey in `p` tag).
-   - Include NIP-10 threading tags linking to original request.
+   - Include NIP-10 threading tags: `[["e", "<original_request_giftwrap_id>", "", "root"]]`
+   - **Create TWO gift wraps**: one for customer, one for self (Self CC)
+   - Publish both to relays.
 
 4. **After Customer Responds**
    - If customer accepts (kind:9904 with `status: "accepted"`), send kind:9902 with `status: "confirmed"`.
@@ -104,7 +108,8 @@ All communications use the **NIP-59 Gift Wrap** model (Rumor → Seal → Gift W
 
 - Always use **NIP-44 encryption** for rumor payloads.
 - Always use **NIP-59 wrapping** for message transport.
-- Thread conversations per **NIP-10**.
+- Thread conversations per **NIP-10** (see [Threading](#threading-nip-10) section).
+- Use **Self CC** for all outgoing messages (see [Self CC](#self-cc-copy-to-self) section).
 - Use **NIP-40 expiration** to expire old proposals.
 - Use **Addressable Events (NIP-01)** with `a` tags, not deprecated `d` tags.
 
