@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildActiveContextForSuggestionAcceptance } from './ChatPanel'
+import { buildActiveContextForSuggestionAcceptance, resolveRestaurantForReservationAction } from './ChatPanel'
 import type { ReservationThread } from '../contexts/ReservationContext'
 import type { ReservationMessage } from '../services/reservationMessenger'
+import type { ReservationAction, SellerResult } from '../lib/api'
 
 const baseThread: ReservationThread = {
   threadId: 'thread-123',
@@ -63,5 +64,47 @@ describe('buildActiveContextForSuggestionAcceptance', () => {
     )
 
     expect(context).toBeDefined()
+  })
+})
+
+describe('resolveRestaurantForReservationAction', () => {
+  const action: ReservationAction = {
+    action: 'send_reservation_request',
+    restaurant_id: 'restaurant-abc',
+    restaurant_name: 'Smoothies & Muffins',
+    npub: 'npub1',
+    party_size: 3,
+    iso_time: '2025-11-03T11:30:00-08:00',
+    thread_id: 'thread-123',
+  }
+
+  it('prefers matching search result when available', () => {
+    const results: SellerResult[] = [
+      {
+        id: 'restaurant-abc',
+        name: 'Smoothies & Muffins',
+        npub: 'npub1',
+        supports_reservations: true,
+        score: 0.5,
+      },
+    ]
+
+    const resolved = resolveRestaurantForReservationAction(action, results, [threadFactory()])
+    expect(resolved).toBe(results[0])
+  })
+
+  it('falls back to reservation thread when search results are missing', () => {
+    const resolved = resolveRestaurantForReservationAction(action, [], [threadFactory()])
+    expect(resolved).toMatchObject({
+      id: 'restaurant-abc',
+      name: 'Smoothies & Muffins',
+      npub: 'npub1',
+      supports_reservations: true,
+    })
+  })
+
+  it('returns undefined when neither results nor threads match', () => {
+    const resolved = resolveRestaurantForReservationAction(action, [], [])
+    expect(resolved).toBeUndefined()
   })
 })

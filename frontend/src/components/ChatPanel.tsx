@@ -49,6 +49,7 @@ import type {
   ListingPrice,
   ProductListing,
   ActiveReservationContext,
+  ReservationAction,
   SellerResult,
 } from '../lib/api'
 import { chat } from '../lib/api'
@@ -185,6 +186,42 @@ export function buildActiveContextForSuggestionAcceptance(
     original_time: thread.request.isoTime,
     suggested_time: thread.suggestedTime,
     thread_id: thread.threadId,
+  }
+}
+
+export function resolveRestaurantForReservationAction(
+  action: ReservationAction,
+  searchResults: SellerResult[],
+  threads: ReservationThread[] | undefined,
+): SellerResult | undefined {
+  const fromResults = searchResults.find(
+    (result) => result.id === action.restaurant_id && (result.npub === action.npub || !action.npub),
+  )
+  if (fromResults) {
+    return fromResults
+  }
+
+  if (!threads || threads.length === 0) {
+    return undefined
+  }
+
+  const matchingThread = threads.find((thread) => {
+    if (action.thread_id && thread.threadId === action.thread_id) {
+      return true
+    }
+    return thread.restaurantId === action.restaurant_id
+  })
+
+  if (!matchingThread || !matchingThread.restaurantNpub) {
+    return undefined
+  }
+
+  return {
+    id: matchingThread.restaurantId,
+    name: matchingThread.restaurantName,
+    npub: matchingThread.restaurantNpub,
+    supports_reservations: true,
+    score: 1,
   }
 }
 
@@ -621,17 +658,19 @@ export const ChatPanel = () => {
     // Handle reservation action from backend
     if (payload.reservation_action) {
       const action = payload.reservation_action
-      // Find the restaurant in the results
-      const restaurant = payload.results.find(r => r.id === action.restaurant_id)
-      
+      const restaurant = resolveRestaurantForReservationAction(
+        action,
+        payload.results,
+        reservationThreads,
+      )
+
       if (restaurant && restaurant.npub) {
-        // Automatically send the reservation request
         await sendReservationRequest(restaurant, {
           restaurantName: action.restaurant_name,
           partySize: action.party_size,
           time: action.iso_time,
           notes: action.notes,
-        }, undefined, action.thread_id) // Pass thread_id to link to original request if accepting a suggestion
+        }, undefined, action.thread_id)
       } else {
         toast({
           title: 'Restaurant not found',
@@ -640,7 +679,7 @@ export const ChatPanel = () => {
         })
       }
     }
-  }, [sendReservationRequest, toast])
+  }, [sendReservationRequest, toast, reservationThreads])
 
   const canSend = useMemo(
     () => Boolean(inputValue.trim()) && Boolean(sessionId) && Boolean(visitorId) && !isLoading,
