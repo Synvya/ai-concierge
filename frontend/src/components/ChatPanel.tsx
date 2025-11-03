@@ -538,20 +538,48 @@ export const ChatPanel = () => {
     setInputValue('')
 
     // Check if there's an active "suggested" reservation to include context
-    // Always pass this if available - let the AI decide whether to use it or make a new request
+    // Only pass this if the user's message seems to be accepting the suggestion (not making a new request)
     let activeReservationContext = undefined
     if (reservationThreads && reservationThreads.length > 0) {
       // Find the most recent thread with "suggested" status
       const suggestedThread = reservationThreads.find(t => t.status === 'suggested')
       if (suggestedThread && suggestedThread.restaurantId !== 'unknown' && suggestedThread.suggestedTime) {
-        activeReservationContext = {
-          restaurant_id: suggestedThread.restaurantId,
-          restaurant_name: suggestedThread.restaurantName,
-          npub: suggestedThread.restaurantNpub,
-          party_size: suggestedThread.request.partySize,
-          original_time: suggestedThread.request.isoTime,
-          suggested_time: suggestedThread.suggestedTime,
-          thread_id: suggestedThread.threadId, // Include thread ID for linking
+        const lowerMessage = inputValue.toLowerCase()
+        
+        // Only include context if message is a simple acceptance (no new time/date/party size specified)
+        // If the message contains "reservation", "book", "table", or time-related words, it's likely a NEW request
+        const hasNewRequestIndicators = lowerMessage.includes('reservation') ||
+                                       lowerMessage.includes('book') ||
+                                       lowerMessage.includes('table') ||
+                                       lowerMessage.includes('for ') || // "for 3 people"
+                                       /\d+:\d+/.test(lowerMessage) || // time pattern like "11:15"
+                                       /\d+\s*(am|pm)/.test(lowerMessage) || // time pattern like "11am"
+                                       lowerMessage.includes('today') ||
+                                       lowerMessage.includes('tomorrow') ||
+                                       lowerMessage.includes('tonight')
+        
+        // Simple acceptance keywords that don't specify new details
+        const isSimpleAcceptance = (lowerMessage.includes('yes') ||
+                                   lowerMessage.includes('accept') ||
+                                   lowerMessage.includes('confirm') ||
+                                   lowerMessage.includes('go ahead') ||
+                                   lowerMessage.includes('that works') ||
+                                   lowerMessage.includes('sounds good') ||
+                                   lowerMessage.includes('sure') ||
+                                   lowerMessage.includes('ok') ||
+                                   lowerMessage.includes('okay')) &&
+                                  !hasNewRequestIndicators
+        
+        if (isSimpleAcceptance) {
+          activeReservationContext = {
+            restaurant_id: suggestedThread.restaurantId,
+            restaurant_name: suggestedThread.restaurantName,
+            npub: suggestedThread.restaurantNpub,
+            party_size: suggestedThread.request.partySize,
+            original_time: suggestedThread.request.isoTime,
+            suggested_time: suggestedThread.suggestedTime,
+            thread_id: suggestedThread.threadId, // Include thread ID for linking
+          }
         }
       }
     }
