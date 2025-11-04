@@ -274,8 +274,11 @@ export function updateThreadWithMessage(
   console.log('[ReservationContext] Processing message:', {
     type: message.type,
     giftWrapId: message.giftWrap.id,
+    rumorId: message.rumor.id,
     extractedThreadId: threadId,
     rumorTags: message.rumor.tags,
+    eTags: message.rumor.tags.filter(t => t[0] === 'e'),
+    rootETags: message.rumor.tags.filter(t => t[0] === 'e' && t[3] === 'root'),
     availableThreads: threads.map(t => ({ id: t.threadId, name: t.restaurantName })),
   });
 
@@ -342,8 +345,11 @@ export function updateThreadWithMessage(
     // Response/modification without a matching thread - log warning and ignore
     console.warn('[ReservationContext] ⚠️ Received message for unknown thread:', message.type);
     console.warn('[ReservationContext] Message threadId:', threadId);
+    console.warn('[ReservationContext] Message rumor.id:', message.rumor.id);
     console.warn('[ReservationContext] Available threadIds:', threads.map(t => t.threadId));
-    console.warn('[ReservationContext] Message e-tags:', message.rumor.tags.filter(t => t[0] === 'e'));
+    console.warn('[ReservationContext] All e-tags:', JSON.stringify(message.rumor.tags.filter(t => t[0] === 'e'), null, 2));
+    console.warn('[ReservationContext] Root e-tags:', JSON.stringify(message.rumor.tags.filter(t => t[0] === 'e' && t[3] === 'root'), null, 2));
+    console.warn('[ReservationContext] Thread context:', threadContext);
     console.warn('[ReservationContext] Full message:', message);
     return threads;
   }
