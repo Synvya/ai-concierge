@@ -287,8 +287,8 @@ describe('ReservationContext', () => {
         content: '{"party_size":2,"iso_time":"2025-10-25T15:00:00Z"}',
         created_at: Math.floor(Date.now() / 1000),
         pubkey: 'test-pubkey-hex',
-        tags: [['e', 'thread-root-id', '', 'root']],
-        id: 'request-id-1',
+        tags: [], // Request messages don't have e-tags (they're the root)
+        id: 'thread-root-id', // This is the rumor ID, which becomes the thread ID per NIP-17
         sig: 'sig',
       } as any,
       type: 'request',
@@ -303,7 +303,7 @@ describe('ReservationContext', () => {
         created_at: Math.floor(Date.now() / 1000),
         pubkey: 'random-pubkey',
         tags: [['p', 'restaurant-pubkey']],
-        id: 'thread-root-id',
+        id: 'giftwrap-request-id-1', // Gift wrap ID is different from rumor ID
         sig: 'sig',
       } as any,
     }
@@ -320,6 +320,7 @@ describe('ReservationContext', () => {
     await waitFor(() => {
       expect(result.current.threads).toHaveLength(1)
       expect(result.current.threads[0].status).toBe('sent')
+      expect(result.current.threads[0].threadId).toBe('thread-root-id') // Verify thread ID is rumor ID
     })
 
     // Now simulate receiving a modification request
@@ -329,7 +330,7 @@ describe('ReservationContext', () => {
         content: '{"iso_time":"2025-10-25T16:00:00Z","message":"We can accommodate you at 4pm instead"}',
         created_at: Math.floor(Date.now() / 1000) + 60,
         pubkey: 'restaurant-pubkey',
-        tags: [['e', 'thread-root-id', '', 'root']],
+        tags: [['e', 'thread-root-id', '', 'root']], // References the rumor ID in e-tag
         id: 'modification-request-id-1',
         sig: 'sig',
       } as any,
