@@ -56,7 +56,7 @@ import type {
 import { chat } from '../lib/api'
 import type { ReservationIntent } from '../lib/parseReservationIntent'
 import { buildReservationRequest, buildReservationModificationResponse } from '../lib/nostr/reservationEvents'
-import { wrapEvent } from '../lib/nostr/nip59'
+import { wrapEvent, unwrapEvent } from '../lib/nostr/nip59'
 import { publishToRelays } from '../lib/nostr/relayPool'
 import type { ReservationModificationResponse } from '../types/reservation'
 import { npubToHex } from '../lib/nostr/keys'
@@ -603,6 +603,15 @@ export const ChatPanel = () => {
         'wss://relay.nostr.band',
       ]
 
+      // Unwrap the self CC to get the rumor with its ID before publishing
+      // Per NIP-17: The rumor ID is the same for both gift wraps (to merchant and to self)
+      // This rumor ID is what should be used as the thread ID in e-tags for subsequent messages
+      const selfCCRumor = unwrapEvent(giftWrapToSelf, nostrIdentity.privateKeyHex)
+      
+      console.log('📤 Sent reservation request - Thread ID (rumor.id):', selfCCRumor.id)
+      console.log('📤 Gift wrap to merchant ID:', giftWrapToMerchant.id)
+      console.log('📤 Gift wrap to self ID:', giftWrapToSelf.id)
+
       // Publish BOTH gift wraps to relays (Self CC ensures persistence across devices)
       await Promise.all([
         publishToRelays(giftWrapToMerchant, relays),
@@ -610,16 +619,8 @@ export const ChatPanel = () => {
       ])
 
       // Add to reservation context for tracking
-      // Convert EventTemplate to Rumor by adding required id field
-      // Use the Self CC rumor since that's the one we can decrypt
-      const rumorWithId: Rumor = {
-        ...rumorToSelf,
-        id: giftWrapToMerchant.id, // Use merchant gift wrap ID as thread ID
-        pubkey: nostrIdentity.publicKeyHex,
-      };
-
       const reservationMessage: ReservationMessage = {
-        rumor: rumorWithId,
+        rumor: selfCCRumor,
         type: 'request',
         payload: request,
         senderPubkey: nostrIdentity.publicKeyHex,

@@ -172,8 +172,13 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
       setThreads((prev) => {
         // Find thread by extracting thread context
         const threadContext = getThreadContext(message.rumor as any); // Rumor extends UnsignedEvent but getThreadContext expects Event
-        // Use rumor.id as threadId since that's what NIP-10 e-tags will reference
-        const threadId = threadContext.rootId || message.rumor.id;
+        // Thread ID logic per NIP-17:
+        // - For request messages (root), use rumor.id (the rumor's computed ID, same for both gift wraps)
+        // - For response/modification messages, use rootId from e-tags (which references the rumor ID of the original request)
+        // - Fallback to rumor.id if neither applies (shouldn't happen for properly formatted messages)
+        const threadId = message.type === 'request'
+          ? message.rumor.id  // Request messages are root - use rumor ID as thread ID (per NIP-17)
+          : (threadContext.rootId || message.rumor.id);  // Responses/modifications reference root rumor ID via e-tags
 
         const existingThread = prev.find((t) => t.threadId === threadId);
 
@@ -258,8 +263,13 @@ export function updateThreadWithMessage(
 
   // Extract thread context using NIP-10
   const threadContext = getThreadContext(message.rumor as any);
-  // Use rumor.id as threadId since that's what NIP-10 e-tags will reference
-  const threadId = threadContext.rootId || message.rumor.id;
+  // Thread ID logic per NIP-17:
+  // - For request messages (root), use rumor.id (the rumor's computed ID, same for both gift wraps)
+  // - For response/modification messages, use rootId from e-tags (which references the rumor ID of the original request)
+  // - Fallback to rumor.id if neither applies (shouldn't happen for properly formatted messages)
+  const threadId = message.type === 'request' 
+    ? message.rumor.id  // Request messages are root - use rumor ID as thread ID (per NIP-17)
+    : (threadContext.rootId || message.rumor.id);  // Responses/modifications reference root rumor ID via e-tags
 
   console.log('[ReservationContext] Processing message:', {
     type: message.type,
