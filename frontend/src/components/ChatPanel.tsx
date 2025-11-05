@@ -1476,7 +1476,7 @@ export const ChatPanel = () => {
                 <FormLabel>Phone Number</FormLabel>
                 <Input
                   type="tel"
-                  placeholder="+1-555-1234"
+                  placeholder="555-111-1001"
                   value={tempPhone}
                   onChange={(e) => setTempPhone(e.target.value)}
                   onKeyPress={(e) => {
@@ -1486,7 +1486,7 @@ export const ChatPanel = () => {
                   }}
                 />
                 <FormHelperText color="gray.500" fontSize="sm">
-                  Any format accepted: +14253942379, 425-394-2379, (425) 394-2379
+                  Any format accepted: +15551111001, 555-111-1001, (555) 111-1001
                 </FormHelperText>
               </FormControl>
             </Stack>
