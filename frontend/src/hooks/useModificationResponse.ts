@@ -56,7 +56,7 @@ export function useModificationResponse(setIsLoading?: (loading: boolean) => voi
         message,
       };
 
-      // Find the modification request message to get its event ID for threading
+      // Find the modification request message to extract the original 9901 rumor ID
       const modificationRequestMessage = thread.messages.find(
         (m) => m.type === 'modification_request'
       );
@@ -65,12 +65,28 @@ export function useModificationResponse(setIsLoading?: (loading: boolean) => voi
         throw new Error('Modification request message not found in thread');
       }
 
-      // Build NIP-10 thread tags:
-      // - root: original request (thread.threadId)
-      // - reply: modification request (modificationRequestMessage.giftWrap.id)
+      // Extract the original 9901 request rumor ID from the modification request's e tag
+      // Per NIP-RR: kind:9903 MUST include ["e", "<unsigned-9901-rumor-id>", "", "root"]
+      const rootETag = modificationRequestMessage.rumor.tags.find(
+        (tag) => Array.isArray(tag) && tag[0] === 'e' && tag[3] === 'root'
+      );
+
+      if (!rootETag || !Array.isArray(rootETag) || typeof rootETag[1] !== 'string') {
+        throw new Error(
+          'Modification request must include an e tag with the original 9901 request rumor ID'
+        );
+      }
+
+      const originalRequestRumorId = rootETag[1];
+
+      console.log('[useModificationResponse] Extracted original 9901 request rumor ID:', originalRequestRumorId);
+      console.log('[useModificationResponse] Modification request rumor ID:', modificationRequestMessage.rumor.id);
+      console.log('[useModificationResponse] Thread ID:', thread.threadId);
+
+      // Per NIP-RR: kind:9904 MUST include ["e", "<unsigned-9901-rumor-id>", "", "root"]
+      // We reference the original request rumor ID, not the modification request
       const additionalTags: string[][] = [
-        ["e", thread.threadId, "", "root"],  // Link to original request
-        ["e", modificationRequestMessage.giftWrap.id, "", "reply"],  // Reply to modification request
+        ["e", originalRequestRumorId, "", "root"],  // Reference original 9901 request rumor ID
       ];
 
       // Create ONE rumor template with p tag pointing to the restaurant (the actual recipient)
