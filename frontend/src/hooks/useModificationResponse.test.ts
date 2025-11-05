@@ -57,8 +57,9 @@ describe('useModificationResponse', () => {
       original_iso_time: '2025-10-25T15:00:00Z',
     };
 
+    const originalRequestId = '0123456789abcdef'.repeat(4); // Valid hex ID for original request
     return {
-      threadId: 'test-thread-id',
+      threadId: originalRequestId,
       restaurantId: 'restaurant-123',
       restaurantName: 'Test Restaurant',
       restaurantNpub: restaurantKeypair.npub, // Use valid npub format
@@ -69,8 +70,11 @@ describe('useModificationResponse', () => {
             content: 'encrypted',
             created_at: Math.floor(Date.now() / 1000),
             pubkey: keypair.publicKeyHex,
-            tags: [],
-            id: 'modification-request-id',
+            tags: [
+              ['p', restaurantKeypair.publicKeyHex],
+              ['e', originalRequestId, '', 'root'], // Required e tag per NIP-RR
+            ],
+            id: 'fedcba9876543210'.repeat(4),
           },
           type: 'modification_request',
           payload: modificationRequest,

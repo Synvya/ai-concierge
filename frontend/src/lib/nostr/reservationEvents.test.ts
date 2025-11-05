@@ -332,7 +332,7 @@ describe("reservationEvents", () => {
             // Create rumor WITHOUT e tag (should fail validation)
             const rumorWithoutETag: any = {
                 kind: 9903,
-                id: "a".repeat(64),
+                id: "89abcdef01234567".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
@@ -358,13 +358,13 @@ describe("reservationEvents", () => {
             // Create rumor with invalid e tag format (wrong marker)
             const rumorWithInvalidETag: any = {
                 kind: 9903,
-                id: "a".repeat(64),
+                id: "9abcdef012345678".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
                 tags: [
                     ["p", recipient.publicKeyHex],
-                    ["e", "b".repeat(64), "", "reply"], // Wrong marker - should be "root"
+                    ["e", "abcdef0123456789".repeat(4), "", "reply"], // Wrong marker - should be "root"
                 ],
             };
 
@@ -386,7 +386,7 @@ describe("reservationEvents", () => {
             // Create rumor with valid e tag
             const rumorWithValidETag: any = {
                 kind: 9903,
-                id: "a".repeat(64),
+                id: "bcdef0123456789a".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
@@ -641,7 +641,7 @@ describe("reservationEvents", () => {
         it("parses a valid modification response", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
-            const originalRequestId = "d".repeat(64);
+            const originalRequestId = "0123456789abcdef".repeat(4);
 
             const originalResponse: ReservationModificationResponse = {
                 status: "accepted",
@@ -652,7 +652,7 @@ describe("reservationEvents", () => {
             // Create modification response rumor manually (content is plain JSON, not encrypted)
             const mockRumor: any = {
                 kind: 9904,
-                id: "e".repeat(64),
+                id: "0123456789abcdef".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(originalResponse),
@@ -672,7 +672,7 @@ describe("reservationEvents", () => {
         it("parses declined modification response", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
-            const originalRequestId = "f".repeat(64);
+            const originalRequestId = "fedcba9876543210".repeat(4);
 
             const originalResponse: ReservationModificationResponse = {
                 status: "declined",
@@ -681,7 +681,7 @@ describe("reservationEvents", () => {
 
             const mockRumor: any = {
                 kind: 9904,
-                id: "g".repeat(64),
+                id: "fedcba9876543210".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(originalResponse),
@@ -713,7 +713,7 @@ describe("reservationEvents", () => {
         it("throws on invalid payload", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
-            const originalRequestId = "h".repeat(64);
+            const originalRequestId = "bcdef0123456789a".repeat(4);
 
             // Invalid payload (missing required iso_time for accepted)
             const invalidPayload = {
@@ -723,7 +723,7 @@ describe("reservationEvents", () => {
 
             const mockRumor: any = {
                 kind: 9904,
-                id: "i".repeat(64),
+                id: "cdef0123456789ab".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(invalidPayload),
@@ -750,7 +750,7 @@ describe("reservationEvents", () => {
             // Create rumor WITHOUT e tag (should fail validation)
             const rumorWithoutETag: any = {
                 kind: 9904,
-                id: "j".repeat(64),
+                id: "1234567890abcdef".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
@@ -776,13 +776,13 @@ describe("reservationEvents", () => {
             // Create rumor with invalid e tag format (wrong marker)
             const rumorWithInvalidETag: any = {
                 kind: 9904,
-                id: "k".repeat(64),
+                id: "234567890abcdef1".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
                 tags: [
                     ["p", recipient.publicKeyHex],
-                    ["e", "l".repeat(64), "", "reply"], // Wrong marker - should be "root"
+                    ["e", "34567890abcdef12".repeat(4), "", "reply"], // Wrong marker - should be "root"
                 ],
             };
 
@@ -794,7 +794,7 @@ describe("reservationEvents", () => {
         it("validates e tag with correct format", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
-            const originalRequestId = "m".repeat(64);
+            const originalRequestId = "4567890abcdef123".repeat(4);
 
             const payload: ReservationModificationResponse = {
                 status: "accepted",
@@ -805,7 +805,7 @@ describe("reservationEvents", () => {
             // Create rumor with valid e tag
             const rumorWithValidETag: any = {
                 kind: 9904,
-                id: "n".repeat(64),
+                id: "567890abcdef1234".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
@@ -826,7 +826,7 @@ describe("reservationEvents", () => {
         it("validates a valid modification request event with e tag", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
-            const originalRequestId = "o".repeat(64);
+            const originalRequestId = "67890abcdef12345".repeat(4);
 
             const payload: ReservationModificationRequest = {
                 iso_time: "2025-10-20T19:30:00-07:00",
@@ -835,7 +835,7 @@ describe("reservationEvents", () => {
 
             const rumor: any = {
                 kind: 9903,
-                id: "p".repeat(64),
+                id: "7890abcdef123456".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
@@ -846,6 +846,9 @@ describe("reservationEvents", () => {
             };
 
             const result = validateReservationModificationRequestEvent(rumor);
+            if (!result.valid) {
+                console.log('Validation errors:', result.errors);
+            }
             expect(result.valid).toBe(true);
         });
 
@@ -860,7 +863,7 @@ describe("reservationEvents", () => {
 
             const rumor: any = {
                 kind: 9903,
-                id: "q".repeat(64),
+                id: "890abcdef1234567".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
@@ -879,7 +882,7 @@ describe("reservationEvents", () => {
         it("validates a valid modification response event with e tag", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
-            const originalRequestId = "r".repeat(64);
+            const originalRequestId = "90abcdef12345678".repeat(4);
 
             const payload: ReservationModificationResponse = {
                 status: "accepted",
@@ -888,7 +891,7 @@ describe("reservationEvents", () => {
 
             const rumor: any = {
                 kind: 9904,
-                id: "s".repeat(64),
+                id: "abcdef1234567890".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
@@ -899,6 +902,9 @@ describe("reservationEvents", () => {
             };
 
             const result = validateReservationModificationResponseEvent(rumor);
+            if (!result.valid) {
+                console.log('Validation errors:', result.errors);
+            }
             expect(result.valid).toBe(true);
         });
 
@@ -913,7 +919,7 @@ describe("reservationEvents", () => {
 
             const rumor: any = {
                 kind: 9904,
-                id: "t".repeat(64),
+                id: "bcdef1234567890a".repeat(4),
                 pubkey: sender.publicKeyHex,
                 created_at: Math.floor(Date.now() / 1000),
                 content: JSON.stringify(payload),
