@@ -616,13 +616,14 @@ export function parseReservationModificationRequest(
             throw new Error(`Invalid reservation modification request event: p tag value must be a 64-character lowercase hex string`);
         }
         
-        // Validate e tag structure if present (for modification requests referencing original request)
-        const eTag = rumorObj.tags.find(tag => Array.isArray(tag) && tag[0] === 'e');
-        if (eTag && Array.isArray(eTag)) {
-            if (eTag.length !== 4 || eTag[0] !== 'e' || typeof eTag[1] !== 'string' || 
-                !/^[a-f0-9]{64}$/.test(eTag[1]) || eTag[2] !== '' || eTag[3] !== 'root') {
-                throw new Error(`Invalid reservation modification request event: e tag must have format ['e', '<unsigned-9901-rumor-id>', '', 'root']`);
-            }
+        // Validate e tag structure - REQUIRED per NIP-RR: kind:9903 MUST include ["e", "<unsigned-9901-rumor-id>", "", "root"]
+        const eTag = rumorObj.tags.find(tag => Array.isArray(tag) && tag[0] === 'e' && tag[3] === 'root');
+        if (!eTag || !Array.isArray(eTag)) {
+            throw new Error(`Invalid reservation modification request event: e tag with root marker is required`);
+        }
+        if (eTag.length !== 4 || eTag[0] !== 'e' || typeof eTag[1] !== 'string' || 
+            !/^[a-f0-9]{64}$/.test(eTag[1]) || eTag[2] !== '' || eTag[3] !== 'root') {
+            throw new Error(`Invalid reservation modification request event: e tag must have format ['e', '<unsigned-9901-rumor-id>', '', 'root']`);
         }
     }
 
@@ -729,6 +730,93 @@ export function buildReservationModificationResponse(
         ],
         created_at: Math.floor(Date.now() / 1000),
     };
+}
+
+/**
+ * Parses a reservation modification response from a rumor event.
+ * Content is plain text JSON (not encrypted).
+ * 
+ * @param rumor - The unwrapped rumor event (kind 9904)
+ * @returns Parsed and validated reservation modification response
+ * @throws Error if parsing or validation fails
+ * 
+ * @example
+ * ```typescript
+ * // After unwrapping gift wrap
+ * const rumor = unwrapEvent(giftWrap, myPrivateKeyHex);
+ * const modificationResponse = parseReservationModificationResponse(rumor);
+ * 
+ * console.log(`Status: ${modificationResponse.status}`);
+ * console.log(`Time: ${modificationResponse.iso_time}`);
+ * ```
+ */
+export function parseReservationModificationResponse(
+    rumor: Rumor | Event | { kind: number; content: string; pubkey: string }
+): ReservationModificationResponse {
+    if (rumor.kind !== 9904) {
+        throw new Error(`Expected kind 9904, got ${rumor.kind}`);
+    }
+
+    // Validate rumor event structure if it has id (Rumor type)
+    // Only validate if all required fields are present (id, pubkey, kind, tags, created_at)
+    // This allows partial mock objects in tests to skip event validation
+    // Note: We validate core structure but the schemas are strict about additionalProperties,
+    // so we only validate the essential fields rather than full schema validation for compatibility
+    if ('id' in rumor && typeof rumor.id === 'string' && 
+        'pubkey' in rumor && typeof rumor.pubkey === 'string' &&
+        'tags' in rumor && Array.isArray(rumor.tags) &&
+        'created_at' in rumor && typeof rumor.created_at === 'number') {
+        // Basic validation: check required fields exist and have correct types
+        const rumorObj = rumor as Rumor;
+        
+        // Validate kind
+        if (rumorObj.kind !== 9904) {
+            throw new Error(`Invalid reservation modification response event: kind must be 9904, got ${rumorObj.kind}`);
+        }
+        
+        // Validate id format (64-char hex)
+        if (!/^[a-f0-9]{64}$/.test(rumorObj.id)) {
+            throw new Error(`Invalid reservation modification response event: id must be a 64-character lowercase hex string`);
+        }
+        
+        // Validate pubkey format (64-char hex)
+        if (!/^[a-f0-9]{64}$/.test(rumorObj.pubkey)) {
+            throw new Error(`Invalid reservation modification response event: pubkey must be a 64-character lowercase hex string`);
+        }
+        
+        // Validate tags structure - must have at least one p tag
+        const pTag = rumorObj.tags.find(tag => Array.isArray(tag) && tag[0] === 'p');
+        if (!pTag || !Array.isArray(pTag) || pTag.length < 2) {
+            throw new Error(`Invalid reservation modification response event: tags must include at least one p tag`);
+        }
+        
+        // Validate p tag value format
+        if (typeof pTag[1] !== 'string' || !/^[a-f0-9]{64}$/.test(pTag[1])) {
+            throw new Error(`Invalid reservation modification response event: p tag value must be a 64-character lowercase hex string`);
+        }
+        
+        // Validate e tag structure - REQUIRED per NIP-RR: kind:9904 MUST include ["e", "<unsigned-9901-rumor-id>", "", "root"]
+        const eTag = rumorObj.tags.find(tag => Array.isArray(tag) && tag[0] === 'e' && tag[3] === 'root');
+        if (!eTag || !Array.isArray(eTag)) {
+            throw new Error(`Invalid reservation modification response event: e tag with root marker is required`);
+        }
+        if (eTag.length !== 4 || eTag[0] !== 'e' || typeof eTag[1] !== 'string' || 
+            !/^[a-f0-9]{64}$/.test(eTag[1]) || eTag[2] !== '' || eTag[3] !== 'root') {
+            throw new Error(`Invalid reservation modification response event: e tag must have format ['e', '<unsigned-9901-rumor-id>', '', 'root']`);
+        }
+    }
+
+    // Parse content (plain text JSON, not encrypted)
+    const payload = JSON.parse(rumor.content);
+
+    // Validate payload structure
+    const validation = validateReservationModificationResponsePayload(payload);
+    if (!validation.valid) {
+        const errorMessages = validation.errors?.map(e => e.message).join(", ");
+        throw new Error(`Invalid reservation modification response payload: ${errorMessages}`);
+    }
+
+    return payload as ReservationModificationResponse;
 }
 
 

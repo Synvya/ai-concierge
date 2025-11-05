@@ -9,12 +9,15 @@ import {
     validateReservationResponsePayload,
     validateReservationModificationRequestPayload,
     validateReservationModificationResponsePayload,
+    validateReservationModificationRequestEvent,
+    validateReservationModificationResponseEvent,
     buildReservationRequest,
     buildReservationResponse,
     buildReservationModificationResponse,
     parseReservationRequest,
     parseReservationResponse,
     parseReservationModificationRequest,
+    parseReservationModificationResponse,
 } from "./reservationEvents";
 import type { ReservationRequest, ReservationResponse, ReservationModificationRequest, ReservationModificationResponse } from "../../types/reservation";
 import { unwrapEvent, wrapEvent } from "./nip59";
@@ -316,6 +319,87 @@ describe("reservationEvents", () => {
 
             expect(() => parseReservationModificationRequest(mockRumor)).toThrow();
         });
+
+        it("requires e tag with root marker for full rumor validation", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const payload: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Alternative time available",
+            };
+
+            // Create rumor WITHOUT e tag (should fail validation)
+            const rumorWithoutETag: any = {
+                kind: 9903,
+                id: "a".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                ],
+            };
+
+            expect(() => parseReservationModificationRequest(rumorWithoutETag)).toThrow(
+                "e tag with root marker is required"
+            );
+        });
+
+        it("validates e tag format correctly", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const payload: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Alternative time available",
+            };
+
+            // Create rumor with invalid e tag format (wrong marker)
+            const rumorWithInvalidETag: any = {
+                kind: 9903,
+                id: "a".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", "b".repeat(64), "", "reply"], // Wrong marker - should be "root"
+                ],
+            };
+
+            expect(() => parseReservationModificationRequest(rumorWithInvalidETag)).toThrow(
+                "e tag with root marker is required"
+            );
+        });
+
+        it("validates e tag with correct format", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+            const originalRequestId = "c".repeat(64);
+
+            const payload: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Alternative time available",
+            };
+
+            // Create rumor with valid e tag
+            const rumorWithValidETag: any = {
+                kind: 9903,
+                id: "a".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", originalRequestId, "", "root"], // Correct format
+                ],
+            };
+
+            const parsed = parseReservationModificationRequest(rumorWithValidETag);
+            expect(parsed.iso_time).toBe(payload.iso_time);
+            expect(parsed.message).toBe(payload.message);
+        });
     });
 
     describe("validateReservationModificationResponsePayload", () => {
@@ -550,6 +634,297 @@ describe("reservationEvents", () => {
             expect(template.kind).toBe(9904);
             // Should still have p tag
             expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
+        });
+    });
+
+    describe("parseReservationModificationResponse", () => {
+        it("parses a valid modification response", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+            const originalRequestId = "d".repeat(64);
+
+            const originalResponse: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Yes, 7:30pm works perfectly!",
+            };
+
+            // Create modification response rumor manually (content is plain JSON, not encrypted)
+            const mockRumor: any = {
+                kind: 9904,
+                id: "e".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(originalResponse),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", originalRequestId, "", "root"], // Required e tag per NIP-RR
+                ],
+            };
+
+            const parsed = parseReservationModificationResponse(mockRumor);
+
+            expect(parsed.status).toBe(originalResponse.status);
+            expect(parsed.iso_time).toBe(originalResponse.iso_time);
+            expect(parsed.message).toBe(originalResponse.message);
+        });
+
+        it("parses declined modification response", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+            const originalRequestId = "f".repeat(64);
+
+            const originalResponse: ReservationModificationResponse = {
+                status: "declined",
+                message: "Unfortunately 7:30pm doesn't work for us.",
+            };
+
+            const mockRumor: any = {
+                kind: 9904,
+                id: "g".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(originalResponse),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", originalRequestId, "", "root"],
+                ],
+            };
+
+            const parsed = parseReservationModificationResponse(mockRumor);
+
+            expect(parsed.status).toBe("declined");
+            expect(parsed.iso_time).toBeUndefined();
+            expect(parsed.message).toBe(originalResponse.message);
+        });
+
+        it("throws on wrong event kind", () => {
+            const mockRumor = {
+                kind: 9903, // Wrong kind (should be 9904)
+                content: "encrypted",
+                pubkey: "pubkey",
+            };
+
+            expect(() => parseReservationModificationResponse(mockRumor)).toThrow(
+                "Expected kind 9904"
+            );
+        });
+
+        it("throws on invalid payload", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+            const originalRequestId = "h".repeat(64);
+
+            // Invalid payload (missing required iso_time for accepted)
+            const invalidPayload = {
+                status: "accepted",
+                // missing required iso_time
+            };
+
+            const mockRumor: any = {
+                kind: 9904,
+                id: "i".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(invalidPayload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", originalRequestId, "", "root"],
+                ],
+            };
+
+            expect(() => parseReservationModificationResponse(mockRumor)).toThrow(
+                "Invalid reservation modification response"
+            );
+        });
+
+        it("requires e tag with root marker for full rumor validation", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const payload: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+            };
+
+            // Create rumor WITHOUT e tag (should fail validation)
+            const rumorWithoutETag: any = {
+                kind: 9904,
+                id: "j".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                ],
+            };
+
+            expect(() => parseReservationModificationResponse(rumorWithoutETag)).toThrow(
+                "e tag with root marker is required"
+            );
+        });
+
+        it("validates e tag format correctly", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const payload: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+            };
+
+            // Create rumor with invalid e tag format (wrong marker)
+            const rumorWithInvalidETag: any = {
+                kind: 9904,
+                id: "k".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", "l".repeat(64), "", "reply"], // Wrong marker - should be "root"
+                ],
+            };
+
+            expect(() => parseReservationModificationResponse(rumorWithInvalidETag)).toThrow(
+                "e tag with root marker is required"
+            );
+        });
+
+        it("validates e tag with correct format", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+            const originalRequestId = "m".repeat(64);
+
+            const payload: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Perfect!",
+            };
+
+            // Create rumor with valid e tag
+            const rumorWithValidETag: any = {
+                kind: 9904,
+                id: "n".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", originalRequestId, "", "root"], // Correct format
+                ],
+            };
+
+            const parsed = parseReservationModificationResponse(rumorWithValidETag);
+            expect(parsed.status).toBe(payload.status);
+            expect(parsed.iso_time).toBe(payload.iso_time);
+            expect(parsed.message).toBe(payload.message);
+        });
+    });
+
+    describe("validateReservationModificationRequestEvent", () => {
+        it("validates a valid modification request event with e tag", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+            const originalRequestId = "o".repeat(64);
+
+            const payload: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Alternative time available",
+            };
+
+            const rumor: any = {
+                kind: 9903,
+                id: "p".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", originalRequestId, "", "root"],
+                ],
+            };
+
+            const result = validateReservationModificationRequestEvent(rumor);
+            expect(result.valid).toBe(true);
+        });
+
+        it("rejects modification request event without e tag", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const payload: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Alternative time available",
+            };
+
+            const rumor: any = {
+                kind: 9903,
+                id: "q".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    // Missing required e tag
+                ],
+            };
+
+            const result = validateReservationModificationRequestEvent(rumor);
+            expect(result.valid).toBe(false);
+        });
+    });
+
+    describe("validateReservationModificationResponseEvent", () => {
+        it("validates a valid modification response event with e tag", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+            const originalRequestId = "r".repeat(64);
+
+            const payload: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+            };
+
+            const rumor: any = {
+                kind: 9904,
+                id: "s".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    ["e", originalRequestId, "", "root"],
+                ],
+            };
+
+            const result = validateReservationModificationResponseEvent(rumor);
+            expect(result.valid).toBe(true);
+        });
+
+        it("rejects modification response event without e tag", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            const payload: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+            };
+
+            const rumor: any = {
+                kind: 9904,
+                id: "t".repeat(64),
+                pubkey: sender.publicKeyHex,
+                created_at: Math.floor(Date.now() / 1000),
+                content: JSON.stringify(payload),
+                tags: [
+                    ["p", recipient.publicKeyHex],
+                    // Missing required e tag
+                ],
+            };
+
+            const result = validateReservationModificationResponseEvent(rumor);
+            expect(result.valid).toBe(false);
         });
     });
 
@@ -910,6 +1285,121 @@ describe("reservationEvents", () => {
 
             expect(parsedResponse.status).toBe("declined");
             expect(parsedResponse.iso_time).toBeUndefined();
+        });
+
+        it("full modification request/response cycle with e tags", () => {
+            const customer = generateKeypair();
+            const restaurant = generateKeypair();
+
+            // Step 1: Customer creates a request
+            const request: ReservationRequest = {
+                party_size: 4,
+                iso_time: "2025-10-20T19:00:00-07:00",
+                notes: "Window seat please",
+            };
+
+            const requestRumor = buildReservationRequest(
+                request,
+                customer.privateKeyHex,
+                restaurant.publicKeyHex
+            );
+
+            // Wrap for sending
+            const requestGiftWrap = wrapEvent(
+                requestRumor,
+                customer.privateKeyHex,
+                restaurant.publicKeyHex
+            );
+
+            // Step 2: Restaurant receives and parses request
+            const unwrappedRequest = unwrapEvent(
+                requestGiftWrap,
+                restaurant.privateKeyHex
+            );
+
+            const parsedRequest = parseReservationRequest(unwrappedRequest);
+            expect(parsedRequest.party_size).toBe(4);
+
+            // Step 3: Restaurant sends modification request with e tag referencing original request
+            const modificationRequest: ReservationModificationRequest = {
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "We're fully booked at 7pm, but 7:30pm is available.",
+                original_iso_time: "2025-10-20T19:00:00-07:00",
+            };
+
+            // Create modification request rumor manually (we don't have buildReservationModificationRequest yet)
+            // In real implementation, restaurant would use buildReservationModificationRequest
+            const modificationRequestRumorCorrect: any = {
+                kind: 9903,
+                content: JSON.stringify(modificationRequest),
+                pubkey: restaurant.publicKeyHex,
+                tags: [
+                    ["p", customer.publicKeyHex],
+                    ["e", unwrappedRequest.id, "", "root"], // Reference original request
+                ],
+                created_at: Math.floor(Date.now() / 1000),
+            };
+
+            // Wrap modification request
+            const modificationRequestGiftWrap = wrapEvent(
+                modificationRequestRumorCorrect,
+                restaurant.privateKeyHex,
+                customer.publicKeyHex
+            );
+
+            // Step 4: Customer receives and parses modification request
+            const unwrappedModificationRequest = unwrapEvent(
+                modificationRequestGiftWrap,
+                customer.privateKeyHex
+            );
+
+            const parsedModificationRequest = parseReservationModificationRequest(unwrappedModificationRequest);
+            expect(parsedModificationRequest.iso_time).toBe("2025-10-20T19:30:00-07:00");
+
+            // Verify e tag is present and correct
+            const eTag = unwrappedModificationRequest.tags.find(
+                (tag) => Array.isArray(tag) && tag[0] === 'e' && tag[3] === 'root'
+            );
+            expect(eTag).toBeDefined();
+            expect(eTag![1]).toBe(unwrappedRequest.id); // Should reference original request
+
+            // Step 5: Customer sends modification response with e tag referencing original request
+            const modificationResponse: ReservationModificationResponse = {
+                status: "accepted",
+                iso_time: "2025-10-20T19:30:00-07:00",
+                message: "Yes, 7:30pm works perfectly!",
+            };
+
+            const modificationResponseRumor = buildReservationModificationResponse(
+                modificationResponse,
+                customer.privateKeyHex,
+                restaurant.publicKeyHex,
+                [["e", unwrappedRequest.id, "", "root"]] // Reference original request (not modification request)
+            );
+
+            // Wrap modification response
+            const modificationResponseGiftWrap = wrapEvent(
+                modificationResponseRumor,
+                customer.privateKeyHex,
+                restaurant.publicKeyHex
+            );
+
+            // Step 6: Restaurant receives and parses modification response
+            const unwrappedModificationResponse = unwrapEvent(
+                modificationResponseGiftWrap,
+                restaurant.privateKeyHex
+            );
+
+            const parsedModificationResponse = parseReservationModificationResponse(unwrappedModificationResponse);
+            expect(parsedModificationResponse.status).toBe("accepted");
+            expect(parsedModificationResponse.iso_time).toBe("2025-10-20T19:30:00-07:00");
+
+            // Verify e tag references original request (not modification request)
+            const responseETag = unwrappedModificationResponse.tags.find(
+                (tag) => Array.isArray(tag) && tag[0] === 'e' && tag[3] === 'root'
+            );
+            expect(responseETag).toBeDefined();
+            expect(responseETag![1]).toBe(unwrappedRequest.id); // Should reference original request, not modification request
         });
     });
 });
