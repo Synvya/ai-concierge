@@ -49,27 +49,34 @@ export type ReservationStatus =
     | "cancelled";
 
 /**
- * Reservation modification request payload (kind 9903)
+ * Reservation modification request payload (kind:9903)
  * Sent from restaurant to customer to suggest an alternative time
+ * Per NIP-RR: Uses the same structure as reservation request (kind:9901)
  */
 export interface ReservationModificationRequest {
+    /** Number of guests (1-20) */
+    party_size: number;
     /** Suggested alternative time in ISO8601 format with timezone */
     iso_time: string;
-    /** Explanation of why modification is needed and details about the suggested time */
-    message: string;
-    /** Original requested time (for reference) */
-    original_iso_time?: string;
+    /** Optional notes or special requests (max 2000 characters) */
+    notes?: string;
+    /** Optional contact information */
+    contact?: ReservationContact;
+    /** Optional constraints for negotiation */
+    constraints?: ReservationConstraints;
 }
 
 /**
- * Reservation modification response payload (kind 9904)
+ * Reservation modification response payload (kind:9904)
  * Sent from customer to restaurant to accept or decline a modification suggestion
+ * Per NIP-RR: status must be "confirmed" or "declined"
+ * Per NIP-RR: iso_time is required (can be null when declined)
  */
 export interface ReservationModificationResponse {
-    /** Whether customer accepts the modification */
-    status: "accepted" | "declined";
-    /** Accepted time (required if status is 'accepted') */
-    iso_time?: string;
+    /** Whether customer confirms the modification (per NIP-RR: "confirmed" or "declined") */
+    status: "confirmed" | "declined";
+    /** ISO8601 datetime with timezone (required field, can be null when declined) */
+    iso_time: string | null;
     /** Optional message from customer */
     message?: string;
 }

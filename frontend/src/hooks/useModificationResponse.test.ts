@@ -51,10 +51,10 @@ describe('useModificationResponse', () => {
   const createMockThread = (overrides?: Partial<ReservationThread>): ReservationThread => {
     const keypair = generateKeypair();
     const restaurantKeypair = generateKeypair(); // Generate valid npub for restaurant
-    const modificationRequest: ReservationModificationRequest = {
+      const modificationRequest: ReservationModificationRequest = {
+      party_size: 2,
       iso_time: '2025-10-25T16:00:00Z',
-      message: 'We can accommodate you at 4pm instead',
-      original_iso_time: '2025-10-25T15:00:00Z',
+      notes: 'We can accommodate you at 4pm instead',
     };
 
     const originalRequestId = '0123456789abcdef'.repeat(4); // Valid hex ID for original request
@@ -105,7 +105,7 @@ describe('useModificationResponse', () => {
     vi.clearAllMocks();
   });
 
-  it('sends accepted modification response', async () => {
+  it('sends confirmed modification response', async () => {
     const { result } = renderHook(
       () => {
         const { sendModificationResponse } = useModificationResponse();
@@ -119,7 +119,7 @@ describe('useModificationResponse', () => {
     const thread = createMockThread();
 
     await act(async () => {
-      await result.current.sendModificationResponse(thread, 'accepted', 'Yes, that works!');
+      await result.current.sendModificationResponse(thread, 'confirmed', 'Yes, that works!');
     });
 
     // Verify that publishToRelays was called
@@ -207,7 +207,7 @@ describe('useModificationResponse', () => {
     const thread = createMockThread();
 
     await act(async () => {
-      await result.current.sendModificationResponse(thread, 'accepted');
+      await result.current.sendModificationResponse(thread, 'confirmed');
     });
 
     // Verify publishToRelays was called (indirect verification that iso_time was included)

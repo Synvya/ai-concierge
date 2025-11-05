@@ -119,7 +119,11 @@ function validatePayloadStructure(payload: unknown, type: 'request' | 'response'
     }
     
     if (type === 'modificationRequest') {
+        // Per NIP-RR: modification request uses the same structure as reservation request
         const mod = payload as ReservationModificationRequest;
+        if (typeof mod.party_size !== 'number' || mod.party_size < 1 || mod.party_size > 20) {
+            return { valid: false, errors: [{ field: 'party_size', message: 'party_size must be between 1 and 20' }] };
+        }
         if (typeof mod.iso_time !== 'string' || !mod.iso_time) {
             return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a non-empty string' }] };
         }
@@ -127,31 +131,63 @@ function validatePayloadStructure(payload: unknown, type: 'request' | 'response'
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.iso_time)) {
             return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a valid ISO 8601 datetime with timezone' }] };
         }
-        if (typeof mod.message !== 'string' || !mod.message) {
-            return { valid: false, errors: [{ field: 'message', message: 'message must be a non-empty string' }] };
+        // Validate notes length
+        if (mod.notes && typeof mod.notes === 'string' && mod.notes.length > 2000) {
+            return { valid: false, errors: [{ field: 'notes', message: 'notes must be 2000 characters or less' }] };
         }
-        // Validate message length
-        if (mod.message.length > 2000) {
-            return { valid: false, errors: [{ field: 'message', message: 'message must be 2000 characters or less' }] };
+        // Validate contact
+        if (mod.contact) {
+            if (mod.contact.name && typeof mod.contact.name === 'string' && mod.contact.name.length > 200) {
+                return { valid: false, errors: [{ field: 'contact.name', message: 'contact.name must be 200 characters or less' }] };
+            }
+            if (mod.contact.phone && typeof mod.contact.phone === 'string' && mod.contact.phone.length > 64) {
+                return { valid: false, errors: [{ field: 'contact.phone', message: 'contact.phone must be 64 characters or less' }] };
+            }
+            if (mod.contact.email && typeof mod.contact.email === 'string') {
+                // Basic email validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(mod.contact.email)) {
+                    return { valid: false, errors: [{ field: 'contact.email', message: 'contact.email must be a valid email address' }] };
+                }
+            }
         }
-        // Validate original_iso_time if present
-        if (mod.original_iso_time && typeof mod.original_iso_time === 'string') {
-            if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.original_iso_time)) {
-                return { valid: false, errors: [{ field: 'original_iso_time', message: 'must be a valid ISO 8601 datetime with timezone' }] };
+        // Validate constraints
+        if (mod.constraints) {
+            if (mod.constraints.earliest_iso_time && typeof mod.constraints.earliest_iso_time === 'string') {
+                if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.constraints.earliest_iso_time)) {
+                    return { valid: false, errors: [{ field: 'constraints.earliest_iso_time', message: 'must be a valid ISO 8601 datetime with timezone' }] };
+                }
+            }
+            if (mod.constraints.latest_iso_time && typeof mod.constraints.latest_iso_time === 'string') {
+                if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.constraints.latest_iso_time)) {
+                    return { valid: false, errors: [{ field: 'constraints.latest_iso_time', message: 'must be a valid ISO 8601 datetime with timezone' }] };
+                }
             }
         }
     }
     
     if (type === 'modificationResponse') {
         const mod = payload as ReservationModificationResponse;
-        if (mod.status !== 'accepted' && mod.status !== 'declined') {
-            return { valid: false, errors: [{ field: 'status', message: 'status must be "accepted" or "declined"' }] };
+        // Per NIP-RR: status must be "confirmed" or "declined"
+        if (mod.status !== 'confirmed' && mod.status !== 'declined') {
+            return { valid: false, errors: [{ field: 'status', message: 'status must be "confirmed" or "declined"' }] };
         }
-        if (mod.status === 'accepted' && typeof mod.iso_time !== 'string') {
-            return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time is required when status is "accepted"' }] };
+        // Per NIP-RR: iso_time is required (can be null when declined)
+        if (!('iso_time' in mod)) {
+            return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time is required (can be null when declined)' }] };
         }
-        // Validate ISO time format if present
-        if (mod.iso_time && typeof mod.iso_time === 'string') {
+        // When confirmed, iso_time must be a valid ISO8601 string
+        if (mod.status === 'confirmed') {
+            if (mod.iso_time === null || typeof mod.iso_time !== 'string') {
+                return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a valid ISO8601 datetime string when status is "confirmed"' }] };
+            }
+            if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.iso_time)) {
+                return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a valid ISO 8601 datetime with timezone' }] };
+            }
+        }
+        // When declined, iso_time can be null
+        if (mod.status === 'declined' && mod.iso_time !== null && typeof mod.iso_time === 'string') {
+            // If provided when declined, validate format
             if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.iso_time)) {
                 return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a valid ISO 8601 datetime with timezone' }] };
             }
@@ -568,7 +604,10 @@ export function validateReservationModificationRequestPayload(payload: unknown):
  * const modificationRequest = parseReservationModificationRequest(rumor);
  * 
  * console.log(`Suggested time: ${modificationRequest.iso_time}`);
- * console.log(`Message: ${modificationRequest.message}`);
+ * console.log(`Party size: ${modificationRequest.party_size}`);
+ * if (modificationRequest.notes) {
+ *   console.log(`Notes: ${modificationRequest.notes}`);
+ * }
  * ```
  */
 export function parseReservationModificationRequest(
@@ -687,7 +726,7 @@ export function validateReservationModificationResponsePayload(payload: unknown)
  * ```typescript
  * const rumor = buildReservationModificationResponse(
  *   {
- *     status: "accepted",
+ *     status: "confirmed",
  *     iso_time: "2025-10-20T19:30:00-07:00",
  *     message: "Yes, 7:30pm works perfectly!"
  *   },

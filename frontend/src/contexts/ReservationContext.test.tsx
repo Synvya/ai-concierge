@@ -327,7 +327,7 @@ describe('ReservationContext', () => {
     const modificationRequestMessage: ReservationMessage = {
       rumor: {
         kind: 9903,
-        content: '{"iso_time":"2025-10-25T16:00:00Z","message":"We can accommodate you at 4pm instead"}',
+        content: '{"party_size":2,"iso_time":"2025-10-25T16:00:00Z","notes":"We can accommodate you at 4pm instead"}',
         created_at: Math.floor(Date.now() / 1000) + 60,
         pubkey: 'restaurant-pubkey',
         tags: [['e', 'thread-root-id', '', 'root']], // References the rumor ID in e-tag
@@ -336,9 +336,9 @@ describe('ReservationContext', () => {
       } as any,
       type: 'modification_request',
       payload: {
+        party_size: 2,
         iso_time: '2025-10-25T16:00:00Z',
-        message: 'We can accommodate you at 4pm instead',
-        original_iso_time: '2025-10-25T15:00:00Z',
+        notes: 'We can accommodate you at 4pm instead',
       },
       senderPubkey: 'restaurant-pubkey',
       giftWrap: {
@@ -363,7 +363,8 @@ describe('ReservationContext', () => {
       expect(updatedThread?.status).toBe('modification_requested')
       expect(updatedThread?.modificationRequest).toBeDefined()
       expect(updatedThread?.modificationRequest?.iso_time).toBe('2025-10-25T16:00:00Z')
-      expect(updatedThread?.modificationRequest?.message).toBe('We can accommodate you at 4pm instead')
+      expect(updatedThread?.modificationRequest?.party_size).toBe(2)
+      expect(updatedThread?.modificationRequest?.notes).toBe('We can accommodate you at 4pm instead')
     })
 
     unmount()
@@ -419,7 +420,7 @@ describe('ReservationContext', () => {
     const modificationRequestMessage: ReservationMessage = {
       rumor: {
         kind: 9903,
-        content: '{"iso_time":"2025-10-25T16:00:00Z","message":"We can accommodate you at 4pm instead"}',
+        content: '{"party_size":2,"iso_time":"2025-10-25T16:00:00Z","notes":"We can accommodate you at 4pm instead"}',
         created_at: Math.floor(Date.now() / 1000) + 60,
         pubkey: 'restaurant-pubkey',
         tags: [['e', 'thread-root-id', '', 'root']],
@@ -428,9 +429,9 @@ describe('ReservationContext', () => {
       } as any,
       type: 'modification_request',
       payload: {
+        party_size: 2,
         iso_time: '2025-10-25T16:00:00Z',
-        message: 'We can accommodate you at 4pm instead',
-        original_iso_time: '2025-10-25T15:00:00Z',
+        notes: 'We can accommodate you at 4pm instead',
       },
       senderPubkey: 'restaurant-pubkey',
       giftWrap: {
@@ -451,7 +452,7 @@ describe('ReservationContext', () => {
     const modificationResponseMessage: ReservationMessage = {
       rumor: {
         kind: 9904,
-        content: '{"status":"accepted","iso_time":"2025-10-25T16:00:00Z"}',
+        content: '{"status":"confirmed","iso_time":"2025-10-25T16:00:00Z"}',
         created_at: Math.floor(Date.now() / 1000) + 120,
         pubkey: 'test-pubkey-hex',
         tags: [
@@ -463,7 +464,7 @@ describe('ReservationContext', () => {
       } as any,
       type: 'modification_response',
       payload: {
-        status: 'accepted',
+        status: 'confirmed',
         iso_time: '2025-10-25T16:00:00Z',
       },
       senderPubkey: 'test-pubkey-hex',

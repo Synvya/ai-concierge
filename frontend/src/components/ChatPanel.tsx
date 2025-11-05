@@ -486,7 +486,7 @@ export const ChatPanel = () => {
       const notificationTitle = '💡 Modification Request'
       const notificationDescription = `${restaurantName} suggests a different time:\n\n` +
         `Original: ${originalTime}\n` +
-        `Suggested: ${suggestedTime}${modificationRequest.message ? `\n\n${modificationRequest.message}` : ''}`
+        `Suggested: ${suggestedTime}${modificationRequest.notes ? `\n\n${modificationRequest.notes}` : ''}`
 
       // Add message to chat
       const chatMessage: ChatMessage = {
@@ -726,7 +726,7 @@ export const ChatPanel = () => {
         
         await sendModificationResponse(
           modificationThread,
-          action.status as 'accepted' | 'declined',
+          action.status as 'confirmed' | 'declined',
           action.message
         )
       } else {
@@ -757,7 +757,7 @@ export const ChatPanel = () => {
         const isAcceptance = modificationThread.modificationRequest?.iso_time === action.iso_time
         await sendModificationResponse(
           modificationThread,
-          isAcceptance ? 'accepted' : 'declined'
+          isAcceptance ? 'confirmed' : 'declined'
         )
       } else {
         // Regular reservation request flow

@@ -141,9 +141,9 @@ export function ThreadCard({ thread, onClick, onAcceptModification, onDeclineMod
                     <Text as="span" fontWeight="medium">Suggested:</Text>{' '}
                     {formatDateTime(thread.modificationRequest.iso_time)}
                   </Text>
-                  {thread.modificationRequest.message && (
+                  {thread.modificationRequest.notes && (
                     <Text color="gray.600" mt={1} fontStyle="italic">
-                      "{thread.modificationRequest.message}"
+                      "{thread.modificationRequest.notes}"
                     </Text>
                   )}
                 </VStack>

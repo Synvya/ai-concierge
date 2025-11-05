@@ -20,7 +20,7 @@ export function useModificationResponse(setIsLoading?: (loading: boolean) => voi
 
   const sendModificationResponse = useCallback(async (
     thread: ReservationThread,
-    status: 'accepted' | 'declined',
+    status: 'confirmed' | 'declined',
     message?: string
   ) => {
     if (!nostrIdentity) {
@@ -50,9 +50,10 @@ export function useModificationResponse(setIsLoading?: (loading: boolean) => voi
       }
 
       // Build modification response payload
+      // Per NIP-RR: iso_time is required (can be null when declined)
       const response: ReservationModificationResponse = {
         status,
-        iso_time: status === 'accepted' ? thread.modificationRequest.iso_time : undefined,
+        iso_time: status === 'confirmed' ? thread.modificationRequest.iso_time : null,
         message,
       };
 
@@ -143,7 +144,7 @@ export function useModificationResponse(setIsLoading?: (loading: boolean) => voi
       addOutgoingMessage(reservationMessage, thread.restaurantId, thread.restaurantName, thread.restaurantNpub);
 
       toast({
-        title: `Modification ${status === 'accepted' ? 'accepted' : 'declined'}`,
+        title: `Modification ${status === 'confirmed' ? 'confirmed' : 'declined'}`,
         description: `Sent to ${thread.restaurantName}`,
         status: 'success',
       });

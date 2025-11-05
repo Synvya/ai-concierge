@@ -181,8 +181,9 @@ describe("reservationEvents", () => {
     describe("validateReservationModificationRequestPayload", () => {
         it("validates a valid modification request", () => {
             const request: ReservationModificationRequest = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "We're fully booked at 7pm, but 7:30pm is available.",
+                notes: "Alternative time available",
             };
 
             const result = validateReservationModificationRequestPayload(request);
@@ -191,11 +192,14 @@ describe("reservationEvents", () => {
             expect(result.errors).toBeUndefined();
         });
 
-        it("validates modification request with optional original_iso_time", () => {
+        it("validates modification request with optional fields", () => {
             const request: ReservationModificationRequest = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "We're fully booked at 7pm, but 7:30pm is available.",
-                original_iso_time: "2025-10-20T19:00:00-07:00",
+                notes: "Alternative time available",
+                contact: {
+                    name: "John Doe",
+                },
             };
 
             const result = validateReservationModificationRequestPayload(request);
@@ -205,7 +209,7 @@ describe("reservationEvents", () => {
 
         it("rejects modification request missing required iso_time", () => {
             const request = {
-                message: "We're fully booked at 7pm",
+                party_size: 2,
                 // missing iso_time
             };
 
@@ -216,10 +220,10 @@ describe("reservationEvents", () => {
             expect(result.errors!.length).toBeGreaterThan(0);
         });
 
-        it("rejects modification request missing required message", () => {
+        it("rejects modification request missing required party_size", () => {
             const request = {
                 iso_time: "2025-10-20T19:30:00-07:00",
-                // missing message
+                // missing party_size
             };
 
             const result = validateReservationModificationRequestPayload(request);
@@ -227,10 +231,11 @@ describe("reservationEvents", () => {
             expect(result.valid).toBe(false);
         });
 
-        it("rejects modification request with message too long", () => {
+        it("rejects modification request with notes too long", () => {
             const request = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "x".repeat(2001), // Max 2000
+                notes: "x".repeat(2001), // Max 2000
             };
 
             const result = validateReservationModificationRequestPayload(request);
@@ -240,8 +245,8 @@ describe("reservationEvents", () => {
 
         it("rejects modification request with invalid date format", () => {
             const request = {
+                party_size: 2,
                 iso_time: "not-a-date",
-                message: "Test message",
             };
 
             const result = validateReservationModificationRequestPayload(request);
@@ -256,9 +261,9 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const originalRequest: ReservationModificationRequest = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "We're fully booked at 7pm, but 7:30pm is available.",
-                original_iso_time: "2025-10-20T19:00:00-07:00",
+                notes: "We're fully booked at 7pm, but 7:30pm is available.",
             };
 
             // Create modification request rumor manually (content is plain JSON, not encrypted)
@@ -271,8 +276,8 @@ describe("reservationEvents", () => {
             const parsed = parseReservationModificationRequest(mockRumor);
 
             expect(parsed.iso_time).toBe(originalRequest.iso_time);
-            expect(parsed.message).toBe(originalRequest.message);
-            expect(parsed.original_iso_time).toBe(originalRequest.original_iso_time);
+            expect(parsed.party_size).toBe(originalRequest.party_size);
+            expect(parsed.notes).toBe(originalRequest.notes);
         });
 
         it("throws on wrong event kind", () => {
@@ -290,10 +295,10 @@ describe("reservationEvents", () => {
         it("throws on invalid payload", () => {
             const sender = generateKeypair();
 
-            // Invalid payload (missing required message)
+            // Invalid payload (missing required party_size)
             const invalidPayload = {
                 iso_time: "2025-10-20T19:30:00-07:00",
-                // missing required message
+                // missing required party_size
             };
 
             const mockRumor = {
@@ -325,8 +330,9 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const payload: ReservationModificationRequest = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "Alternative time available",
+                notes: "Alternative time available",
             };
 
             // Create rumor WITHOUT e tag (should fail validation)
@@ -351,8 +357,9 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const payload: ReservationModificationRequest = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "Alternative time available",
+                notes: "Alternative time available",
             };
 
             // Create rumor with invalid e tag format (wrong marker)
@@ -379,8 +386,9 @@ describe("reservationEvents", () => {
             const originalRequestId = "c".repeat(64);
 
             const payload: ReservationModificationRequest = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "Alternative time available",
+                notes: "Alternative time available",
             };
 
             // Create rumor with valid e tag
@@ -398,14 +406,15 @@ describe("reservationEvents", () => {
 
             const parsed = parseReservationModificationRequest(rumorWithValidETag);
             expect(parsed.iso_time).toBe(payload.iso_time);
-            expect(parsed.message).toBe(payload.message);
+            expect(parsed.party_size).toBe(payload.party_size);
+            expect(parsed.notes).toBe(payload.notes);
         });
     });
 
     describe("validateReservationModificationResponsePayload", () => {
         it("validates a valid accepted response", () => {
             const response: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
                 message: "Yes, 7:30pm works perfectly!",
             };
@@ -419,6 +428,7 @@ describe("reservationEvents", () => {
         it("validates a valid declined response", () => {
             const response: ReservationModificationResponse = {
                 status: "declined",
+                iso_time: null, // Per NIP-RR: required but can be null when declined
                 message: "Unfortunately 7:30pm doesn't work for us.",
             };
 
@@ -429,7 +439,7 @@ describe("reservationEvents", () => {
 
         it("validates accepted response without message", () => {
             const response: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
@@ -438,10 +448,10 @@ describe("reservationEvents", () => {
             expect(result.valid).toBe(true);
         });
 
-        it("rejects accepted response missing required iso_time", () => {
+        it("rejects response missing required iso_time field", () => {
             const response = {
-                status: "accepted",
-                // missing required iso_time for accepted status
+                status: "declined",
+                // missing required iso_time field (should be null when declined)
             };
 
             const result = validateReservationModificationResponsePayload(response);
@@ -473,7 +483,7 @@ describe("reservationEvents", () => {
 
         it("rejects response with message too long", () => {
             const response = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
                 message: "x".repeat(2001), // Max 2000
             };
@@ -483,9 +493,10 @@ describe("reservationEvents", () => {
             expect(result.valid).toBe(false);
         });
 
-        it("accepts declined response without iso_time", () => {
+        it("accepts declined response with iso_time null", () => {
             const response: ReservationModificationResponse = {
                 status: "declined",
+                iso_time: null, // Per NIP-RR: required but can be null when declined
             };
 
             const result = validateReservationModificationResponsePayload(response);
@@ -500,7 +511,7 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const response: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
                 message: "Yes, 7:30pm works perfectly!",
             };
@@ -523,6 +534,7 @@ describe("reservationEvents", () => {
 
             const response: ReservationModificationResponse = {
                 status: "declined",
+                iso_time: null, // Per NIP-RR: required but can be null when declined
                 message: "Unfortunately 7:30pm doesn't work for us.",
             };
 
@@ -543,7 +555,7 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const response: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
@@ -566,7 +578,7 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const invalidResponse = {
-                status: "accepted",
+                status: "confirmed",
                 // missing required iso_time
             } as ReservationModificationResponse;
 
@@ -602,7 +614,7 @@ describe("reservationEvents", () => {
 
             // This should fail validation before building
             const invalidResponse = {
-                status: "accepted",
+                status: "confirmed",
                 // missing iso_time
             } as ReservationModificationResponse;
 
@@ -620,7 +632,7 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const response: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
@@ -644,7 +656,7 @@ describe("reservationEvents", () => {
             const originalRequestId = "0123456789abcdef".repeat(4);
 
             const originalResponse: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
                 message: "Yes, 7:30pm works perfectly!",
             };
@@ -676,6 +688,7 @@ describe("reservationEvents", () => {
 
             const originalResponse: ReservationModificationResponse = {
                 status: "declined",
+                iso_time: null, // Per NIP-RR: required but can be null when declined
                 message: "Unfortunately 7:30pm doesn't work for us.",
             };
 
@@ -694,7 +707,7 @@ describe("reservationEvents", () => {
             const parsed = parseReservationModificationResponse(mockRumor);
 
             expect(parsed.status).toBe("declined");
-            expect(parsed.iso_time).toBeUndefined();
+            expect(parsed.iso_time).toBeNull();
             expect(parsed.message).toBe(originalResponse.message);
         });
 
@@ -717,7 +730,7 @@ describe("reservationEvents", () => {
 
             // Invalid payload (missing required iso_time for accepted)
             const invalidPayload = {
-                status: "accepted",
+                status: "confirmed",
                 // missing required iso_time
             };
 
@@ -743,7 +756,7 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const payload: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
@@ -769,7 +782,7 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const payload: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
@@ -797,7 +810,7 @@ describe("reservationEvents", () => {
             const originalRequestId = "4567890abcdef123".repeat(4);
 
             const payload: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
                 message: "Perfect!",
             };
@@ -829,8 +842,9 @@ describe("reservationEvents", () => {
             const originalRequestId = "67890abcdef12345".repeat(4);
 
             const payload: ReservationModificationRequest = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "Alternative time available",
+                notes: "Alternative time available",
             };
 
             const rumor: any = {
@@ -857,8 +871,9 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const payload: ReservationModificationRequest = {
+                party_size: 2,
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "Alternative time available",
+                notes: "Alternative time available",
             };
 
             const rumor: any = {
@@ -885,7 +900,7 @@ describe("reservationEvents", () => {
             const originalRequestId = "90abcdef12345678".repeat(4);
 
             const payload: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
@@ -913,7 +928,7 @@ describe("reservationEvents", () => {
             const recipient = generateKeypair();
 
             const payload: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
@@ -1328,9 +1343,9 @@ describe("reservationEvents", () => {
 
             // Step 3: Restaurant sends modification request with e tag referencing original request
             const modificationRequest: ReservationModificationRequest = {
+                party_size: 4, // Same party size as original request
                 iso_time: "2025-10-20T19:30:00-07:00",
-                message: "We're fully booked at 7pm, but 7:30pm is available.",
-                original_iso_time: "2025-10-20T19:00:00-07:00",
+                notes: "We're fully booked at 7pm, but 7:30pm is available.",
             };
 
             // Create modification request rumor manually (we don't have buildReservationModificationRequest yet)
@@ -1371,7 +1386,7 @@ describe("reservationEvents", () => {
 
             // Step 5: Customer sends modification response with e tag referencing original request
             const modificationResponse: ReservationModificationResponse = {
-                status: "accepted",
+                status: "confirmed",
                 iso_time: "2025-10-20T19:30:00-07:00",
                 message: "Yes, 7:30pm works perfectly!",
             };
@@ -1397,7 +1412,7 @@ describe("reservationEvents", () => {
             );
 
             const parsedModificationResponse = parseReservationModificationResponse(unwrappedModificationResponse);
-            expect(parsedModificationResponse.status).toBe("accepted");
+            expect(parsedModificationResponse.status).toBe("confirmed");
             expect(parsedModificationResponse.iso_time).toBe("2025-10-20T19:30:00-07:00");
 
             // Verify e tag references original request (not modification request)

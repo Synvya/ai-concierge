@@ -66,7 +66,7 @@ export interface ModificationResponseAction {
   restaurant_id: string
   restaurant_name: string
   npub: string
-  status: 'accepted' | 'declined'
+  status: 'confirmed' | 'declined'
   iso_time: string
   thread_id: string
   message?: string
