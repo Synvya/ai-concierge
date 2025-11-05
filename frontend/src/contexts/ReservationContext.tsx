@@ -184,12 +184,23 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
 
         if (existingThread) {
           // Add message to existing thread
+          // Also update restaurant info if it's currently unknown (can happen if self-CC arrived first)
+          const needsRestaurantInfoUpdate = 
+            existingThread.restaurantName === 'Unknown Restaurant' || 
+            existingThread.restaurantId === 'unknown';
+          
           return prev.map((t) =>
             t.threadId === threadId
               ? {
                   ...t,
                   messages: [...t.messages, message].sort((a, b) => a.rumor.created_at - b.rumor.created_at),
                   lastUpdated: message.rumor.created_at,
+                  // Update restaurant info if it was unknown
+                  ...(needsRestaurantInfoUpdate && {
+                    restaurantId,
+                    restaurantName,
+                    restaurantNpub,
+                  }),
                 }
               : t
           );
@@ -251,13 +262,15 @@ export function updateThreadWithMessage(
   threads: ReservationThread[],
   message: ReservationMessage
 ): ReservationThread[] {
-  // Deduplication: Check if this message already exists in any thread
-  const messageAlreadyExists = threads.some((t) =>
-    t.messages.some((m) => m.giftWrap.id === message.giftWrap.id)
+  // Deduplication: Check if this rumor already exists in any thread
+  // We check rumor.id because the same rumor can be wrapped in different gift wraps
+  // (e.g., self-CC vs merchant gift wrap). We only need one copy per rumor.
+  const rumorAlreadyExists = threads.some((t) =>
+    t.messages.some((m) => m.rumor.id === message.rumor.id)
   );
 
-  if (messageAlreadyExists) {
-    // Message already exists (likely from localStorage), skip it
+  if (rumorAlreadyExists) {
+    // Rumor already exists, skip it
     return threads;
   }
 
