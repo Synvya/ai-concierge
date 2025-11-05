@@ -163,7 +163,7 @@ export class ReservationSubscription {
             // Determine type and parse
             if (rumor.kind === 9901) {
                 // Reservation request
-                const payload = parseReservationRequest(rumor, privateKey);
+                const payload = parseReservationRequest(rumor);
                 onMessage({
                     rumor,
                     type: "request",
@@ -174,7 +174,7 @@ export class ReservationSubscription {
             } else if (rumor.kind === 9902) {
                 // Reservation response
                 console.log('[ReservationMessenger] Parsing kind:9902 response');
-                const payload = parseReservationResponse(rumor, privateKey);
+                const payload = parseReservationResponse(rumor);
                 console.log('[ReservationMessenger] Response parsed successfully, status:', payload.status);
                 onMessage({
                     rumor,
@@ -187,7 +187,7 @@ export class ReservationSubscription {
             } else if (rumor.kind === 9903) {
                 // Reservation modification request
                 console.log('[ReservationMessenger] Parsing kind:9903 modification request');
-                const payload = parseReservationModificationRequest(rumor, privateKey);
+                const payload = parseReservationModificationRequest(rumor);
                 console.log('[ReservationMessenger] Modification request parsed successfully');
                 onMessage({
                     rumor,
