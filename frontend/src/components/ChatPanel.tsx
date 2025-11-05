@@ -555,9 +555,12 @@ export const ChatPanel = () => {
       }
 
       // IMPORTANT: Implement "Self CC" per NIP-17 pattern
-      // Create TWO separate request templates with DIFFERENT encryption:
-      // 1. Request TO merchant (encrypted for merchant to read)
-      // 2. Request TO self (encrypted for self to read - Self CC)
+      // Create ONE rumor template with p tag pointing to the original recipient (restaurant)
+      // Then wrap the same rumor in two gift wraps with different encryption targets:
+      // 1. Encrypted for merchant to read
+      // 2. Encrypted for self to read (Self CC)
+      // This ensures both gift wraps contain the same rumor with the same rumor ID.
+      // Encryption happens at the seal/gift wrap layer, not the rumor layer.
       
       // If threadId is provided, add e tag to link this to the original request (NIP-10 threading)
       const additionalTags: string[][] = []
@@ -566,31 +569,26 @@ export const ChatPanel = () => {
         additionalTags.push(["e", threadId, "", "root"])
       }
       
-      const rumorToMerchant = buildReservationRequest(
+      // Create ONE rumor template with p tag pointing to the restaurant (the actual recipient)
+      // The p tag represents who the message is intended for, not who can decrypt it
+      const rumorTemplate = buildReservationRequest(
         request,
         nostrIdentity.privateKeyHex,
-        restaurantPubkeyHex,  // Encrypted TO merchant
+        restaurantPubkeyHex,  // p tag points to restaurant (the recipient)
         additionalTags
       )
 
-      const rumorToSelf = buildReservationRequest(
-        request,
-        nostrIdentity.privateKeyHex,
-        nostrIdentity.publicKeyHex,  // Encrypted TO self (Self CC)
-        additionalTags
-      )
-
-      // Create TWO gift wraps
+      // Wrap the SAME rumor in two gift wraps with different encryption targets
       const giftWrapToMerchant = wrapEvent(
-        rumorToMerchant, 
+        rumorTemplate, 
         nostrIdentity.privateKeyHex, 
-        restaurantPubkeyHex  // Addressed to merchant
+        restaurantPubkeyHex  // Encrypted for merchant to decrypt
       )
 
       const giftWrapToSelf = wrapEvent(
-        rumorToSelf, 
+        rumorTemplate,  // Same rumor template!
         nostrIdentity.privateKeyHex, 
-        nostrIdentity.publicKeyHex  // Addressed to self
+        nostrIdentity.publicKeyHex  // Encrypted for self to decrypt
       )
       
       console.log('📤 Sent reservation request - Thread ID:', giftWrapToMerchant.id)
