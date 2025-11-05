@@ -64,7 +64,7 @@ function validatePayloadStructure(payload: unknown, type: 'request' | 'response'
             return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a non-empty string' }] };
         }
         // Validate ISO time format
-        if (req.iso_time && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}$/.test(req.iso_time)) {
+        if (req.iso_time && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(req.iso_time)) {
             return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a valid ISO 8601 datetime with timezone' }] };
         }
         // Validate notes length
@@ -90,12 +90,12 @@ function validatePayloadStructure(payload: unknown, type: 'request' | 'response'
         // Validate constraints
         if (req.constraints) {
             if (req.constraints.earliest_iso_time && typeof req.constraints.earliest_iso_time === 'string') {
-                if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}$/.test(req.constraints.earliest_iso_time)) {
+                if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(req.constraints.earliest_iso_time)) {
                     return { valid: false, errors: [{ field: 'constraints.earliest_iso_time', message: 'must be a valid ISO 8601 datetime with timezone' }] };
                 }
             }
             if (req.constraints.latest_iso_time && typeof req.constraints.latest_iso_time === 'string') {
-                if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}$/.test(req.constraints.latest_iso_time)) {
+                if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(req.constraints.latest_iso_time)) {
                     return { valid: false, errors: [{ field: 'constraints.latest_iso_time', message: 'must be a valid ISO 8601 datetime with timezone' }] };
                 }
             }
@@ -124,7 +124,7 @@ function validatePayloadStructure(payload: unknown, type: 'request' | 'response'
             return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a non-empty string' }] };
         }
         // Validate ISO time format
-        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}$/.test(mod.iso_time)) {
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.iso_time)) {
             return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a valid ISO 8601 datetime with timezone' }] };
         }
         if (typeof mod.message !== 'string' || !mod.message) {
@@ -136,7 +136,7 @@ function validatePayloadStructure(payload: unknown, type: 'request' | 'response'
         }
         // Validate original_iso_time if present
         if (mod.original_iso_time && typeof mod.original_iso_time === 'string') {
-            if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}$/.test(mod.original_iso_time)) {
+            if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.original_iso_time)) {
                 return { valid: false, errors: [{ field: 'original_iso_time', message: 'must be a valid ISO 8601 datetime with timezone' }] };
             }
         }
@@ -152,7 +152,7 @@ function validatePayloadStructure(payload: unknown, type: 'request' | 'response'
         }
         // Validate ISO time format if present
         if (mod.iso_time && typeof mod.iso_time === 'string') {
-            if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}$/.test(mod.iso_time)) {
+            if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[-+]\d{2}:\d{2})$/.test(mod.iso_time)) {
                 return { valid: false, errors: [{ field: 'iso_time', message: 'iso_time must be a valid ISO 8601 datetime with timezone' }] };
             }
         }
