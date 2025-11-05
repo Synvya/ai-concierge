@@ -27,7 +27,8 @@ import { hexToBytes } from '@noble/hashes/utils';
 
 /**
  * A Rumor is an unsigned event with an id.
- * It contains the actual message content (encrypted with NIP-44).
+ * For reservation events (kinds 9901-9904), the content is plain JSON (not encrypted).
+ * For other use cases, content may be encrypted with NIP-44.
  */
 export interface Rumor extends UnsignedEvent {
     id: string;

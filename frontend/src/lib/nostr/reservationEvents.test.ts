@@ -5,10 +5,10 @@
 import { describe, it, expect } from "vitest";
 import { generateKeypair } from "./keys";
 import {
-    validateReservationRequest,
-    validateReservationResponse,
-    validateReservationModificationRequest,
-    validateReservationModificationResponse,
+    validateReservationRequestPayload,
+    validateReservationResponsePayload,
+    validateReservationModificationRequestPayload,
+    validateReservationModificationResponsePayload,
     buildReservationRequest,
     buildReservationResponse,
     buildReservationModificationResponse,
@@ -17,18 +17,17 @@ import {
     parseReservationModificationRequest,
 } from "./reservationEvents";
 import type { ReservationRequest, ReservationResponse, ReservationModificationRequest, ReservationModificationResponse } from "../../types/reservation";
-import { unwrapAndDecrypt, wrapEvent } from "./nip59";
-import { encryptMessage } from "./nip44";
+import { unwrapEvent, wrapEvent } from "./nip59";
 
 describe("reservationEvents", () => {
-    describe("validateReservationRequest", () => {
+    describe("validateReservationRequestPayload", () => {
         it("validates a valid request", () => {
             const request: ReservationRequest = {
                 party_size: 2,
                 iso_time: "2025-10-20T19:00:00-07:00",
             };
 
-            const result = validateReservationRequest(request);
+            const result = validateReservationRequestPayload(request);
 
             expect(result.valid).toBe(true);
             expect(result.errors).toBeUndefined();
@@ -52,7 +51,7 @@ describe("reservationEvents", () => {
                 },
             };
 
-            const result = validateReservationRequest(request);
+            const result = validateReservationRequestPayload(request);
 
             expect(result.valid).toBe(true);
         });
@@ -63,7 +62,7 @@ describe("reservationEvents", () => {
                 // missing iso_time
             };
 
-            const result = validateReservationRequest(request);
+            const result = validateReservationRequestPayload(request);
 
             expect(result.valid).toBe(false);
             expect(result.errors).toBeDefined();
@@ -76,7 +75,7 @@ describe("reservationEvents", () => {
                 iso_time: "2025-10-20T19:00:00-07:00",
             };
 
-            const result = validateReservationRequest(request);
+            const result = validateReservationRequestPayload(request);
 
             expect(result.valid).toBe(false);
         });
@@ -87,7 +86,7 @@ describe("reservationEvents", () => {
                 iso_time: "2025-10-20T19:00:00-07:00",
             };
 
-            const result = validateReservationRequest(request);
+            const result = validateReservationRequestPayload(request);
 
             expect(result.valid).toBe(false);
         });
@@ -101,7 +100,7 @@ describe("reservationEvents", () => {
                 },
             };
 
-            const result = validateReservationRequest(request);
+            const result = validateReservationRequestPayload(request);
 
             expect(result.valid).toBe(false);
         });
@@ -113,13 +112,13 @@ describe("reservationEvents", () => {
                 notes: "x".repeat(2001), // Max 2000
             };
 
-            const result = validateReservationRequest(request);
+            const result = validateReservationRequestPayload(request);
 
             expect(result.valid).toBe(false);
         });
     });
 
-    describe("validateReservationResponse", () => {
+    describe("validateReservationResponsePayload", () => {
         it("validates confirmed response", () => {
             const response: ReservationResponse = {
                 status: "confirmed",
@@ -128,7 +127,7 @@ describe("reservationEvents", () => {
                 table: "A4",
             };
 
-            const result = validateReservationResponse(response);
+            const result = validateReservationResponsePayload(response);
 
             expect(result.valid).toBe(true);
         });
@@ -139,7 +138,7 @@ describe("reservationEvents", () => {
                 message: "Sorry, we're fully booked",
             };
 
-            const result = validateReservationResponse(response);
+            const result = validateReservationResponsePayload(response);
 
             expect(result.valid).toBe(true);
         });
@@ -149,7 +148,7 @@ describe("reservationEvents", () => {
                 iso_time: "2025-10-20T19:00:00-07:00",
             };
 
-            const result = validateReservationResponse(response);
+            const result = validateReservationResponsePayload(response);
 
             expect(result.valid).toBe(false);
         });
@@ -159,7 +158,7 @@ describe("reservationEvents", () => {
                 status: "invalid-status",
             } as unknown as ReservationResponse;
 
-            const result = validateReservationResponse(response);
+            const result = validateReservationResponsePayload(response);
 
             expect(result.valid).toBe(false);
         });
@@ -170,20 +169,20 @@ describe("reservationEvents", () => {
                 // missing required iso_time for confirmed status
             };
 
-            const result = validateReservationResponse(response);
+            const result = validateReservationResponsePayload(response);
 
             expect(result.valid).toBe(false);
         });
     });
 
-    describe("validateReservationModificationRequest", () => {
+    describe("validateReservationModificationRequestPayload", () => {
         it("validates a valid modification request", () => {
             const request: ReservationModificationRequest = {
                 iso_time: "2025-10-20T19:30:00-07:00",
                 message: "We're fully booked at 7pm, but 7:30pm is available.",
             };
 
-            const result = validateReservationModificationRequest(request);
+            const result = validateReservationModificationRequestPayload(request);
 
             expect(result.valid).toBe(true);
             expect(result.errors).toBeUndefined();
@@ -196,7 +195,7 @@ describe("reservationEvents", () => {
                 original_iso_time: "2025-10-20T19:00:00-07:00",
             };
 
-            const result = validateReservationModificationRequest(request);
+            const result = validateReservationModificationRequestPayload(request);
 
             expect(result.valid).toBe(true);
         });
@@ -207,7 +206,7 @@ describe("reservationEvents", () => {
                 // missing iso_time
             };
 
-            const result = validateReservationModificationRequest(request);
+            const result = validateReservationModificationRequestPayload(request);
 
             expect(result.valid).toBe(false);
             expect(result.errors).toBeDefined();
@@ -220,7 +219,7 @@ describe("reservationEvents", () => {
                 // missing message
             };
 
-            const result = validateReservationModificationRequest(request);
+            const result = validateReservationModificationRequestPayload(request);
 
             expect(result.valid).toBe(false);
         });
@@ -231,7 +230,7 @@ describe("reservationEvents", () => {
                 message: "x".repeat(2001), // Max 2000
             };
 
-            const result = validateReservationModificationRequest(request);
+            const result = validateReservationModificationRequestPayload(request);
 
             expect(result.valid).toBe(false);
         });
@@ -242,14 +241,14 @@ describe("reservationEvents", () => {
                 message: "Test message",
             };
 
-            const result = validateReservationModificationRequest(request);
+            const result = validateReservationModificationRequestPayload(request);
 
             expect(result.valid).toBe(false);
         });
     });
 
     describe("parseReservationModificationRequest", () => {
-        it("parses and decrypts a valid modification request", () => {
+        it("parses a valid modification request", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
 
@@ -259,30 +258,14 @@ describe("reservationEvents", () => {
                 original_iso_time: "2025-10-20T19:00:00-07:00",
             };
 
-            // Build encrypted rumor
-            const rumor = buildReservationRequest(
-                {
-                    party_size: 2,
-                    iso_time: originalRequest.original_iso_time!,
-                } as ReservationRequest,
-                sender.privateKeyHex,
-                recipient.publicKeyHex
-            );
-
-            // Create modification request rumor manually (since we don't have builder yet)
-            const encrypted = encryptMessage(
-                JSON.stringify(originalRequest),
-                sender.privateKeyHex,
-                recipient.publicKeyHex
-            );
-
+            // Create modification request rumor manually (content is plain JSON, not encrypted)
             const mockRumor = {
                 kind: 9903,
-                content: encrypted,
+                content: JSON.stringify(originalRequest),
                 pubkey: sender.publicKeyHex,
             };
 
-            const parsed = parseReservationModificationRequest(mockRumor, recipient.privateKeyHex);
+            const parsed = parseReservationModificationRequest(mockRumor);
 
             expect(parsed.iso_time).toBe(originalRequest.iso_time);
             expect(parsed.message).toBe(originalRequest.message);
@@ -296,100 +279,46 @@ describe("reservationEvents", () => {
                 pubkey: "pubkey",
             };
 
-            expect(() => parseReservationModificationRequest(mockRumor, "privatekey")).toThrow(
+            expect(() => parseReservationModificationRequest(mockRumor)).toThrow(
                 "Expected kind 9903"
             );
         });
 
         it("throws on invalid payload", () => {
             const sender = generateKeypair();
-            const recipient = generateKeypair();
 
-            // Encrypt invalid payload
+            // Invalid payload (missing required message)
             const invalidPayload = {
                 iso_time: "2025-10-20T19:30:00-07:00",
                 // missing required message
             };
 
-            const encrypted = encryptMessage(
-                JSON.stringify(invalidPayload),
-                sender.privateKeyHex,
-                recipient.publicKeyHex
-            );
-
             const mockRumor = {
                 kind: 9903,
-                content: encrypted,
+                content: JSON.stringify(invalidPayload),
                 pubkey: sender.publicKeyHex,
             };
 
-            expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow(
+            expect(() => parseReservationModificationRequest(mockRumor)).toThrow(
                 "Invalid reservation modification request"
             );
         });
 
-        it("throws on decryption error", () => {
+        it("throws on invalid JSON", () => {
             const sender = generateKeypair();
-            const recipient = generateKeypair();
 
-            // Create rumor with invalid encrypted content
+            // Create rumor with invalid JSON content
             const mockRumor = {
                 kind: 9903,
-                content: "invalid-encrypted-content",
+                content: "not valid json",
                 pubkey: sender.publicKeyHex,
             };
 
-            expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow();
-        });
-
-        it("throws on malformed JSON", () => {
-            const sender = generateKeypair();
-            const recipient = generateKeypair();
-
-            // Encrypt invalid JSON
-            const encrypted = encryptMessage(
-                "not valid json",
-                sender.privateKeyHex,
-                recipient.publicKeyHex
-            );
-
-            const mockRumor = {
-                kind: 9903,
-                content: encrypted,
-                pubkey: sender.publicKeyHex,
-            };
-
-            expect(() => parseReservationModificationRequest(mockRumor, recipient.privateKeyHex)).toThrow();
-        });
-
-        it("throws when using wrong private key for decryption", () => {
-            const sender = generateKeypair();
-            const recipient = generateKeypair();
-            const wrongKey = generateKeypair();
-
-            const request: ReservationModificationRequest = {
-                iso_time: "2025-10-20T19:30:00-07:00",
-                message: "Test message",
-            };
-
-            const encrypted = encryptMessage(
-                JSON.stringify(request),
-                sender.privateKeyHex,
-                recipient.publicKeyHex
-            );
-
-            const mockRumor = {
-                kind: 9903,
-                content: encrypted,
-                pubkey: sender.publicKeyHex,
-            };
-
-            // Try to decrypt with wrong private key
-            expect(() => parseReservationModificationRequest(mockRumor, wrongKey.privateKeyHex)).toThrow();
+            expect(() => parseReservationModificationRequest(mockRumor)).toThrow();
         });
     });
 
-    describe("validateReservationModificationResponse", () => {
+    describe("validateReservationModificationResponsePayload", () => {
         it("validates a valid accepted response", () => {
             const response: ReservationModificationResponse = {
                 status: "accepted",
@@ -397,7 +326,7 @@ describe("reservationEvents", () => {
                 message: "Yes, 7:30pm works perfectly!",
             };
 
-            const result = validateReservationModificationResponse(response);
+            const result = validateReservationModificationResponsePayload(response);
 
             expect(result.valid).toBe(true);
             expect(result.errors).toBeUndefined();
@@ -409,7 +338,7 @@ describe("reservationEvents", () => {
                 message: "Unfortunately 7:30pm doesn't work for us.",
             };
 
-            const result = validateReservationModificationResponse(response);
+            const result = validateReservationModificationResponsePayload(response);
 
             expect(result.valid).toBe(true);
         });
@@ -420,7 +349,7 @@ describe("reservationEvents", () => {
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
-            const result = validateReservationModificationResponse(response);
+            const result = validateReservationModificationResponsePayload(response);
 
             expect(result.valid).toBe(true);
         });
@@ -431,7 +360,7 @@ describe("reservationEvents", () => {
                 // missing required iso_time for accepted status
             };
 
-            const result = validateReservationModificationResponse(response);
+            const result = validateReservationModificationResponsePayload(response);
 
             expect(result.valid).toBe(false);
             expect(result.errors).toBeDefined();
@@ -443,7 +372,7 @@ describe("reservationEvents", () => {
                 iso_time: "2025-10-20T19:30:00-07:00",
             };
 
-            const result = validateReservationModificationResponse(response);
+            const result = validateReservationModificationResponsePayload(response);
 
             expect(result.valid).toBe(false);
         });
@@ -453,7 +382,7 @@ describe("reservationEvents", () => {
                 status: "invalid-status",
             } as unknown as ReservationModificationResponse;
 
-            const result = validateReservationModificationResponse(response);
+            const result = validateReservationModificationResponsePayload(response);
 
             expect(result.valid).toBe(false);
         });
@@ -465,7 +394,7 @@ describe("reservationEvents", () => {
                 message: "x".repeat(2001), // Max 2000
             };
 
-            const result = validateReservationModificationResponse(response);
+            const result = validateReservationModificationResponsePayload(response);
 
             expect(result.valid).toBe(false);
         });
@@ -475,7 +404,7 @@ describe("reservationEvents", () => {
                 status: "declined",
             };
 
-            const result = validateReservationModificationResponse(response);
+            const result = validateReservationModificationResponsePayload(response);
 
             expect(result.valid).toBe(true);
         });
@@ -500,7 +429,7 @@ describe("reservationEvents", () => {
 
             expect(template.kind).toBe(9904);
             expect(template.content).toBeTruthy();
-            expect(template.content).not.toContain("status"); // Encrypted
+            expect(template.content).toContain("status"); // Plain JSON
             expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
         });
 
@@ -521,7 +450,7 @@ describe("reservationEvents", () => {
 
             expect(template.kind).toBe(9904);
             expect(template.content).toBeTruthy();
-            expect(template.content).not.toContain("status"); // Encrypted
+            expect(template.content).toContain("status"); // Plain JSON
             expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
         });
 
@@ -625,7 +554,7 @@ describe("reservationEvents", () => {
     });
 
     describe("buildReservationRequest", () => {
-        it("builds encrypted event template", () => {
+        it("builds event template with plain JSON content", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
 
@@ -642,7 +571,7 @@ describe("reservationEvents", () => {
 
             expect(template.kind).toBe(9901);
             expect(template.content).toBeTruthy();
-            expect(template.content).not.toContain("party_size"); // Encrypted
+            expect(template.content).toContain("party_size"); // Plain JSON
             expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
         });
 
@@ -685,7 +614,7 @@ describe("reservationEvents", () => {
     });
 
     describe("buildReservationResponse", () => {
-        it("builds encrypted event template", () => {
+        it("builds event template with plain JSON content", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
 
@@ -703,7 +632,7 @@ describe("reservationEvents", () => {
 
             expect(template.kind).toBe(9902);
             expect(template.content).toBeTruthy();
-            expect(template.content).not.toContain("confirmed"); // Encrypted
+            expect(template.content).toContain("confirmed"); // Plain JSON
             expect(template.tags).toContainEqual(["p", recipient.publicKeyHex]);
         });
 
@@ -746,7 +675,7 @@ describe("reservationEvents", () => {
     });
 
     describe("parseReservationRequest", () => {
-        it("parses and decrypts a reservation request", () => {
+        it("parses a reservation request", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
 
@@ -770,7 +699,7 @@ describe("reservationEvents", () => {
                 pubkey: sender.publicKeyHex,
             };
 
-            const parsed = parseReservationRequest(mockRumor, recipient.privateKeyHex);
+            const parsed = parseReservationRequest(mockRumor);
 
             expect(parsed.party_size).toBe(originalRequest.party_size);
             expect(parsed.iso_time).toBe(originalRequest.iso_time);
@@ -784,32 +713,27 @@ describe("reservationEvents", () => {
                 pubkey: "pubkey",
             };
 
-            expect(() => parseReservationRequest(mockRumor, "privatekey")).toThrow(
+            expect(() => parseReservationRequest(mockRumor)).toThrow(
                 "Expected kind 9901"
             );
         });
 
         it("throws on invalid payload", () => {
             const sender = generateKeypair();
-            const recipient = generateKeypair();
 
-            // Build with invalid data that somehow bypassed builder validation
-            const encrypted = JSON.stringify({ party_size: 0 }); // Invalid
-
+            // Invalid payload (party_size = 0)
             const mockRumor = {
                 kind: 9901,
-                content: encrypted, // Not encrypted for test
+                content: JSON.stringify({ party_size: 0 }), // Invalid
                 pubkey: sender.publicKeyHex,
             };
 
-            // This will fail because it's not encrypted properly
-            // In real scenario, we'd have properly encrypted invalid data
-            expect(() => parseReservationRequest(mockRumor, recipient.privateKeyHex)).toThrow();
+            expect(() => parseReservationRequest(mockRumor)).toThrow();
         });
     });
 
     describe("parseReservationResponse", () => {
-        it("parses and decrypts a reservation response", () => {
+        it("parses a reservation response", () => {
             const sender = generateKeypair();
             const recipient = generateKeypair();
 
@@ -834,7 +758,7 @@ describe("reservationEvents", () => {
                 pubkey: sender.publicKeyHex,
             };
 
-            const parsed = parseReservationResponse(mockRumor, recipient.privateKeyHex);
+            const parsed = parseReservationResponse(mockRumor);
 
             expect(parsed.status).toBe(originalResponse.status);
             expect(parsed.iso_time).toBe(originalResponse.iso_time);
@@ -849,7 +773,7 @@ describe("reservationEvents", () => {
                 pubkey: "pubkey",
             };
 
-            expect(() => parseReservationResponse(mockRumor, "privatekey")).toThrow(
+            expect(() => parseReservationResponse(mockRumor)).toThrow(
                 "Expected kind 9902"
             );
         });
@@ -887,15 +811,12 @@ describe("reservationEvents", () => {
             expect(requestGiftWrap.kind).toBe(1059);
 
             // Step 2: Restaurant receives and parses request
-            const { rumor: unwrappedRequest } = unwrapAndDecrypt(
+            const unwrappedRequest = unwrapEvent(
                 requestGiftWrap,
                 restaurant.privateKeyHex
             );
 
-            const parsedRequest = parseReservationRequest(
-                unwrappedRequest,
-                restaurant.privateKeyHex
-            );
+            const parsedRequest = parseReservationRequest(unwrappedRequest);
 
             expect(parsedRequest.party_size).toBe(4);
             expect(parsedRequest.notes).toBe("Celebrating anniversary");
@@ -912,7 +833,7 @@ describe("reservationEvents", () => {
                 response,
                 restaurant.privateKeyHex,
                 concierge.publicKeyHex,
-                [["e", unwrappedRequest.id, "", "reply"]]
+                [["e", unwrappedRequest.id, "", "root"]]  // Schema requires 'root', not 'reply'
             );
 
             // Wrap for sending
@@ -923,15 +844,12 @@ describe("reservationEvents", () => {
             );
 
             // Step 4: Concierge receives and parses response
-            const { rumor: unwrappedResponse } = unwrapAndDecrypt(
+            const unwrappedResponse = unwrapEvent(
                 responseGiftWrap,
                 concierge.privateKeyHex
             );
 
-            const parsedResponse = parseReservationResponse(
-                unwrappedResponse,
-                concierge.privateKeyHex
-            );
+            const parsedResponse = parseReservationResponse(unwrappedResponse);
 
             expect(parsedResponse.status).toBe("confirmed");
             expect(parsedResponse.table).toBe("A4");
@@ -959,7 +877,7 @@ describe("reservationEvents", () => {
                 restaurant.publicKeyHex
             );
 
-            const { rumor: unwrappedRequest } = unwrapAndDecrypt(
+            const unwrappedRequest = unwrapEvent(
                 requestGiftWrap,
                 restaurant.privateKeyHex
             );
@@ -973,7 +891,8 @@ describe("reservationEvents", () => {
             const responseRumor = buildReservationResponse(
                 response,
                 restaurant.privateKeyHex,
-                concierge.publicKeyHex
+                concierge.publicKeyHex,
+                [["e", unwrappedRequest.id, "", "root"]]  // Schema requires e tag referencing original request
             );
 
             const responseGiftWrap = wrapEvent(
@@ -982,15 +901,12 @@ describe("reservationEvents", () => {
                 concierge.publicKeyHex
             );
 
-            const { rumor: unwrappedResponse } = unwrapAndDecrypt(
+            const unwrappedResponse = unwrapEvent(
                 responseGiftWrap,
                 concierge.privateKeyHex
             );
 
-            const parsedResponse = parseReservationResponse(
-                unwrappedResponse,
-                concierge.privateKeyHex
-            );
+            const parsedResponse = parseReservationResponse(unwrappedResponse);
 
             expect(parsedResponse.status).toBe("declined");
             expect(parsedResponse.iso_time).toBeUndefined();
