@@ -7,6 +7,12 @@
     {
       "type": "object",
       "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Deterministic event hash as defined in NIP-01",
+          "errorMessage": "id must be a 64-character lowercase hex string"
+        },
         "content": {
           "type": "string",
           "errorMessage": "content must be a string",
