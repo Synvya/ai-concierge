@@ -251,14 +251,24 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
             }),
           };
           
-          // If this is a modification response with status "confirmed", update the time immediately
-          // but keep status as modification_requested until restaurant sends final response
+          /**
+           * TIME RESOLUTION FOR CUSTOMER MODIFICATION ACCEPTANCE
+           * 
+           * When customer accepts a restaurant's modification proposal, we immediately
+           * update the reservation time for responsive UI feedback:
+           * 
+           * Priority for time selection:
+           * 1. iso_time from customer's kind:9904 response (if provided)
+           * 2. iso_time from restaurant's kind:9903 modification request
+           * 
+           * This immediate update provides instant visual feedback to the user.
+           * The restaurant will later send a kind:9902 confirmation which becomes
+           * the final authoritative time (see time resolution logic in updateThreadWithMessage).
+           */
           if (message.type === 'modification_response') {
             const modificationResponse = message.payload as ReservationModificationResponse;
             if (modificationResponse.status === 'confirmed' && existingThread.modificationRequest) {
-              // Update the request time to the new accepted time immediately for UI feedback
-              // Set status to modification_confirmed to show user their acceptance was registered
-              // The restaurant's response will trigger the final "confirmed" status
+              // Update time immediately using customer's confirmed time or modification request time
               updatedThread = {
                 ...updatedThread,
                 request: {
@@ -270,8 +280,8 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
                 modificationRequest: undefined,
               };
             } else if (modificationResponse.status === 'declined') {
-              // If declined, keep status as modification_requested (restaurant may send another suggestion)
-              // but clear the modification request
+              // Customer declined the modification - clear the request
+              // Status remains modification_requested for potential new proposals
               updatedThread = {
                 ...updatedThread,
                 modificationRequest: undefined,
@@ -430,6 +440,33 @@ export function updateThreadWithMessage(
       lastUpdated: message.rumor.created_at,
     };
 
+    /**
+     * RESERVATION TIME RESOLUTION LOGIC
+     * 
+     * The reservation time displayed to the user is determined by the following priority:
+     * 
+     * 1. LATEST CONFIRMED RESPONSE (kind:9902 with status:confirmed and iso_time)
+     *    - When restaurant sends final confirmation with a time
+     *    - This is the authoritative time after modifications are completed
+     * 
+     * 2. ACCEPTED MODIFICATION (kind:9904 with status:confirmed and iso_time)
+     *    - When customer accepts restaurant's proposed modification
+     *    - Updates immediately for UI feedback before restaurant's final confirmation
+     *    - May be overridden by subsequent kind:9902 with different time
+     * 
+     * 3. ORIGINAL REQUEST (kind:9901 iso_time)
+     *    - Initial time proposed by customer
+     *    - Used as fallback if no confirmations with times exist
+     * 
+     * EDGE CASES HANDLED:
+     * - If restaurant confirms with old time after modification was accepted,
+     *   we preserve the modification time (don't regress to original time)
+     * - If restaurant confirms with new time, we update to that time
+     * - If no iso_time in confirmation, we keep existing time
+     * 
+     * See also: RESERVATION_STATE_MACHINE.md for complete flow documentation
+     */
+    
     // Update status based on latest response
     if (message.type === 'response') {
       const response = message.payload as ReservationResponse;
@@ -438,25 +475,25 @@ export function updateThreadWithMessage(
       if (response.status === 'confirmed' || response.status === 'declined' || 
           response.status === 'expired' || response.status === 'cancelled') {
         updatedThread.status = response.status;
-        // Update the request time if the response includes a confirmed time
-        // This is especially important after a modification was accepted
+        
+        // Time Resolution: Update reservation time if response includes a confirmed time
         if (response.status === 'confirmed' && response.iso_time) {
-          // Check if we previously accepted a modification
-          // Find the original request time from the first message
+          // Find the original request time for comparison
           const originalRequestMessage = existingThread.messages.find(m => m.type === 'request');
           const originalRequestTime = originalRequestMessage 
             ? (originalRequestMessage.payload as ReservationRequest).iso_time 
             : existingThread.request.isoTime;
           
-          // If the response time matches the original request time (before modification),
-          // but we've already updated to a modification time, preserve the modification time
-          // This handles cases where restaurant confirms with old time instead of new time
+          // Edge Case: Restaurant confirms with original time after modification was accepted
+          // If response time matches original (pre-modification) time, but we've already
+          // updated to a modification time, preserve the modification time
           if (response.iso_time === originalRequestTime && 
               existingThread.request.isoTime !== originalRequestTime) {
-            // Keep the modification time we already updated
-            // Don't overwrite with the old time from response
+            // Keep the modification time - don't regress to old time
+            // This handles restaurants that confirm with old time by mistake
           } else {
-            // Use the time from the response
+            // Normal Case: Use the time from the restaurant's confirmation
+            // This is the authoritative time for the reservation
             updatedThread.request = {
               ...existingThread.request,
               isoTime: response.iso_time,
