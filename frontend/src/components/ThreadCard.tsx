@@ -32,7 +32,7 @@ export function ThreadCard({ thread, onClick, onAcceptModification, onDeclineMod
     confirmed: 'green',
     declined: 'red',
     modification_requested: 'orange',
-    modification_accepted: 'green',
+    modification_confirmed: 'green',
     expired: 'gray',
     cancelled: 'gray',
   };
@@ -42,7 +42,7 @@ export function ThreadCard({ thread, onClick, onAcceptModification, onDeclineMod
     confirmed: 'Confirmed',
     declined: 'Declined',
     modification_requested: 'Modification Requested',
-    modification_accepted: 'Modification Accepted',
+    modification_confirmed: 'Modification Confirmed',
     expired: 'Expired',
     cancelled: 'Cancelled',
   };

@@ -117,7 +117,7 @@ describe('ReservationsPanel', () => {
 
       renderWithProviders(<ReservationsPanel />);
 
-      // Only active reservations (sent, confirmed, modification_requested, modification_accepted) with future dates are shown
+      // Only active reservations (sent, confirmed, modification_requested, modification_confirmed) with future dates are shown
       // The Olive Garden has status 'declined' so it should NOT be displayed
       expect(screen.getByText("Mario's Pizza")).toBeInTheDocument();
       expect(screen.getByText('La Terraza')).toBeInTheDocument();
@@ -193,7 +193,7 @@ describe('ReservationsPanel', () => {
 
       renderWithProviders(<ReservationsPanel />);
 
-      // Only active status badges should be shown (sent, confirmed, modification_requested, modification_accepted)
+      // Only active status badges should be shown (sent, confirmed, modification_requested, modification_confirmed)
       // Declined reservations are filtered out
       expect(screen.getByText('Sent')).toBeInTheDocument();
       expect(screen.getByText('Confirmed')).toBeInTheDocument();
@@ -290,12 +290,12 @@ describe('ReservationsPanel', () => {
   describe('status display', () => {
     test('displays all allowed status types correctly', () => {
       // Only test statuses that are shown in the UI per Guidance.md
-      // (sent, confirmed, modification_requested, modification_accepted)
+      // (sent, confirmed, modification_requested, modification_confirmed)
       const statuses: Array<ReservationThread['status']> = [
         'sent',
         'confirmed',
         'modification_requested',
-        'modification_accepted',
+        'modification_confirmed',
       ];
 
       const threads = statuses.map((status, index) => ({
@@ -322,7 +322,7 @@ describe('ReservationsPanel', () => {
       expect(screen.getAllByText('Sent').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Confirmed').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Modification Requested').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Modification Accepted').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Modification Confirmed').length).toBeGreaterThan(0);
       
       // Verify filtered statuses are not shown
       expect(screen.queryByText('Declined')).not.toBeInTheDocument();
