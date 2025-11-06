@@ -37,7 +37,7 @@ stateDiagram-v2
 ### Pending (sent)
 - **Triggered by**: Customer sends `kind:9901` reservation request
 - **Description**: Initial state after customer submits a reservation request
-- **UI Label**: "Sent"
+- **UI Label**: "Pending"
 - **Next States**: Confirmed, Declined
 
 ### Confirmed (confirmed)
