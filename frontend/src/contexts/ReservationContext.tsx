@@ -291,6 +291,42 @@ export function updateThreadWithMessage(
   threads: ReservationThread[],
   message: ReservationMessage
 ): ReservationThread[] {
+  // Validation Rule 1: Reject messages with future timestamps
+  // Allow 5 minutes of clock skew tolerance
+  const now = Math.floor(Date.now() / 1000);
+  const CLOCK_SKEW_TOLERANCE = 5 * 60; // 5 minutes in seconds
+  if (message.rumor.created_at > now + CLOCK_SKEW_TOLERANCE) {
+    console.warn('[ReservationContext] ⚠️ Rejecting message with future timestamp:', {
+      created_at: message.rumor.created_at,
+      now,
+      difference: message.rumor.created_at - now,
+      tolerance: CLOCK_SKEW_TOLERANCE,
+    });
+    return threads;
+  }
+
+  // Validation Rule 2: Validate required fields per NIP-RR schema
+  if (!message.rumor.kind || !message.rumor.content || !message.rumor.created_at || !message.rumor.tags) {
+    console.warn('[ReservationContext] ⚠️ Rejecting message missing required fields');
+    return threads;
+  }
+
+  // Validate kind is a valid reservation kind
+  const validKinds = [9901, 9902, 9903, 9904];
+  if (!validKinds.includes(message.rumor.kind)) {
+    console.warn('[ReservationContext] ⚠️ Rejecting message with invalid kind:', message.rumor.kind);
+    return threads;
+  }
+
+  // Validate required tags based on message type
+  const eTags = message.rumor.tags.filter((t) => t[0] === 'e');
+  
+  // Non-request messages (responses, modifications) MUST have e-tags referencing the original request
+  if (message.type !== 'request' && eTags.length === 0) {
+    console.warn('[ReservationContext] ⚠️ Rejecting non-request message without e-tags');
+    return threads;
+  }
+
   // Deduplication: Check if this rumor already exists in any thread
   // We check rumor.id because the same rumor can be wrapped in different gift wraps
   // (e.g., self-CC vs merchant gift wrap). We only need one copy per rumor.
@@ -329,11 +365,19 @@ export function updateThreadWithMessage(
 
   if (existingThread) {
     // Update existing thread
+    // Sort messages by created_at (ascending), with lexicographic id comparison for ties
+    const sortedMessages = [...existingThread.messages, message].sort((a, b) => {
+      // Rule 1: Sort by created_at timestamp
+      if (a.rumor.created_at !== b.rumor.created_at) {
+        return a.rumor.created_at - b.rumor.created_at;
+      }
+      // Rule 2: If created_at is identical, use lexicographic comparison of id
+      return a.rumor.id.localeCompare(b.rumor.id);
+    });
+
     const updatedThread: ReservationThread = {
       ...existingThread,
-      messages: [...existingThread.messages, message].sort(
-        (a, b) => a.rumor.created_at - b.rumor.created_at
-      ),
+      messages: sortedMessages,
       lastUpdated: message.rumor.created_at,
     };
 
