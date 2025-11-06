@@ -90,7 +90,44 @@ const ReservationContext = createContext<ReservationContextValue | null>(null);
 const STORAGE_KEY = 'reservation_threads';
 
 /**
+ * Local Storage Rules for Reservation Threads
+ * 
+ * ## What Gets Stored
+ * - All reservation threads with their complete message history
+ * - Each thread includes: threadId, restaurantId, restaurantName, restaurantNpub, 
+ *   messages[], request details, status, and lastUpdated timestamp
+ * 
+ * ## When Storage Occurs
+ * - Automatically saved whenever threads state changes (via useEffect)
+ * - On initial load from localStorage
+ * - After adding outgoing messages (user sends reservation request/response)
+ * - After receiving incoming messages from restaurants
+ * - After thread status updates
+ * 
+ * ## Storage Key
+ * - Key: 'reservation_threads'
+ * - Contains: JSON-serialized array of ReservationThread objects
+ * 
+ * ## Data Persistence
+ * - Threads persist across browser sessions and page refreshes
+ * - No automatic expiration - threads remain until explicitly cleared
+ * - Storage survives user logout (tied to browser, not session)
+ * 
+ * ## Error Handling
+ * - Parse errors during load return empty array (graceful degradation)
+ * - Storage errors are logged but don't crash the app
+ * - Quota exceeded errors fall back to in-memory storage only
+ * 
+ * ## Privacy & Security
+ * - All message content is stored in localStorage (unencrypted)
+ * - Gift wrap encryption is preserved in stored messages
+ * - User should be aware data persists locally
+ * - Clear localStorage to remove all reservation data
+ */
+
+/**
  * Load reservation threads from localStorage
+ * @returns Array of reservation threads, or empty array if none cached or on error
  */
 function loadThreadsFromStorage(): ReservationThread[] {
   try {
@@ -106,6 +143,8 @@ function loadThreadsFromStorage(): ReservationThread[] {
 
 /**
  * Save reservation threads to localStorage
+ * Automatically called whenever threads state changes
+ * @param threads - Array of reservation threads to persist
  */
 function saveThreadsToStorage(threads: ReservationThread[]): void {
   try {
