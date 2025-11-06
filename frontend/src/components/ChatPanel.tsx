@@ -72,111 +72,19 @@ const LINK_REGEX = /(https?:\/\/[^\s]+)/g
 const LOCATION_STORAGE_KEY = 'ai-concierge-shared-location'
 const PROCESSED_RESPONSES_STORAGE_KEY = 'ai-concierge-processed-responses'
 
-const ACCEPTANCE_PATTERNS = [
-  /\byes\b/i,
-  /\baccept\b/i,
-  /\bconfirm\b/i,
-  /\bgo ahead\b/i,
-  /\bthat works\b/i,
-  /\bsounds good\b/i,
-  /\bsure\b/i,
-  /\bok\b/i,
-  /\bokay\b/i,
-  /\blet'?s go\b/i,
-  /\blet'?s do it\b/i,
-] as const
-
-const RESERVATION_KEYWORD_PATTERNS = [/\breservation\b/i, /\bbook\b/i, /\btable\b/i] as const
-const PARTY_SIZE_PATTERN = /\bfor\s+(\d+)(?:\s+(?:people|person|guests?|pax))?\b/i
-
-function extractTimesInMinutes(message: string): number[] {
-  const times = new Set<number>()
-  const normalized = message.toLowerCase()
-
-  const timeWithMinutes = normalized.matchAll(/\b(\d{1,2})(?::|\.)(\d{2})\s*(am|pm)?\b/g)
-  for (const match of timeWithMinutes) {
-    const hours = parseInt(match[1] ?? '', 10)
-    const minutes = parseInt(match[2] ?? '', 10)
-    if (Number.isNaN(hours) || Number.isNaN(minutes) || hours > 23 || minutes > 59) {
-      continue
-    }
-    const meridiem = match[3]?.toLowerCase()
-    let hours24 = hours
-    if (meridiem === 'pm' && hours24 !== 12) {
-      hours24 += 12
-    } else if (meridiem === 'am' && hours24 === 12) {
-      hours24 = 0
-    }
-    times.add(hours24 * 60 + minutes)
-  }
-
-  const timeWithMeridiem = normalized.matchAll(/\b(\d{1,2})\s*(am|pm)\b/g)
-  for (const match of timeWithMeridiem) {
-    const hours = parseInt(match[1] ?? '', 10)
-    if (Number.isNaN(hours) || hours > 12 || hours === 0) {
-      continue
-    }
-    const meridiem = match[2]?.toLowerCase()
-    let hours24 = hours
-    if (meridiem === 'pm' && hours24 !== 12) {
-      hours24 += 12
-    } else if (meridiem === 'am' && hours24 === 12) {
-      hours24 = 0
-    }
-    times.add(hours24 * 60)
-  }
-
-  return Array.from(times)
-}
-
-function getMinutesFromIsoTime(iso?: string): number | null {
-  if (!iso) return null
-  const match = iso.match(/T(\d{2}):(\d{2})/)
-  if (!match) return null
-  const hours = parseInt(match[1] ?? '', 10)
-  const minutes = parseInt(match[2] ?? '', 10)
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-    return null
-  }
-  return hours * 60 + minutes
-}
-
-export function buildActiveContextForModificationAcceptance(
-  message: string,
+/**
+ * Builds active reservation context for modification requests.
+ * Always includes context if there's an active modification request thread.
+ * The LLM will intelligently determine if the user is accepting, declining, or making a new request.
+ */
+export function buildActiveReservationContext(
   thread: ReservationThread | undefined,
 ): ActiveReservationContext | undefined {
+  // Only include context if there's an active modification request
   if (!thread || thread.status !== 'modification_requested') {
     return undefined
   }
   if (thread.restaurantId === 'unknown' || !thread.modificationRequest) {
-    return undefined
-  }
-
-  const trimmedMessage = message.trim()
-  if (!trimmedMessage) {
-    return undefined
-  }
-
-  const containsAcceptance = ACCEPTANCE_PATTERNS.some((pattern) => pattern.test(trimmedMessage))
-  if (!containsAcceptance) {
-    return undefined
-  }
-
-  const hasReservationKeyword = RESERVATION_KEYWORD_PATTERNS.some((pattern) => pattern.test(trimmedMessage))
-  const hasPartySizeDetail = PARTY_SIZE_PATTERN.test(trimmedMessage)
-  const timeMentions = extractTimesInMinutes(trimmedMessage)
-
-  let hasConflictingTime = false
-  if (timeMentions.length > 0) {
-    const suggestedMinutes = getMinutesFromIsoTime(thread.modificationRequest.iso_time ?? thread.request.isoTime)
-    if (suggestedMinutes === null) {
-      hasConflictingTime = true
-    } else {
-      hasConflictingTime = timeMentions.some((value) => value !== suggestedMinutes)
-    }
-  }
-
-  if (hasReservationKeyword || hasPartySizeDetail || hasConflictingTime) {
     return undefined
   }
 
@@ -341,7 +249,7 @@ export const ChatPanel = () => {
     }
   }, [])
 
-  // Clean up processed responses that are no longer in any thread
+  // Clean up processed responses/modification requests that are no longer in any thread
   useEffect(() => {
     if (!reservationThreads || reservationThreads.length === 0) return
     
@@ -353,9 +261,25 @@ export const ChatPanel = () => {
         .forEach((m) => currentResponseIds.add(m.giftWrap.id))
     })
     
-    // Remove any processed IDs that are no longer in any thread
+    // Get all current modification request keys from threads with active modification requests
+    const currentModificationKeys = new Set<string>()
+    reservationThreads.forEach((thread) => {
+      if (thread.status === 'modification_requested' && thread.modificationRequest) {
+        const key = `modification-${thread.threadId}-${thread.modificationRequest.iso_time}-${thread.modificationRequest.party_size}-${thread.modificationRequest.notes || ''}`
+        currentModificationKeys.add(key)
+      }
+    })
+    
+    // Remove any processed IDs/keys that are no longer in any thread
     const processedIds = Array.from(processedResponsesRef.current)
-    const validIds = processedIds.filter((id) => currentResponseIds.has(id))
+    const validIds = processedIds.filter((id) => {
+      // Keep response IDs if they're still in threads
+      if (currentResponseIds.has(id)) return true
+      // Keep modification request keys if they're still active
+      if (currentModificationKeys.has(id)) return true
+      // Remove everything else
+      return false
+    })
     
     // Only update if something was removed
     if (validIds.length < processedIds.length) {
@@ -448,22 +372,28 @@ export const ChatPanel = () => {
   }, [reservationThreads])
 
   // Process modification requests and display them in chat
+  // Only show modification requests that are currently active (status is 'modification_requested')
   useEffect(() => {
     if (!reservationThreads) return
 
     reservationThreads.forEach((thread) => {
-      // Get modification request messages
-      const modificationRequestMessages = thread.messages.filter((m) => m.type === 'modification_request')
-      if (modificationRequestMessages.length === 0) return
+      // Only process threads with active modification requests
+      // Skip if status is not 'modification_requested' or if modificationRequest is not defined
+      if (thread.status !== 'modification_requested' || !thread.modificationRequest) {
+        return
+      }
 
-      const latestModificationRequest = modificationRequestMessages[modificationRequestMessages.length - 1]
-      const modificationRequestId = latestModificationRequest.giftWrap.id
+      // Create a unique key based on thread ID and modification request content
+      // This ensures we don't show the same modification request twice, even if it comes from different gift wraps
+      const modificationRequestKey = `modification-${thread.threadId}-${thread.modificationRequest.iso_time}-${thread.modificationRequest.party_size}-${thread.modificationRequest.notes || ''}`
 
       // Check if we've already processed this modification request
-      if (processedResponsesRef.current.has(`modification-${modificationRequestId}`)) return
+      if (processedResponsesRef.current.has(modificationRequestKey)) {
+        return
+      }
 
       // Mark as processed
-      processedResponsesRef.current.add(`modification-${modificationRequestId}`)
+      processedResponsesRef.current.add(modificationRequestKey)
 
       // Persist to localStorage
       try {
@@ -474,7 +404,7 @@ export const ChatPanel = () => {
       }
 
       // Get modification request details
-      const modificationRequest = latestModificationRequest.payload as any
+      const modificationRequest = thread.modificationRequest
       const restaurantName = thread.restaurantName
 
       // Format the modification request message
@@ -724,9 +654,14 @@ export const ChatPanel = () => {
           )
         }
         
+        // Map backend status "accepted" to frontend status "confirmed"
+        const status: 'confirmed' | 'declined' = action.status === 'accepted' || action.status === 'confirmed' 
+          ? 'confirmed' 
+          : 'declined'
+        
         await sendModificationResponse(
           modificationThread,
-          action.status as 'confirmed' | 'declined',
+          status,
           action.message
         )
       } else {
@@ -801,14 +736,12 @@ export const ChatPanel = () => {
     setInputValue('')
 
     // Check if there's an active modification request to include context
-    // Only pass this if the user's message seems to be accepting the modification (not making a new request)
+    // Always include context if there's an active modification request - let the LLM decide
+    // if the user is accepting, declining, or making a new request
     let activeReservationContext: ActiveReservationContext | undefined
     if (reservationThreads && reservationThreads.length > 0) {
       const modificationThread = reservationThreads.find((t) => t.status === 'modification_requested')
-      activeReservationContext = buildActiveContextForModificationAcceptance(
-        userMessage.content,
-        modificationThread,
-      )
+      activeReservationContext = buildActiveReservationContext(modificationThread)
     }
 
     // Always send to backend - let OpenAI handle the intelligence

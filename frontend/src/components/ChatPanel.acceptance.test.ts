@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildActiveContextForModificationAcceptance, resolveRestaurantForReservationAction } from './ChatPanel'
+import { buildActiveReservationContext, resolveRestaurantForReservationAction } from './ChatPanel'
 import type { ReservationThread } from '../contexts/ReservationContext'
 import type { ReservationMessage } from '../services/reservationMessenger'
 import type { ReservationAction, SellerResult } from '../lib/api'
@@ -31,43 +31,44 @@ function threadFactory(overrides: Partial<ReservationThread> = {}): ReservationT
   }
 }
 
-describe('buildActiveContextForModificationAcceptance', () => {
-  it('returns context when user accepts suggested time even if they repeat the time', () => {
-    const context = buildActiveContextForModificationAcceptance(
-      'Ok, lets go with 11.30am then',
-      threadFactory(),
-    )
+describe('buildActiveReservationContext', () => {
+  it('returns context when there is an active modification request', () => {
+    const context = buildActiveReservationContext(threadFactory())
 
     expect(context).toBeDefined()
     expect(context?.restaurant_id).toBe('restaurant-abc')
+    expect(context?.restaurant_name).toBe('Smoothies & Muffins')
+    expect(context?.npub).toBe('npub1')
+    expect(context?.party_size).toBe(3)
+    expect(context?.original_time).toBe('2025-11-03T11:15:00-08:00')
     expect(context?.suggested_time).toBe('2025-11-03T11:30:00-08:00')
+    expect(context?.thread_id).toBe('thread-123')
   })
 
-  it('ignores acceptance when message introduces a different time', () => {
-    const context = buildActiveContextForModificationAcceptance(
-      'Sure, 12pm works better for us',
-      threadFactory(),
+  it('returns undefined when thread status is not modification_requested', () => {
+    const context = buildActiveReservationContext(threadFactory({ status: 'confirmed' }))
+
+    expect(context).toBeUndefined()
+  })
+
+  it('returns undefined when thread has no modificationRequest', () => {
+    const context = buildActiveReservationContext(
+      threadFactory({ modificationRequest: undefined })
     )
 
     expect(context).toBeUndefined()
   })
 
-  it('treats reservation keywords and party size as a new request', () => {
-    const context = buildActiveContextForModificationAcceptance(
-      'Ok please book a table for 2 at noon',
-      threadFactory(),
-    )
+  it('returns undefined when restaurantId is unknown', () => {
+    const context = buildActiveReservationContext(threadFactory({ restaurantId: 'unknown' }))
 
     expect(context).toBeUndefined()
   })
 
-  it('allows acceptance phrasing that includes "for" without a number', () => {
-    const context = buildActiveContextForModificationAcceptance(
-      'That works for me, thanks!',
-      threadFactory(),
-    )
+  it('returns undefined when thread is undefined', () => {
+    const context = buildActiveReservationContext(undefined)
 
-    expect(context).toBeDefined()
+    expect(context).toBeUndefined()
   })
 })
 

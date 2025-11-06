@@ -66,7 +66,7 @@ export interface ModificationResponseAction {
   restaurant_id: string
   restaurant_name: string
   npub: string
-  status: 'confirmed' | 'declined'
+  status: 'accepted' | 'confirmed' | 'declined' // Backend returns "accepted", frontend uses "confirmed"
   iso_time: string
   thread_id: string
   message?: string
