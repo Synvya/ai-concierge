@@ -164,7 +164,7 @@ describe('useModificationResponse', () => {
 
     await act(async () => {
       // Should return early without throwing (shows toast instead)
-      await result.current.sendModificationResponse(thread, 'accepted');
+      await result.current.sendModificationResponse(thread, 'confirmed');
     });
 
     // Should not have published anything
@@ -187,8 +187,8 @@ describe('useModificationResponse', () => {
     });
 
     await act(async () => {
-      await expect(
-        result.current.sendModificationResponse(thread, 'accepted')
+        await expect(
+        result.current.sendModificationResponse(thread, 'confirmed')
       ).rejects.toThrow('Modification request message not found in thread');
     });
   });

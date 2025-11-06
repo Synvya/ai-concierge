@@ -13,35 +13,41 @@ import type {
 describe("ReservationModificationRequest", () => {
     it("should accept a valid modification request with all required fields", () => {
         const request: ReservationModificationRequest = {
+            party_size: 2,
             iso_time: "2025-10-17T19:30:00-07:00",
-            message: "We're fully booked at 7pm, but 7:30pm is available.",
+            notes: "We're fully booked at 7pm, but 7:30pm is available.",
         };
 
         expect(request.iso_time).toBe("2025-10-17T19:30:00-07:00");
-        expect(request.message).toBe("We're fully booked at 7pm, but 7:30pm is available.");
+        expect(request.party_size).toBe(2);
+        expect(request.notes).toBe("We're fully booked at 7pm, but 7:30pm is available.");
     });
 
-    it("should accept a modification request with optional original_iso_time", () => {
+    it("should accept a modification request with optional fields", () => {
         const request: ReservationModificationRequest = {
+            party_size: 2,
             iso_time: "2025-10-17T19:30:00-07:00",
-            message: "We're fully booked at 7pm, but 7:30pm is available.",
-            original_iso_time: "2025-10-17T19:00:00-07:00",
+            notes: "We're fully booked at 7pm, but 7:30pm is available.",
+            contact: {
+                name: "John Doe",
+            },
         };
 
-        expect(request.original_iso_time).toBe("2025-10-17T19:00:00-07:00");
+        expect(request.contact?.name).toBe("John Doe");
     });
 
     it("should match the schema structure", () => {
         // Type check: all required fields must be present
         const request: ReservationModificationRequest = {
+            party_size: 2,
             iso_time: "2025-10-17T19:30:00-07:00",
-            message: "Test message",
+            notes: "Test message",
         };
 
         // Verify structure matches schema
+        expect(typeof request.party_size).toBe("number");
         expect(typeof request.iso_time).toBe("string");
-        expect(typeof request.message).toBe("string");
-        expect(typeof request.original_iso_time === "string" || request.original_iso_time === undefined).toBe(true);
+        expect(typeof request.notes === "string" || request.notes === undefined).toBe(true);
     });
 });
 
@@ -123,8 +129,9 @@ describe("Type compatibility", () => {
     it("should be compatible with ReservationMessage payload union", () => {
         // This test ensures the types can be used in ReservationMessage payload
         const modificationRequest: ReservationModificationRequest = {
+            party_size: 2,
             iso_time: "2025-10-17T19:30:00-07:00",
-            message: "Test",
+            notes: "Test",
         };
 
         const modificationResponse: ReservationModificationResponse = {

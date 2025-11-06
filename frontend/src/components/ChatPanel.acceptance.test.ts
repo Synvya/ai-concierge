@@ -17,9 +17,9 @@ const baseThread: ReservationThread = {
   },
   status: 'modification_requested',
   modificationRequest: {
+    party_size: 3,
     iso_time: '2025-11-03T11:30:00-08:00',
-    message: 'We can accommodate you at 11:30am instead',
-    original_iso_time: '2025-11-03T11:15:00-08:00',
+    notes: 'We can accommodate you at 11:30am instead',
   },
   lastUpdated: 0,
 }
