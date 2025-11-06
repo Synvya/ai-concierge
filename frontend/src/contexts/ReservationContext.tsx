@@ -3,6 +3,16 @@
  * 
  * Manages reservation threads state and real-time updates from ReservationMessenger.
  * Groups messages by thread ID and tracks conversation status.
+ * 
+ * ## State Machine
+ * For a visual representation of the reservation state machine and detailed state 
+ * transition rules, see: ./RESERVATION_STATE_MACHINE.md
+ * 
+ * ## Key Concepts
+ * - Threads are grouped by threadId (rumor.id of the original request)
+ * - Status is determined by the last message in the thread
+ * - Messages are sorted by created_at timestamp (ascending) with id tie-breaking
+ * - All threads are persisted to localStorage for cross-session availability
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
