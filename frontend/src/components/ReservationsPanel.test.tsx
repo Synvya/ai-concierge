@@ -45,8 +45,8 @@ describe('ReservationsPanel', () => {
 
       renderWithProviders(<ReservationsPanel />);
 
-      expect(screen.getByText(/no reservations yet/i)).toBeInTheDocument();
-      expect(screen.getByText(/when you make a reservation/i)).toBeInTheDocument();
+      expect(screen.getByText(/no upcoming reservations/i)).toBeInTheDocument();
+      expect(screen.getByText(/your upcoming confirmed reservations/i)).toBeInTheDocument();
     });
 
     test('shows calendar icon in empty state', () => {
@@ -74,7 +74,7 @@ describe('ReservationsPanel', () => {
         messages: [],
         request: {
           partySize: 4,
-          isoTime: '2025-10-21T19:00:00-07:00',
+          isoTime: '2025-11-21T19:00:00-07:00',
           notes: 'Window seat please',
         },
         status: 'sent',
@@ -88,7 +88,7 @@ describe('ReservationsPanel', () => {
         messages: [],
         request: {
           partySize: 2,
-          isoTime: '2025-10-22T18:30:00-07:00',
+          isoTime: '2025-11-22T18:30:00-07:00',
         },
         status: 'confirmed',
         lastUpdated: Math.floor(Date.now() / 1000) - 7200, // 2 hours ago
@@ -101,7 +101,7 @@ describe('ReservationsPanel', () => {
         messages: [],
         request: {
           partySize: 6,
-          isoTime: '2025-10-23T20:00:00-07:00',
+          isoTime: '2025-11-23T20:00:00-07:00',
         },
         status: 'declined',
         lastUpdated: Math.floor(Date.now() / 1000) - 86400, // 1 day ago
@@ -117,9 +117,11 @@ describe('ReservationsPanel', () => {
 
       renderWithProviders(<ReservationsPanel />);
 
+      // Only active reservations (sent, confirmed, modification_requested, modification_accepted) with future dates are shown
+      // The Olive Garden has status 'declined' so it should NOT be displayed
       expect(screen.getByText("Mario's Pizza")).toBeInTheDocument();
       expect(screen.getByText('La Terraza')).toBeInTheDocument();
-      expect(screen.getByText('The Olive Garden')).toBeInTheDocument();
+      expect(screen.queryByText('The Olive Garden')).not.toBeInTheDocument();
     });
 
     test('displays party size correctly', () => {
@@ -166,7 +168,7 @@ describe('ReservationsPanel', () => {
       renderWithProviders(<ReservationsPanel />);
 
       // Should show formatted date (exact format depends on locale)
-      const dateText = screen.getByText(/oct/i);
+      const dateText = screen.getByText(/nov/i);
       expect(dateText).toBeInTheDocument();
     });
 
@@ -191,9 +193,11 @@ describe('ReservationsPanel', () => {
 
       renderWithProviders(<ReservationsPanel />);
 
+      // Only active status badges should be shown (sent, confirmed, modification_requested, modification_accepted)
+      // Declined reservations are filtered out
       expect(screen.getByText('Sent')).toBeInTheDocument();
       expect(screen.getByText('Confirmed')).toBeInTheDocument();
-      expect(screen.getByText('Declined')).toBeInTheDocument();
+      expect(screen.queryByText('Declined')).not.toBeInTheDocument();
     });
 
     test('displays relative timestamps', () => {
@@ -223,7 +227,7 @@ describe('ReservationsPanel', () => {
           lastUpdated: 3000,
         },
         {
-          ...mockThreads[2],
+          ...mockThreads[1], // Use mockThreads[1] instead of [2] since [2] has 'declined' status and would be filtered
           restaurantName: 'Restaurant C',
           lastUpdated: 2000,
         },
@@ -237,7 +241,7 @@ describe('ReservationsPanel', () => {
 
       renderWithProviders(<ReservationsPanel />);
 
-      // Verify all three restaurants are rendered
+      // Verify all three restaurants are rendered (all have allowed statuses)
       expect(screen.getByText('Restaurant A')).toBeInTheDocument();
       expect(screen.getByText('Restaurant B')).toBeInTheDocument();
       expect(screen.getByText('Restaurant C')).toBeInTheDocument();
@@ -253,7 +257,7 @@ describe('ReservationsPanel', () => {
           restaurantName: "Mario's Pizza",
           restaurantNpub: 'npub1test',
           messages: [],
-          request: { partySize: 4, isoTime: '2025-10-21T19:00:00Z' },
+          request: { partySize: 4, isoTime: '2025-11-21T19:00:00Z' },
           status: 'sent',
           lastUpdated: Date.now() / 1000,
         }],
@@ -277,21 +281,21 @@ describe('ReservationsPanel', () => {
 
       renderWithProviders(<ReservationsPanel />);
 
-      // In empty state, the heading should be "No reservations yet", not "Reservations"
+      // In empty state, the heading should be "No upcoming reservations", not "Reservations"
       expect(screen.queryByText(/track your reservation requests/i)).not.toBeInTheDocument();
-      expect(screen.getByText(/no reservations yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/no upcoming reservations/i)).toBeInTheDocument();
     });
   });
 
   describe('status display', () => {
-    test('displays all status types correctly', () => {
+    test('displays all allowed status types correctly', () => {
+      // Only test statuses that are shown in the UI per Guidance.md
+      // (sent, confirmed, modification_requested, modification_accepted)
       const statuses: Array<ReservationThread['status']> = [
         'sent',
         'confirmed',
-        'declined',
         'modification_requested',
-        'expired',
-        'cancelled',
+        'modification_accepted',
       ];
 
       const threads = statuses.map((status, index) => ({
@@ -300,7 +304,7 @@ describe('ReservationsPanel', () => {
         restaurantName: `Restaurant ${index}`,
         restaurantNpub: `npub1test${index}`,
         messages: [],
-        request: { partySize: 2, isoTime: '2025-10-21T19:00:00Z' },
+        request: { partySize: 2, isoTime: '2025-11-21T19:00:00Z' }, // Future date
         status,
         lastUpdated: Date.now() / 1000,
       }));
@@ -314,12 +318,16 @@ describe('ReservationsPanel', () => {
       renderWithProviders(<ReservationsPanel />);
 
       // Use getAllByText for badges that might appear multiple times
+      // Only allowed statuses should be displayed
       expect(screen.getAllByText('Sent').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Confirmed').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Declined').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Modification Requested').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Expired').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Cancelled').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Modification Accepted').length).toBeGreaterThan(0);
+      
+      // Verify filtered statuses are not shown
+      expect(screen.queryByText('Declined')).not.toBeInTheDocument();
+      expect(screen.queryByText('Expired')).not.toBeInTheDocument();
+      expect(screen.queryByText('Cancelled')).not.toBeInTheDocument();
     });
   });
 });

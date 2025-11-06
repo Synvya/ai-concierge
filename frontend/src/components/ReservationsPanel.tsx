@@ -22,6 +22,26 @@ export function ReservationsPanel() {
   const { threads } = useReservations();
   const { sendModificationResponse } = useModificationResponse();
 
+  // Filter threads to only show:
+  // 1. Reservations with dates in the future
+  // 2. With status: sent, confirmed, modification_requested, or modification_accepted
+  // Note: Per Guidance.md, only show Confirmed, Modification Requested, or Modification Confirmed
+  // However, 'sent' represents pending requests that should be shown as they're active
+  const filteredThreads = threads.filter((thread) => {
+    // Check if reservation time is in the future
+    const reservationDate = new Date(thread.request.isoTime);
+    const now = new Date();
+    if (reservationDate <= now) {
+      return false;
+    }
+
+    // Check if status is one of the allowed values
+    // 'sent' = pending requests, 'confirmed' = confirmed reservations
+    // 'modification_requested' = awaiting user response, 'modification_accepted' = user accepted modification
+    const allowedStatuses = ['sent', 'confirmed', 'modification_requested', 'modification_accepted'];
+    return allowedStatuses.includes(thread.status);
+  });
+
   const handleAcceptModification = async (thread: ReservationThread) => {
     // Note: We don't check supports_modifications here because:
     // 1. The restaurant already sent a modification request (indicating support)
@@ -34,7 +54,7 @@ export function ReservationsPanel() {
     await sendModificationResponse(thread, 'declined');
   };
 
-  if (threads.length === 0) {
+  if (filteredThreads.length === 0) {
     return (
       <Center minH="400px">
         <VStack spacing={4}>
@@ -46,11 +66,11 @@ export function ReservationsPanel() {
           </Icon>
           <VStack spacing={2}>
             <Heading size="md" color="gray.600">
-              No reservations yet
+              No upcoming reservations
             </Heading>
             <Text color="gray.500" textAlign="center" maxW="sm">
-              When you make a reservation, it will appear here. You can track the status and view the
-              conversation with the restaurant.
+              Your upcoming confirmed reservations and active requests will appear here. Past
+              reservations and declined requests are not shown.
             </Text>
           </VStack>
         </VStack>
@@ -68,7 +88,7 @@ export function ReservationsPanel() {
       </Stack>
 
       <Stack spacing={3}>
-        {threads.map((thread) => (
+        {filteredThreads.map((thread) => (
           <ThreadCard
             key={thread.threadId}
             thread={thread}
