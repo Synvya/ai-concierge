@@ -88,8 +88,10 @@ export class ReservationSubscription {
         const { relays, publicKey, privateKey, onMessage, onError, onReady, historySince } = this.config;
 
         // Calculate the 'since' timestamp for historical messages
-        // Default to 30 days ago if not specified
-        const defaultHistorySeconds = 30 * 24 * 60 * 60; // 30 days in seconds
+        // Default to 9 days ago if not specified
+        // This ensures we get rumors from the last 7 days, accounting for gift wrap
+        // timestamp randomization (up to 2 days in the past per NIP-59)
+        const defaultHistorySeconds = 9 * 24 * 60 * 60; // 9 days in seconds
         const historyWindow = historySince ?? defaultHistorySeconds;
         const sinceTimestamp = Math.floor(Date.now() / 1000) - historyWindow;
 
