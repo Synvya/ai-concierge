@@ -24,7 +24,7 @@ export function ReservationsPanel() {
 
   // Filter threads to only show:
   // 1. Reservations with dates in the future
-  // 2. With status: sent, confirmed, modification_requested, or modification_accepted
+  // 2. With status: sent, confirmed, modification_requested, or modification_confirmed
   // Note: Per Guidance.md, only show Confirmed, Modification Requested, or Modification Confirmed
   // However, 'sent' represents pending requests that should be shown as they're active
   const filteredThreads = threads.filter((thread) => {
@@ -37,8 +37,8 @@ export function ReservationsPanel() {
 
     // Check if status is one of the allowed values
     // 'sent' = pending requests, 'confirmed' = confirmed reservations
-    // 'modification_requested' = awaiting user response, 'modification_accepted' = user accepted modification
-    const allowedStatuses = ['sent', 'confirmed', 'modification_requested', 'modification_accepted'];
+    // 'modification_requested' = awaiting user response, 'modification_confirmed' = user confirmed modification
+    const allowedStatuses = ['sent', 'confirmed', 'modification_requested', 'modification_confirmed'];
     return allowedStatuses.includes(thread.status);
   });
 

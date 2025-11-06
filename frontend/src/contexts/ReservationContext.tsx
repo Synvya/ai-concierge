@@ -69,7 +69,7 @@ export interface ReservationThread {
     notes?: string;
   };
   /** Current conversation status */
-  status: 'sent' | 'confirmed' | 'declined' | 'modification_requested' | 'modification_accepted' | 'expired' | 'cancelled';
+  status: 'sent' | 'confirmed' | 'declined' | 'modification_requested' | 'modification_confirmed' | 'expired' | 'cancelled';
   /** Latest modification request from restaurant (if status is 'modification_requested') */
   modificationRequest?: ReservationModificationRequest;
   /** Timestamp of last message (Unix timestamp in seconds) */
@@ -208,7 +208,7 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
             const modificationResponse = message.payload as ReservationModificationResponse;
             if (modificationResponse.status === 'confirmed' && existingThread.modificationRequest) {
               // Update the request time to the new accepted time immediately for UI feedback
-              // Set status to modification_accepted to show user their acceptance was registered
+              // Set status to modification_confirmed to show user their acceptance was registered
               // The restaurant's response will trigger the final "confirmed" status
               updatedThread = {
                 ...updatedThread,
@@ -216,7 +216,7 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
                   ...existingThread.request,
                   isoTime: modificationResponse.iso_time || existingThread.modificationRequest.iso_time,
                 },
-                status: 'modification_accepted' as const,
+                status: 'modification_confirmed' as const,
                 // Clear modification request since it's been accepted
                 modificationRequest: undefined,
               };
@@ -381,12 +381,12 @@ export function updateThreadWithMessage(
       const modificationResponse = message.payload as ReservationModificationResponse;
       if (modificationResponse.status === 'confirmed' && existingThread.modificationRequest) {
         // Customer accepted the modification - update time immediately for UI feedback
-        // Set status to modification_accepted to show user their acceptance was registered
+        // Set status to modification_confirmed to show user their acceptance was registered
         updatedThread.request = {
           ...existingThread.request,
           isoTime: modificationResponse.iso_time || existingThread.modificationRequest.iso_time,
         };
-        updatedThread.status = 'modification_accepted';
+        updatedThread.status = 'modification_confirmed';
         // Clear modification request since it's been accepted
         updatedThread.modificationRequest = undefined;
       } else if (modificationResponse.status === 'declined') {
