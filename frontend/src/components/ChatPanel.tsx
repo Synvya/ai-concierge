@@ -71,6 +71,7 @@ const USER_AVATAR_URL = '/assets/user.png'
 const LINK_REGEX = /(https?:\/\/[^\s]+)/g
 const LOCATION_STORAGE_KEY = 'ai-concierge-shared-location'
 const PROCESSED_RESPONSES_STORAGE_KEY = 'ai-concierge-processed-responses'
+const PAGE_TIME_STORAGE_KEY = 'ai-concierge-page-time'
 
 /**
  * Builds active reservation context for modification requests.
@@ -205,6 +206,27 @@ export const ChatPanel = () => {
     status: 'idle' | 'pending' | 'granted' | 'denied'
   }>({ status: 'idle' })
   
+  // Initialize pageTime from sessionStorage or set to current time
+  // This tracks when the user loaded/refreshed the page to filter out old messages
+  const [pageTime] = useState<number>(() => {
+    try {
+      const cached = sessionStorage.getItem(PAGE_TIME_STORAGE_KEY)
+      if (cached) {
+        return parseInt(cached, 10)
+      }
+    } catch (error) {
+      console.error('Failed to load pageTime from sessionStorage:', error)
+    }
+    // Set pageTime to current Unix timestamp and persist to sessionStorage
+    const now = Math.floor(Date.now() / 1000)
+    try {
+      sessionStorage.setItem(PAGE_TIME_STORAGE_KEY, now.toString())
+    } catch (error) {
+      console.error('Failed to save pageTime to sessionStorage:', error)
+    }
+    return now
+  })
+  
   // Initialize processedResponsesRef from localStorage using useMemo for lazy initialization
   const initialProcessedResponses = useMemo(() => {
     try {
@@ -308,6 +330,10 @@ export const ChatPanel = () => {
       // Check if we've already processed this response
       if (processedResponsesRef.current.has(responseId)) return
 
+      // Filter: Only display messages with created_at > pageTime
+      // This ensures old messages don't re-appear after page refresh
+      if (latestResponse.rumor.created_at <= pageTime) return
+
       // Mark as processed immediately to prevent duplicate processing
       processedResponsesRef.current.add(responseId)
       
@@ -389,6 +415,15 @@ export const ChatPanel = () => {
 
       // Check if we've already processed this modification request
       if (processedResponsesRef.current.has(modificationRequestKey)) {
+        return
+      }
+
+      // Filter: Only display modification requests with created_at > pageTime
+      // Find the modification request message in the thread to check its timestamp
+      const modificationRequestMessage = thread.messages.find(
+        (m) => m.type === 'modification_request' && m.payload === thread.modificationRequest
+      )
+      if (modificationRequestMessage && modificationRequestMessage.rumor.created_at <= pageTime) {
         return
       }
 
