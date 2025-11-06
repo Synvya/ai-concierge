@@ -99,15 +99,30 @@ export function useModificationResponse(setIsLoading?: (loading: boolean) => voi
         additionalTags
       );
 
+      // Log the rumor template to verify content is a string
+      console.log('[useModificationResponse] Rumor template:', {
+        kind: rumorTemplate.kind,
+        contentType: typeof rumorTemplate.content,
+        contentLength: rumorTemplate.content?.length,
+        contentPreview: rumorTemplate.content?.substring(0, 100),
+        tags: rumorTemplate.tags,
+      });
+
+      // Ensure content is a string (defensive programming)
+      const rumorWithStringContent = {
+        ...rumorTemplate,
+        content: String(rumorTemplate.content),
+      };
+
       // Wrap the SAME rumor in two gift wraps with different encryption targets
       const giftWrapToMerchant = wrapEvent(
-        rumorTemplate,  // Same rumor template!
+        rumorWithStringContent,  // Rumor with explicitly string content
         nostrIdentity.privateKeyHex,
         restaurantPubkeyHex  // Encrypted for merchant to decrypt
       );
 
       const giftWrapToSelf = wrapEvent(
-        rumorTemplate,  // Same rumor template!
+        rumorWithStringContent,  // Same rumor template with string content!
         nostrIdentity.privateKeyHex,
         nostrIdentity.publicKeyHex  // Encrypted for self to decrypt
       );
