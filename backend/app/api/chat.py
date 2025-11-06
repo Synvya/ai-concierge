@@ -51,7 +51,7 @@ async def chat(
     results = [SellerResult(**seller) for seller in sellers]
 
     answer, function_call_data, modification_response_data = await generate_response(
-        payload.message, results, payload.history, payload.active_reservation_context
+        payload.message, results, payload.history, payload.active_reservation_context, payload.user_datetime
     )
 
     # Convert function call data to ReservationAction if present

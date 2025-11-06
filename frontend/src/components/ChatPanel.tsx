@@ -747,6 +747,9 @@ export const ChatPanel = () => {
     // Always send to backend - let OpenAI handle the intelligence
     setIsLoading(true)
     try {
+      // Get user's local date/time to help with date parsing
+      const userDatetime = new Date().toISOString()
+      
       const payload = await chat({
         message: userMessage.content,
         session_id: sessionId,
@@ -755,6 +758,7 @@ export const ChatPanel = () => {
         user_location: sharedLocation.status === 'granted' ? sharedLocation.label : undefined,
         user_coordinates: sharedLocation.status === 'granted' ? sharedLocation.coords : undefined,
         active_reservation_context: activeReservationContext,
+        user_datetime: userDatetime,
       })
       await handleChatResponse(payload)
     } catch (error) {

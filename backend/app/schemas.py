@@ -42,6 +42,10 @@ class ChatRequest(BaseModel):
     user_location: str | None = None
     user_coordinates: GeoPoint | None = None
     active_reservation_context: ActiveReservationContext | None = None
+    user_datetime: str | None = Field(
+        default=None,
+        description="User's local date/time in ISO format with timezone to help with date parsing"
+    )
 
 
 class SearchRequest(BaseModel):

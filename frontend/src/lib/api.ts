@@ -103,6 +103,7 @@ export interface ChatRequestPayload {
   user_location?: string
   user_coordinates?: GeoPoint
   active_reservation_context?: ActiveReservationContext
+  user_datetime?: string // User's local date/time in ISO format with timezone
 }
 
 export interface ChatResponse {

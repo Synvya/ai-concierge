@@ -159,8 +159,16 @@ async def generate_response(
     results: list[SellerResult],
     history: list[ChatMessage],
     active_reservation_context: Any | None = None,
+    user_datetime: str | None = None,
 ) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
     """Call OpenAI to craft a concierge-style response.
+
+    Args:
+        query: User's message
+        results: Search results from the database
+        history: Conversation history
+        active_reservation_context: Context for active reservation/modification
+        user_datetime: User's local date/time in ISO format with timezone
 
     Returns:
         tuple: (response_text, function_call_data or None, modification_response_data or None)
@@ -187,8 +195,25 @@ async def generate_response(
             raise AssistantError("OPENAI_API_KEY is not configured")
 
         # Get current date/time for OpenAI to use as reference
-        now = datetime.now(timezone.utc)
-        current_datetime = now.isoformat()
+        # Prefer user's local datetime if provided, otherwise fall back to UTC
+        if user_datetime:
+            # Parse the user's datetime (already in ISO format with timezone)
+            try:
+                from dateutil import parser
+                now = parser.isoparse(user_datetime)
+                current_datetime = user_datetime
+                # Format a more readable datetime string for the LLM
+                current_datetime_readable = now.strftime("%A, %B %d, %Y at %I:%M:%S %p %Z")
+            except Exception:
+                # Fall back to UTC if parsing fails
+                now = datetime.now(timezone.utc)
+                current_datetime = now.isoformat()
+                current_datetime_readable = now.strftime("%A, %B %d, %Y at %H:%M:%S UTC")
+        else:
+            # Use UTC as fallback
+            now = datetime.now(timezone.utc)
+            current_datetime = now.isoformat()
+            current_datetime_readable = now.strftime("%A, %B %d, %Y at %H:%M:%S UTC")
 
         # Build active reservation context if present
         reservation_context_block = ""
@@ -285,23 +310,25 @@ async def generate_response(
             "- DO NOT mention suggestions or alternatives UNLESS explicitly provided in ACTIVE RESERVATION CONTEXT above.\n"
             "- DO NOT assume or invent that a request was already sent or that a response was received.\n"
             "\n"
-            f"CURRENT DATE/TIME: {current_datetime}\n"
+            f"CURRENT DATE/TIME (User's Local Time): {current_datetime_readable}\n"
+            f"ISO Format: {current_datetime}\n"
             "\n"
             "TIME PARSING RULES:\n"
-            "- Parse natural language times CAREFULLY into ISO 8601 format with timezone\n"
-            "- Use the CURRENT DATE/TIME above as your reference point\n"
-            "- EXAMPLES (assuming Pacific timezone):\n"
-            "  * '11am' or '11 am' → 11:00:00 (NOT 12:00:00!)\n"
-            "  * '11:30am' → 11:30:00\n"
-            "  * '7pm' → 19:00:00\n"
-            "  * '12pm' or 'noon' → 12:00:00\n"
-            "  * '12am' or 'midnight' → 00:00:00\n"
-            "- Date calculations:\n"
-            "  * 'tomorrow' = current date + 1 day\n"
-            "  * 'tonight' = current date at evening time\n"
-            "  * 'Saturday' = next Saturday from current date\n"
-            "- Always include timezone (default to US Pacific: -07:00 or -08:00 depending on DST)\n"
-            "- Always calculate dates relative to the CURRENT DATE/TIME provided above\n"
+            "- The CURRENT DATE/TIME shown above is in the USER'S LOCAL TIMEZONE\n"
+            "- Parse natural language times CAREFULLY into ISO 8601 format with the same timezone\n"
+            "- When user says 'today', use TODAY's date from the current date/time above\n"
+            "- When user says 'tomorrow', add exactly 1 day to the current date shown above\n"
+            "- EXAMPLES of time parsing:\n"
+            "  * 'today at 8pm' or 'today at 8:00pm' → current date at 20:00:00 with user's timezone\n"
+            "  * 'today at 8.30pm' or 'today at 8:30pm' → current date at 20:30:00 with user's timezone\n"
+            "  * '11am' or '11 am' → current date at 11:00:00 (NOT 12:00:00!)\n"
+            "  * '11:30am' → current date at 11:30:00\n"
+            "  * '7pm' or '7:00pm' → current date at 19:00:00\n"
+            "  * '12pm' or 'noon' → current date at 12:00:00\n"
+            "  * '12am' or 'midnight' → current date at 00:00:00\n"
+            "- CRITICAL: Always use the CURRENT DATE from above for date calculations\n"
+            "- CRITICAL: Always preserve the timezone from the current datetime in your output\n"
+            "- If user doesn't specify a date, assume they mean today (the current date shown above)\n"
             "\n"
             "- If 'supports_reservations' is false or missing, suggest they contact the business directly.\n"
             "- Ask clarifying questions only if details are missing or ambiguous AND not in conversation history.\n"
