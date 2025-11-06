@@ -487,8 +487,8 @@ describe('ReservationContext', () => {
     expect(finalThread).toBeDefined()
     expect(finalThread?.messages).toHaveLength(3) // Request + modification request + modification response
     expect(finalThread?.messages[2].type).toBe('modification_response')
-    // Status should remain modification_requested until restaurant sends final response
-    expect(finalThread?.status).toBe('modification_requested')
+    // Status should be modification_accepted after user accepts, until restaurant sends final response
+    expect(finalThread?.status).toBe('modification_accepted')
 
     unmount()
   })

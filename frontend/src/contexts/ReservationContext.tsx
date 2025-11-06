@@ -13,7 +13,7 @@ import {
   type ReservationSubscription,
 } from '../services/reservationMessenger';
 import { getThreadContext, type ThreadContext } from '../lib/nostr/nip10';
-import type { ReservationRequest, ReservationResponse, ReservationModificationRequest } from '../types/reservation';
+import type { ReservationRequest, ReservationResponse, ReservationModificationRequest, ReservationModificationResponse } from '../types/reservation';
 
 /**
  * Determine whether we should start the live reservation subscription.
@@ -69,7 +69,7 @@ export interface ReservationThread {
     notes?: string;
   };
   /** Current conversation status */
-  status: 'sent' | 'confirmed' | 'declined' | 'modification_requested' | 'expired' | 'cancelled';
+  status: 'sent' | 'confirmed' | 'declined' | 'modification_requested' | 'modification_accepted' | 'expired' | 'cancelled';
   /** Latest modification request from restaurant (if status is 'modification_requested') */
   modificationRequest?: ReservationModificationRequest;
   /** Timestamp of last message (Unix timestamp in seconds) */
@@ -189,20 +189,49 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
             existingThread.restaurantName === 'Unknown Restaurant' || 
             existingThread.restaurantId === 'unknown';
           
+          // Handle modification response optimistically
+          let updatedThread = {
+            ...existingThread,
+            messages: [...existingThread.messages, message].sort((a, b) => a.rumor.created_at - b.rumor.created_at),
+            lastUpdated: message.rumor.created_at,
+            // Update restaurant info if it was unknown
+            ...(needsRestaurantInfoUpdate && {
+              restaurantId,
+              restaurantName,
+              restaurantNpub,
+            }),
+          };
+          
+          // If this is a modification response with status "confirmed", update the time immediately
+          // but keep status as modification_requested until restaurant sends final response
+          if (message.type === 'modification_response') {
+            const modificationResponse = message.payload as ReservationModificationResponse;
+            if (modificationResponse.status === 'confirmed' && existingThread.modificationRequest) {
+              // Update the request time to the new accepted time immediately for UI feedback
+              // Set status to modification_accepted to show user their acceptance was registered
+              // The restaurant's response will trigger the final "confirmed" status
+              updatedThread = {
+                ...updatedThread,
+                request: {
+                  ...existingThread.request,
+                  isoTime: modificationResponse.iso_time || existingThread.modificationRequest.iso_time,
+                },
+                status: 'modification_accepted' as const,
+                // Clear modification request since it's been accepted
+                modificationRequest: undefined,
+              };
+            } else if (modificationResponse.status === 'declined') {
+              // If declined, keep status as modification_requested (restaurant may send another suggestion)
+              // but clear the modification request
+              updatedThread = {
+                ...updatedThread,
+                modificationRequest: undefined,
+              };
+            }
+          }
+          
           return prev.map((t) =>
-            t.threadId === threadId
-              ? {
-                  ...t,
-                  messages: [...t.messages, message].sort((a, b) => a.rumor.created_at - b.rumor.created_at),
-                  lastUpdated: message.rumor.created_at,
-                  // Update restaurant info if it was unknown
-                  ...(needsRestaurantInfoUpdate && {
-                    restaurantId,
-                    restaurantName,
-                    restaurantNpub,
-                  }),
-                }
-              : t
+            t.threadId === threadId ? updatedThread : t
           );
         } else {
           // Create new thread
@@ -316,6 +345,31 @@ export function updateThreadWithMessage(
       if (response.status === 'confirmed' || response.status === 'declined' || 
           response.status === 'expired' || response.status === 'cancelled') {
         updatedThread.status = response.status;
+        // Update the request time if the response includes a confirmed time
+        // This is especially important after a modification was accepted
+        if (response.status === 'confirmed' && response.iso_time) {
+          // Check if we previously accepted a modification
+          // Find the original request time from the first message
+          const originalRequestMessage = existingThread.messages.find(m => m.type === 'request');
+          const originalRequestTime = originalRequestMessage 
+            ? (originalRequestMessage.payload as ReservationRequest).iso_time 
+            : existingThread.request.isoTime;
+          
+          // If the response time matches the original request time (before modification),
+          // but we've already updated to a modification time, preserve the modification time
+          // This handles cases where restaurant confirms with old time instead of new time
+          if (response.iso_time === originalRequestTime && 
+              existingThread.request.isoTime !== originalRequestTime) {
+            // Keep the modification time we already updated
+            // Don't overwrite with the old time from response
+          } else {
+            // Use the time from the response
+            updatedThread.request = {
+              ...existingThread.request,
+              isoTime: response.iso_time,
+            };
+          }
+        }
       }
     } else if (message.type === 'modification_request') {
       // Handle modification request
@@ -324,9 +378,22 @@ export function updateThreadWithMessage(
       updatedThread.modificationRequest = modificationRequest;
     } else if (message.type === 'modification_response') {
       // Handle modification response (customer accepts/declines)
-      // After modification response, status will be updated when restaurant sends final response
-      // For now, keep current status or mark as pending
-      // The restaurant will send a final response (kind 9902) after receiving modification response
+      const modificationResponse = message.payload as ReservationModificationResponse;
+      if (modificationResponse.status === 'confirmed' && existingThread.modificationRequest) {
+        // Customer accepted the modification - update time immediately for UI feedback
+        // Set status to modification_accepted to show user their acceptance was registered
+        updatedThread.request = {
+          ...existingThread.request,
+          isoTime: modificationResponse.iso_time || existingThread.modificationRequest.iso_time,
+        };
+        updatedThread.status = 'modification_accepted';
+        // Clear modification request since it's been accepted
+        updatedThread.modificationRequest = undefined;
+      } else if (modificationResponse.status === 'declined') {
+        // Customer declined - keep status as modification_requested (restaurant may send another suggestion)
+        // but clear the modification request
+        updatedThread.modificationRequest = undefined;
+      }
     }
 
     return threads
