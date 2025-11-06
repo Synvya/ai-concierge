@@ -38,7 +38,7 @@ export function ThreadCard({ thread, onClick, onAcceptModification, onDeclineMod
   };
 
   const statusLabel = {
-    sent: 'Sent',
+    sent: 'Pending',
     confirmed: 'Confirmed',
     declined: 'Declined',
     modification_requested: 'Modification Requested',

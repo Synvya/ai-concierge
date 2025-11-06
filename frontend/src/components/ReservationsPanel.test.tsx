@@ -195,7 +195,7 @@ describe('ReservationsPanel', () => {
 
       // Only active status badges should be shown (sent, confirmed, modification_requested, modification_confirmed)
       // Declined reservations are filtered out
-      expect(screen.getByText('Sent')).toBeInTheDocument();
+      expect(screen.getByText('Pending')).toBeInTheDocument();
       expect(screen.getByText('Confirmed')).toBeInTheDocument();
       expect(screen.queryByText('Declined')).not.toBeInTheDocument();
     });
@@ -319,7 +319,7 @@ describe('ReservationsPanel', () => {
 
       // Use getAllByText for badges that might appear multiple times
       // Only allowed statuses should be displayed
-      expect(screen.getAllByText('Sent').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Confirmed').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Modification Requested').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Modification Confirmed').length).toBeGreaterThan(0);
