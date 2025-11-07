@@ -143,7 +143,20 @@ function loadThreadsFromStorage(): ReservationThread[] {
   try {
     const cached = localStorage.getItem(STORAGE_KEY);
     if (cached) {
-      return JSON.parse(cached);
+      const threads = JSON.parse(cached) as ReservationThread[];
+      
+      // Migration: Fix old status names from before standardization
+      // Replace 'modification_accepted' with 'modification_confirmed'
+      return threads.map(thread => {
+        if (thread.status === 'modification_accepted' as any) {
+          console.log('[ReservationContext] Migrating old status name: modification_accepted → modification_confirmed');
+          return {
+            ...thread,
+            status: 'modification_confirmed' as const,
+          };
+        }
+        return thread;
+      });
     }
   } catch (error) {
     console.error('Failed to load cached reservations:', error);
