@@ -11,6 +11,10 @@
  * - No metadata leaks to relays (sender/receiver/content/kind)
  * - Messages use random ephemeral keys for gift wraps
  * 
+ * SECURITY: This implementation validates that the rumor's pubkey matches the seal's pubkey
+ * during unwrapping, as required by NIP-59. This prevents malicious actors from wrapping a
+ * rumor with a different sender's public key, protecting against impersonation attacks.
+ * 
  * @see https://github.com/nostr-protocol/nips/blob/master/59.md
  */
 
@@ -22,6 +26,7 @@ import {
     wrapEvent as wrapEventLib,
     unwrapEvent as unwrapEventLib,
 } from "nostr-tools/nip59";
+import { verifyEvent } from "nostr-tools/pure";
 import { encryptMessage, decryptMessage } from "./nip44";
 import { hexToBytes } from '@noble/hashes/utils';
 
@@ -131,13 +136,74 @@ export function wrapEvent(
 }
 
 /**
+ * Unwraps a gift wrap (kind 1059) to extract the seal (kind 13).
+ * Internal helper for validation purposes.
+ * 
+ * @param wrap - The kind 1059 gift wrap event
+ * @param recipientPrivateKey - Recipient's private key in hex format
+ * @returns The kind 13 seal event
+ * @throws Error if decryption fails or event is malformed
+ */
+function unwrapGiftWrapToSeal(wrap: Event, recipientPrivateKey: string): Event {
+    if (wrap.kind !== 1059) {
+        throw new Error(`Expected kind 1059 gift wrap, got kind ${wrap.kind}`);
+    }
+
+    // Decrypt the gift wrap content to get the seal
+    const sealContent = decryptMessage(wrap.content, recipientPrivateKey, wrap.pubkey);
+    const seal = JSON.parse(sealContent) as Event;
+
+    // Verify the seal is kind 13
+    if (seal.kind !== 13) {
+        throw new Error(`Expected kind 13 seal inside gift wrap, got kind ${seal.kind}`);
+    }
+
+    // Verify the seal's signature
+    if (!verifyEvent(seal)) {
+        throw new Error('Invalid seal signature');
+    }
+
+    return seal;
+}
+
+/**
+ * Unwraps a seal (kind 13) to extract the rumor.
+ * Internal helper for validation purposes.
+ * 
+ * @param seal - The kind 13 seal event
+ * @param recipientPrivateKey - Recipient's private key in hex format
+ * @returns The rumor (unsigned event with id)
+ * @throws Error if decryption fails or event is malformed
+ */
+function unwrapSealToRumor(seal: Event, recipientPrivateKey: string): Rumor {
+    if (seal.kind !== 13) {
+        throw new Error(`Expected kind 13 seal, got kind ${seal.kind}`);
+    }
+
+    // Decrypt the seal content to get the rumor
+    const rumorContent = decryptMessage(seal.content, recipientPrivateKey, seal.pubkey);
+    const rumor = JSON.parse(rumorContent) as Rumor;
+
+    // Verify the rumor has required fields
+    if (!rumor.id || !rumor.pubkey || typeof rumor.kind !== 'number') {
+        throw new Error('Invalid rumor structure');
+    }
+
+    return rumor;
+}
+
+/**
  * Unwraps a gift-wrapped event (kind 1059) to extract the original rumor.
  * Performs all three decryption steps: unwrap → unseal → extract rumor.
+ * 
+ * SECURITY: This function validates that the rumor's pubkey matches the seal's pubkey,
+ * as required by NIP-59. This prevents malicious actors from wrapping a rumor with a
+ * different sender's public key.
  * 
  * @param wrap - The kind 1059 gift wrap event
  * @param recipientPrivateKey - Recipient's private key in hex format
  * @returns The original rumor with encrypted content
- * @throws Error if decryption fails or event is malformed
+ * @throws Error if decryption fails, event is malformed, or pubkey validation fails
  * 
  * @example
  * ```typescript
@@ -154,17 +220,32 @@ export function wrapEvent(
  * ```
  */
 export function unwrapEvent(wrap: Event, recipientPrivateKey: string): Rumor {
-    const recipientPrivateKeyBytes = hexToBytes(recipientPrivateKey);
-    return unwrapEventLib(wrap, recipientPrivateKeyBytes);
+    // Step 1: Unwrap the gift wrap to get the seal
+    const seal = unwrapGiftWrapToSeal(wrap, recipientPrivateKey);
+
+    // Step 2: Unwrap the seal to get the rumor
+    const rumor = unwrapSealToRumor(seal, recipientPrivateKey);
+
+    // Step 3: CRITICAL VALIDATION (NIP-59 requirement)
+    // The rumor's pubkey MUST match the seal's pubkey
+    if (rumor.pubkey !== seal.pubkey) {
+        throw new Error(
+            `NIP-59 validation failed: rumor pubkey (${rumor.pubkey}) does not match seal pubkey (${seal.pubkey})`
+        );
+    }
+
+    return rumor;
 }
 
 /**
  * Unwraps multiple gift-wrapped events at once.
  * Useful for batch processing incoming messages.
  * 
+ * SECURITY: Each event is validated to ensure rumor pubkey matches seal pubkey.
+ * 
  * @param wraps - Array of kind 1059 gift wrap events
  * @param recipientPrivateKey - Recipient's private key in hex format
- * @returns Array of unwrapped rumors
+ * @returns Array of unwrapped rumors (invalid events are skipped with warning)
  * 
  * @example
  * ```typescript
@@ -181,13 +262,13 @@ export function unwrapEvent(wrap: Event, recipientPrivateKey: string): Rumor {
  * ```
  */
 export function unwrapManyEvents(wraps: Event[], recipientPrivateKey: string): Rumor[] {
-    const recipientPrivateKeyBytes = hexToBytes(recipientPrivateKey);
     const rumors: Rumor[] = [];
     for (const wrap of wraps) {
         try {
-            rumors.push(unwrapEventLib(wrap, recipientPrivateKeyBytes));
+            // Use our validated unwrapEvent function
+            rumors.push(unwrapEvent(wrap, recipientPrivateKey));
         } catch (error) {
-            // Skip events that fail to unwrap (wrong recipient, corrupted, etc.)
+            // Skip events that fail to unwrap (wrong recipient, corrupted, validation failed, etc.)
             console.warn("Failed to unwrap event:", wrap.id, error);
         }
     }

@@ -523,6 +523,122 @@ describe("nip59", () => {
         });
     });
 
+    describe("NIP-59 Security Validation", () => {
+        it("rejects gift wrap when rumor pubkey does not match seal pubkey", () => {
+            const sender = generateKeypair();
+            const imposter = generateKeypair();
+            const recipient = generateKeypair();
+
+            // Create a rumor with sender's key
+            const rumor = createRumor(
+                {
+                    kind: 9901,
+                    content: "malicious-content",
+                    tags: [],
+                    created_at: 1000,
+                },
+                sender.privateKeyHex
+            );
+
+            // Manually create a seal with imposter's key but containing sender's rumor
+            // This simulates a malicious actor trying to impersonate another user
+            const maliciousSeal = createSeal(rumor, imposter.privateKeyHex, recipient.publicKeyHex);
+
+            // Wrap it in a gift wrap
+            const wrap = createWrap(maliciousSeal, recipient.publicKeyHex);
+
+            // Attempting to unwrap should fail validation
+            expect(() => unwrapEvent(wrap, recipient.privateKeyHex)).toThrow(
+                /NIP-59 validation failed.*rumor pubkey.*seal pubkey/
+            );
+        });
+
+        it("successfully unwraps when rumor pubkey matches seal pubkey", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            // Create a legitimate gift-wrapped message
+            const wrap = wrapEvent(
+                {
+                    kind: 9901,
+                    content: "legitimate-content",
+                    tags: [],
+                    created_at: 1000,
+                },
+                sender.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            // Should unwrap successfully
+            const rumor = unwrapEvent(wrap, recipient.privateKeyHex);
+
+            expect(rumor.content).toBe("legitimate-content");
+            expect(rumor.pubkey).toBe(sender.publicKeyHex);
+        });
+
+        it("validates seal signature before checking pubkey match", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            // Create a valid gift wrap
+            const wrap = wrapEvent(
+                {
+                    kind: 9901,
+                    content: "test",
+                    tags: [],
+                    created_at: 1000,
+                },
+                sender.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            // Decrypt to get seal, then corrupt it
+            const sealContent = decryptMessage(wrap.content, recipient.privateKeyHex, wrap.pubkey);
+            const seal = JSON.parse(sealContent) as Event;
+
+            // Corrupt the seal signature
+            seal.sig = "0".repeat(128);
+
+            // Re-encrypt the corrupted seal into a new wrap
+            const ephemeral = generateKeypair();
+            const corruptedWrapContent = encryptMessage(
+                JSON.stringify(seal),
+                ephemeral.privateKeyHex,
+                recipient.publicKeyHex
+            );
+
+            const corruptedWrap: Event = {
+                ...wrap,
+                content: corruptedWrapContent,
+                pubkey: ephemeral.publicKeyHex,
+                // Need to recalculate id and sig for the modified wrap
+                id: wrap.id, // Using same id for test purposes
+                sig: wrap.sig, // Using same sig for test purposes
+            };
+
+            // Should fail signature verification before pubkey check
+            expect(() => unwrapEvent(corruptedWrap, recipient.privateKeyHex)).toThrow(/Invalid seal signature/);
+        });
+
+        it("rejects gift wrap with wrong kind", () => {
+            const sender = generateKeypair();
+            const recipient = generateKeypair();
+
+            // Create a kind 1 event that's not a gift wrap
+            const fakeWrap = {
+                kind: 1,
+                content: "fake content",
+                tags: [],
+                created_at: 1000,
+                pubkey: sender.publicKeyHex,
+                id: "fake-id",
+                sig: "fake-sig",
+            } as Event;
+
+            expect(() => unwrapEvent(fakeWrap, recipient.privateKeyHex)).toThrow(/Expected kind 1059 gift wrap/);
+        });
+    });
+
     describe("End-to-end reservation flow", () => {
         it("simulates a full reservation request/response cycle", () => {
             // Alice (client) and Bob (restaurant)
