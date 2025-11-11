@@ -67,6 +67,21 @@ class Settings(BaseSettings):
         default=3, description="Relay query timeout in seconds"
     )
 
+    # External identity filter for NIP-39 tags
+    external_identity_filter: str | None = Field(
+        default=None,
+        alias="EXTERNAL_IDENTITY_FILTER",
+        description="Filter sellers by external identity in format 'platform:identity' (e.g., 'com.synvya.chamber:snovalley'). Empty string means no filtering.",
+    )
+
+    @field_validator("external_identity_filter", mode="before")
+    @classmethod
+    def parse_external_identity_filter(cls, v: str | None) -> str | None:
+        """Parse external identity filter, treating empty string as None."""
+        if v is None or v == "":
+            return None
+        return v
+
     @field_validator("nostr_relays", mode="before")
     @classmethod
     def parse_nostr_relays(cls, v: str | list[str]) -> list[str]:
