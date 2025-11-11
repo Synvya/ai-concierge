@@ -37,12 +37,17 @@ sellers_table = Table(
 )
 
 
-def _should_exclude_seller(seller: dict[str, Any], show_demo_only: bool | None = None) -> bool:
+def _should_exclude_seller(
+    seller: dict[str, Any],
+    show_demo_only: bool | None = None,
+    external_identity_filter: str | None = None,
+) -> bool:
     """Determine if a seller should be excluded from results.
     
     Args:
         seller: Seller data dictionary
         show_demo_only: If True, exclude non-demo profiles. If False/None, exclude demo profiles.
+        external_identity_filter: External identity filter in format 'platform:identity' or None
         
     Returns:
         True if seller should be excluded, False otherwise
@@ -77,10 +82,119 @@ def _should_exclude_seller(seller: dict[str, Any], show_demo_only: bool | None =
     # Demo mode filtering logic
     if show_demo_only is True:
         # In demo mode: exclude non-demo profiles
-        return not is_demo
-    else:
-        # Normal mode: exclude demo profiles
-        return is_demo
+        if not is_demo:
+            return True
+    # Normal mode: exclude demo profiles
+    elif is_demo:
+        return True
+    
+    # External identity filtering
+    if external_identity_filter and not _has_matching_external_identity(
+        seller, external_identity_filter
+    ):
+        return True
+    
+    return False
+
+
+def _check_external_identities_array(
+    external_identities: list[dict[str, Any]], platform: str, identity: str
+) -> bool:
+    """Check if any external identity in the array matches platform and identity."""
+    for ext_id in external_identities:
+        if isinstance(ext_id, dict):
+            ext_platform = ext_id.get("platform")
+            ext_identity = ext_id.get("identity")
+            if (
+                isinstance(ext_platform, str)
+                and isinstance(ext_identity, str)
+                and ext_platform == platform
+                and ext_identity == identity
+            ):
+                return True
+    return False
+
+
+def _has_matching_external_identity(seller: dict[str, Any], filter_value: str | None) -> bool:
+    """Check if a seller matches the external identity filter.
+    
+    Args:
+        seller: Seller data dictionary
+        filter_value: External identity filter in format 'platform:identity' or None
+        
+    Returns:
+        True if filter is None/empty (no filtering) or if seller matches the filter, False otherwise
+    """
+    # If no filter is set, don't filter (return True)
+    if not filter_value:
+        return True
+    
+    # Parse filter_value as platform:identity
+    parts = filter_value.split(":", 1)
+    if len(parts) != 2:
+        # Invalid format, don't filter (fail open)
+        return True
+    
+    platform, identity = parts[0].strip(), parts[1].strip()
+    if not platform or not identity:
+        # Invalid format, don't filter (fail open)
+        return True
+    
+    # Check flattened format first (faster lookup)
+    meta = seller.get("meta_data")
+    filters = seller.get("filters")
+    
+    flattened_key = f"external_identity_{platform}:{identity}"
+    has_match = False
+    
+    if (isinstance(meta, dict) and meta.get(flattened_key) is True) or (
+        isinstance(filters, dict) and filters.get(flattened_key) is True
+    ):
+        has_match = True
+    
+    # Check external_identities array in meta_data
+    if (
+        not has_match
+        and isinstance(meta, dict)
+        and isinstance(meta.get("external_identities"), list)
+        and _check_external_identities_array(meta["external_identities"], platform, identity)
+    ):
+        has_match = True
+    
+    # Check external_identities array in filters
+    if (
+        not has_match
+        and isinstance(filters, dict)
+        and isinstance(filters.get("external_identities"), list)
+        and _check_external_identities_array(filters["external_identities"], platform, identity)
+    ):
+        has_match = True
+    
+    # Check external_identities in content field (kind:0 JSON)
+    if not has_match:
+        content_raw = seller.get("content")
+        if content_raw:
+            content: dict[str, Any] | None = None
+            if isinstance(content_raw, dict):
+                content = content_raw
+            elif isinstance(content_raw, str):
+                try:
+                    parsed = json.loads(content_raw)
+                    if isinstance(parsed, dict):
+                        content = parsed
+                except json.JSONDecodeError:
+                    pass
+            
+            if (
+                isinstance(content, dict)
+                and isinstance(content.get("external_identities"), list)
+                and _check_external_identities_array(
+                    content["external_identities"], platform, identity
+                )
+            ):
+                has_match = True
+    
+    return has_match
 
 
 def _normalize_pubkeys(pubkeys: Iterable[str]) -> list[str]:
@@ -209,6 +323,7 @@ async def _fetch_sellers_by_public_keys(
     session: AsyncSession,
     public_keys: Sequence[str],
     show_demo_only: bool | None = None,
+    external_identity_filter: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     if not public_keys:
         return {}
@@ -235,7 +350,7 @@ async def _fetch_sellers_by_public_keys(
     seller_map: dict[str, dict[str, Any]] = {}
     for row in result.mappings():
         seller = dict(row)
-        if _should_exclude_seller(seller, show_demo_only):
+        if _should_exclude_seller(seller, show_demo_only, external_identity_filter):
             continue
         pubkeys = _extract_seller_pubkeys(seller)
         if not pubkeys:
@@ -257,6 +372,9 @@ async def search_sellers(
     user_location: str | None = None,
     show_demo_only: bool | None = None,
 ) -> list[dict[str, Any]]:
+    # Get external identity filter from settings
+    external_identity_filter = settings.external_identity_filter
+    
     distance_expr = sellers_table.c.embedding.cosine_distance(query_embedding).label(
         "vector_distance"
     )
@@ -283,7 +401,7 @@ async def search_sellers(
     seller_pubkey_map: dict[str, dict[str, Any]] = {}
     for row in rows:
         seller = dict(row)
-        if _should_exclude_seller(seller, show_demo_only):
+        if _should_exclude_seller(seller, show_demo_only, external_identity_filter):
             continue
         pubkeys = _extract_seller_pubkeys(seller)
         seller["normalized_pubkeys"] = pubkeys
@@ -323,7 +441,7 @@ async def search_sellers(
         listing_matches = normalized_matches
         if missing_pubkeys:
             extra_sellers = await _fetch_sellers_by_public_keys(
-                session, missing_pubkeys, show_demo_only
+                session, missing_pubkeys, show_demo_only, external_identity_filter
             )
             seen_sellers: set[int] = set()
             for seller in extra_sellers.values():
@@ -595,14 +713,17 @@ async def search_sellers(
 async def get_seller_by_id(
     session: AsyncSession, seller_id: str
 ) -> dict[str, Any] | None:
+    # Get external identity filter from settings
+    external_identity_filter = settings.external_identity_filter
+    
     stmt = select(sellers_table).where(sellers_table.c.id == seller_id)
     result = await session.execute(stmt)
     row = result.mappings().first()
     if row is None:
         return None
     seller = dict(row)
-    # Don't exclude sellers when explicitly fetched by ID
-    if _should_exclude_seller(seller, show_demo_only=None):
+    # Don't exclude sellers when explicitly fetched by ID, but still apply external identity filter
+    if _should_exclude_seller(seller, show_demo_only=None, external_identity_filter=external_identity_filter):
         return None
 
     # Extract pubkeys and npub
