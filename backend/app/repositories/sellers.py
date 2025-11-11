@@ -37,7 +37,16 @@ sellers_table = Table(
 )
 
 
-def _should_exclude_seller(seller: dict[str, Any]) -> bool:
+def _should_exclude_seller(seller: dict[str, Any], show_demo_only: bool | None = None) -> bool:
+    """Determine if a seller should be excluded from results.
+    
+    Args:
+        seller: Seller data dictionary
+        show_demo_only: If True, exclude non-demo profiles. If False/None, exclude demo profiles.
+        
+    Returns:
+        True if seller should be excluded, False otherwise
+    """
     def has_demo_flag(data: dict[str, Any] | None) -> bool:
         if not isinstance(data, dict):
             return False
@@ -62,7 +71,16 @@ def _should_exclude_seller(seller: dict[str, Any]) -> bool:
     if isinstance(filters, dict) and filters.get("type") == "classified_listing":
         return True
 
-    return has_demo_flag(meta) or has_demo_flag(filters)
+    # Check if seller has demo flag
+    is_demo = has_demo_flag(meta) or has_demo_flag(filters)
+    
+    # Demo mode filtering logic
+    if show_demo_only is True:
+        # In demo mode: exclude non-demo profiles
+        return not is_demo
+    else:
+        # Normal mode: exclude demo profiles
+        return is_demo
 
 
 def _normalize_pubkeys(pubkeys: Iterable[str]) -> list[str]:
@@ -190,6 +208,7 @@ def _enrich_meta_data_from_content(seller: dict[str, Any]) -> None:
 async def _fetch_sellers_by_public_keys(
     session: AsyncSession,
     public_keys: Sequence[str],
+    show_demo_only: bool | None = None,
 ) -> dict[str, dict[str, Any]]:
     if not public_keys:
         return {}
@@ -216,7 +235,7 @@ async def _fetch_sellers_by_public_keys(
     seller_map: dict[str, dict[str, Any]] = {}
     for row in result.mappings():
         seller = dict(row)
-        if _should_exclude_seller(seller):
+        if _should_exclude_seller(seller, show_demo_only):
             continue
         pubkeys = _extract_seller_pubkeys(seller)
         if not pubkeys:
@@ -236,6 +255,7 @@ async def search_sellers(
     query_text: str | None = None,
     user_coordinates: tuple[float, float] | None = None,
     user_location: str | None = None,
+    show_demo_only: bool | None = None,
 ) -> list[dict[str, Any]]:
     distance_expr = sellers_table.c.embedding.cosine_distance(query_embedding).label(
         "vector_distance"
@@ -263,7 +283,7 @@ async def search_sellers(
     seller_pubkey_map: dict[str, dict[str, Any]] = {}
     for row in rows:
         seller = dict(row)
-        if _should_exclude_seller(seller):
+        if _should_exclude_seller(seller, show_demo_only):
             continue
         pubkeys = _extract_seller_pubkeys(seller)
         seller["normalized_pubkeys"] = pubkeys
@@ -303,7 +323,7 @@ async def search_sellers(
         listing_matches = normalized_matches
         if missing_pubkeys:
             extra_sellers = await _fetch_sellers_by_public_keys(
-                session, missing_pubkeys
+                session, missing_pubkeys, show_demo_only
             )
             seen_sellers: set[int] = set()
             for seller in extra_sellers.values():
@@ -531,7 +551,8 @@ async def get_seller_by_id(
     if row is None:
         return None
     seller = dict(row)
-    if _should_exclude_seller(seller):
+    # Don't exclude sellers when explicitly fetched by ID
+    if _should_exclude_seller(seller, show_demo_only=None):
         return None
 
     # Extract pubkeys and npub
