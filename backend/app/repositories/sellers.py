@@ -323,6 +323,7 @@ async def _fetch_sellers_by_public_keys(
     session: AsyncSession,
     public_keys: Sequence[str],
     show_demo_only: bool | None = None,
+    external_identity_filter: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     if not public_keys:
         return {}
@@ -349,7 +350,7 @@ async def _fetch_sellers_by_public_keys(
     seller_map: dict[str, dict[str, Any]] = {}
     for row in result.mappings():
         seller = dict(row)
-        if _should_exclude_seller(seller, show_demo_only):
+        if _should_exclude_seller(seller, show_demo_only, external_identity_filter):
             continue
         pubkeys = _extract_seller_pubkeys(seller)
         if not pubkeys:
@@ -371,6 +372,9 @@ async def search_sellers(
     user_location: str | None = None,
     show_demo_only: bool | None = None,
 ) -> list[dict[str, Any]]:
+    # Get external identity filter from settings
+    external_identity_filter = settings.external_identity_filter
+    
     distance_expr = sellers_table.c.embedding.cosine_distance(query_embedding).label(
         "vector_distance"
     )
@@ -397,7 +401,7 @@ async def search_sellers(
     seller_pubkey_map: dict[str, dict[str, Any]] = {}
     for row in rows:
         seller = dict(row)
-        if _should_exclude_seller(seller, show_demo_only):
+        if _should_exclude_seller(seller, show_demo_only, external_identity_filter):
             continue
         pubkeys = _extract_seller_pubkeys(seller)
         seller["normalized_pubkeys"] = pubkeys
@@ -437,7 +441,7 @@ async def search_sellers(
         listing_matches = normalized_matches
         if missing_pubkeys:
             extra_sellers = await _fetch_sellers_by_public_keys(
-                session, missing_pubkeys, show_demo_only
+                session, missing_pubkeys, show_demo_only, external_identity_filter
             )
             seen_sellers: set[int] = set()
             for seller in extra_sellers.values():
@@ -709,14 +713,17 @@ async def search_sellers(
 async def get_seller_by_id(
     session: AsyncSession, seller_id: str
 ) -> dict[str, Any] | None:
+    # Get external identity filter from settings
+    external_identity_filter = settings.external_identity_filter
+    
     stmt = select(sellers_table).where(sellers_table.c.id == seller_id)
     result = await session.execute(stmt)
     row = result.mappings().first()
     if row is None:
         return None
     seller = dict(row)
-    # Don't exclude sellers when explicitly fetched by ID
-    if _should_exclude_seller(seller, show_demo_only=None):
+    # Don't exclude sellers when explicitly fetched by ID, but still apply external identity filter
+    if _should_exclude_seller(seller, show_demo_only=None, external_identity_filter=external_identity_filter):
         return None
 
     # Extract pubkeys and npub
