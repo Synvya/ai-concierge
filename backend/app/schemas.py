@@ -46,6 +46,10 @@ class ChatRequest(BaseModel):
         default=None,
         description="User's local date/time in ISO format with timezone to help with date parsing"
     )
+    show_demo_only: bool | None = Field(
+        default=None,
+        description="If True, show only demo profiles. If False/None, exclude demo profiles."
+    )
 
 
 class SearchRequest(BaseModel):
@@ -54,6 +58,10 @@ class SearchRequest(BaseModel):
     debug: bool = False
     user_location: str | None = None
     user_coordinates: GeoPoint | None = None
+    show_demo_only: bool | None = Field(
+        default=None,
+        description="If True, show only demo profiles. If False/None, exclude demo profiles."
+    )
 
 
 class ListingPrice(BaseModel):

@@ -104,6 +104,7 @@ export interface ChatRequestPayload {
   user_coordinates?: GeoPoint
   active_reservation_context?: ActiveReservationContext
   user_datetime?: string // User's local date/time in ISO format with timezone
+  show_demo_only?: boolean // If true, show only demo profiles. If false/null, exclude demo profiles
 }
 
 export interface ChatResponse {
@@ -129,6 +130,17 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+/**
+ * Check if demo mode is enabled via URL parameter ?env=demo
+ * @returns true if demo mode is enabled, undefined otherwise
+ */
+export const isDemoMode = (): boolean | undefined => {
+  if (typeof window === 'undefined') return undefined
+  const params = new URLSearchParams(window.location.search)
+  const env = params.get('env')
+  return env === 'demo' ? true : undefined
+}
 
 type CachedLocation = { label?: string; coords?: GeoPoint }
 
@@ -163,6 +175,18 @@ export const chat = async (payload: ChatRequestPayload) => {
       }
     }
   }
+  
+  // Add show_demo_only if not explicitly set and demo mode is active
+  if (finalPayload.show_demo_only === undefined) {
+    const demoMode = isDemoMode()
+    if (demoMode !== undefined) {
+      finalPayload = {
+        ...finalPayload,
+        show_demo_only: demoMode,
+      }
+    }
+  }
+  
   const { data } = await api.post<ChatResponse>('/chat', finalPayload)
   return data
 }
@@ -173,6 +197,7 @@ export interface SearchRequestPayload {
   debug?: boolean
   user_location?: string
   user_coordinates?: GeoPoint
+  show_demo_only?: boolean // If true, show only demo profiles. If false/null, exclude demo profiles
 }
 
 export interface SearchResponsePayload {
@@ -196,6 +221,18 @@ export const search = async (payload: SearchRequestPayload) => {
       }
     }
   }
+  
+  // Add show_demo_only if not explicitly set and demo mode is active
+  if (finalPayload.show_demo_only === undefined) {
+    const demoMode = isDemoMode()
+    if (demoMode !== undefined) {
+      finalPayload = {
+        ...finalPayload,
+        show_demo_only: demoMode,
+      }
+    }
+  }
+  
   const { data } = await api.post<SearchResponsePayload>('/search', finalPayload)
   return data
 }

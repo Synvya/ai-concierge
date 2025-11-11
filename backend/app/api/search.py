@@ -32,6 +32,7 @@ async def search(
         query_text=payload.query,
         user_coordinates=coordinates_tuple,
         user_location=user_location,
+        show_demo_only=payload.show_demo_only,
     )
     results = [SellerResult(**seller) for seller in sellers]
 
