@@ -132,19 +132,28 @@ def _build_context(results: list[SellerResult]) -> str:
         address_str = seller_address or "Unknown"
         map_str = f"\n   Map: {seller_map}" if seller_map else ""
 
+        # Public key (npub) - always include if available
+        npub_str = getattr(result, "npub", None)
+        public_key_str = ""
+        if npub_str:
+            public_key_str = f"\n   Public Key (npub): {npub_str}"
+            # Also include raw public keys if available
+            normalized_pubkeys = getattr(result, "normalized_pubkeys", [])
+            if normalized_pubkeys and len(normalized_pubkeys) > 0:
+                public_key_str += f"\n   Public Keys (hex): {', '.join(normalized_pubkeys)}"
+
         # Reservation support info
         reservation_str = ""
         if hasattr(result, "supports_reservations") and result.supports_reservations:
             restaurant_id = getattr(result, "id", "Unknown")
-            npub_str = getattr(result, "npub", "")
-            reservation_str = f"\n   Supports Reservations: Yes (ID: {restaurant_id}, npub: {npub_str})"
+            reservation_str = f"\n   Supports Reservations: Yes (ID: {restaurant_id})"
 
         lines.append(
             f"{idx}. {result.name or 'Unknown'} (score: {result.score:.3f})\n"
             f"   Summary: {result.content or 'No description provided.'}\n"
             f"   Address: {address_str}\n"
             f"   Coordinates: {coords_str}\n"
-            f"   Distance: {distance_str}{map_str}{reservation_str}\n"
+            f"   Distance: {distance_str}{map_str}{public_key_str}{reservation_str}\n"
             f"   City: {location_city or 'Unknown'}\n"
             f"   Tags: {tags}"
             f"{warnings_block}"

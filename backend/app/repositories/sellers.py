@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
 from ..services.nostr_relay import get_relay_pool
-from ..utils.geolocation import build_maps_url, haversine_km
+from ..utils.geolocation import build_maps_url, decode_geohash, haversine_km
 from .listings import (
     _npub_to_hex,
     filter_and_rank_listings,
@@ -438,6 +438,8 @@ async def search_sellers(
             user_lat, user_lon = user_coordinates
             min_geo_distance: float | None = None
             min_coords: tuple[float, float] | None = None
+            
+            # First, try to get coordinates from listings
             for listing in trimmed_listings:
                 lat = listing.get("latitude")
                 lon = listing.get("longitude")
@@ -450,12 +452,60 @@ async def search_sellers(
                     if min_geo_distance is None or d_km < min_geo_distance:
                         min_geo_distance = d_km
                         min_coords = (float(lat), float(lon))
-
-            if min_geo_distance is not None:
-                seller["geo_distance_km"] = min_geo_distance
+            
+            # If no coordinates from listings, try seller's profile data (meta_data)
+            if min_coords is None:
+                meta = seller.get("meta_data") or {}
+                content_raw = seller.get("content")
+                filters = seller.get("filters") or {}
+                
+                # Parse content if it's a JSON string
+                content_dict: dict[str, Any] | None = None
+                if isinstance(content_raw, dict):
+                    content_dict = content_raw
+                elif isinstance(content_raw, str):
+                    try:
+                        parsed = json.loads(content_raw)
+                        if isinstance(parsed, dict):
+                            content_dict = parsed
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                
+                # Try direct coordinates from meta_data first, then content
+                seller_lat = meta.get("latitude")
+                seller_lon = meta.get("longitude")
+                
+                if not isinstance(seller_lat, (int, float)) and content_dict:
+                    seller_lat = content_dict.get("latitude")
+                    seller_lon = content_dict.get("longitude")
+                
+                if isinstance(seller_lat, (int, float)) and isinstance(seller_lon, (int, float)):
+                    min_coords = (float(seller_lat), float(seller_lon))
+                else:
+                    # Try geohash from meta_data, content, or filters
+                    geohash = meta.get("geohash")
+                    if not isinstance(geohash, str) and content_dict:
+                        geohash = content_dict.get("geohash")
+                    if not isinstance(geohash, str):
+                        geohash = filters.get("geohash")
+                    
+                    if isinstance(geohash, str):
+                        decoded = decode_geohash(geohash)
+                        if decoded:
+                            min_coords = (float(decoded[0]), float(decoded[1]))
+                            # Store geohash in seller for reference
+                            seller["geohash"] = geohash
+                
+                # Calculate distance if we found coordinates
                 if min_coords is not None:
-                    seller["latitude"], seller["longitude"] = min_coords
-                    seller["maps_url"] = build_maps_url(min_coords[0], min_coords[1])
+                    min_geo_distance = haversine_km(
+                        min_coords[0], min_coords[1], float(user_lat), float(user_lon)
+                    )
+
+            if min_geo_distance is not None and min_coords is not None:
+                seller["geo_distance_km"] = min_geo_distance
+                seller["latitude"], seller["longitude"] = min_coords
+                seller["maps_url"] = build_maps_url(min_coords[0], min_coords[1])
 
         seller["listings"] = trimmed_listings
         if seller.get("vector_distance") is None and best_listing_score > 0:
