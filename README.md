@@ -105,6 +105,7 @@ npm run dev
 | `NIP89_CACHE_TTL` | NIP-89 handler discovery cache TTL in seconds (default: 300) |
 | `NOSTR_CONNECTION_TIMEOUT` | WebSocket connection timeout in seconds (default: 5) |
 | `NOSTR_QUERY_TIMEOUT` | Relay query timeout in seconds (default: 3) |
+| `EXTERNAL_IDENTITY_FILTER` | Filter sellers by NIP-39 external identity in format `platform:identity` (e.g., `com.synvya.chamber:snovalley`). Empty string means no filtering. Filtering is based on external identity tags stored in the database. |
 
 ### Frontend Environment Variables
 | Variable | Description | Default |
