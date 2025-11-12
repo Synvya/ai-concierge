@@ -1302,9 +1302,9 @@ export const ChatPanel = () => {
           gap={4}
         >
           <Box>
-            <Heading size="xl">Shop Snoqualmie Valley</Heading>
+            <Heading size="xl">Snoqualmie Valley Restaurant Concierge</Heading>
             <Text color="gray.500" maxW="2xl">
-              Let our AI concierge surface businesses, products, and experiences tailored to you.
+              Let our concierge find your next restaurant.
             </Text>
           </Box>
           <Button variant="outline" onClick={startNewSession} alignSelf="flex-start">
