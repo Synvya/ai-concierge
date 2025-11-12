@@ -1313,12 +1313,12 @@ export const ChatPanel = () => {
         </Flex>
         <Stack direction={{ base: 'column', md: 'row' }} spacing={4}>
           <SuggestedQuery
-            label="Where should I grab coffee and breakfast in downtown Snoqualmie this weekend?"
+            label="Show me restaurants with outdoor seating in North Bend"
             onClick={handleSuggestedQuery}
           />
           <SuggestedQuery label="Find me a family friendly Italian restaurant" onClick={handleSuggestedQuery} />
           <SuggestedQuery
-            label="Are there any local wine rooms in Snoqualmie Valley for a casual night out?"
+            label="Find a romantic dinner spot for a date night this Saturday"
             onClick={handleSuggestedQuery}
           />
         </Stack>
